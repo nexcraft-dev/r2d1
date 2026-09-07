@@ -56,6 +56,25 @@ Queries are intentionally limited to fields that have been explicitly indexed.
 
 ## Design Philosophy
 
+### Technology-neutral storage SPI
+
+The core module separates authoritative document bytes from the derived index without exposing
+vendor-specific concepts:
+
+```text
+DocumentStore (authoritative serialized documents)
+        ↑ DocumentKey(collection, id)
+IndexStore    (derived fields and queryable document identities)
+```
+
+Physical document locations are derived by adapters from `DocumentKey`; index entries do not keep
+a competing storage reference. Index queries return document keys for later authoritative reads.
+The two stores do not promise a shared atomic transaction, so future orchestration must tolerate
+temporary inconsistency and allow the index to be rebuilt.
+
+These contracts are available in `dev.nexcraft.r2d1.spi`. Cloudflare connectivity and the
+application-to-SPI translation layer are not implemented yet.
+
 ### R2 owns the document
 
 The complete document is stored in Cloudflare R2.

@@ -236,11 +236,11 @@ public final class Query<T> {
     /** Creates a validated request with defensive copies. */
     public Request {
       filters = List.copyOf(Objects.requireNonNull(filters, "filters"));
-      sort = Objects.requireNonNull(sort, "sort");
+      Objects.requireNonNull(sort, "sort");
       if (limit <= 0) {
         throw new IllegalArgumentException("limit must be greater than zero");
       }
-      cursor = Objects.requireNonNull(cursor, "cursor");
+      Objects.requireNonNull(cursor, "cursor");
       cursor.ifPresent(value -> requireText(value, "cursor"));
     }
 
@@ -256,8 +256,8 @@ public final class Query<T> {
       /** Creates a validated filter. */
       public Filter {
         indexedField = requireText(indexedField, "indexedField");
-        operator = Objects.requireNonNull(operator, "operator");
-        value = Objects.requireNonNull(value, "value");
+        Objects.requireNonNull(operator, "operator");
+        Objects.requireNonNull(value, "value");
       }
     }
 
@@ -272,7 +272,7 @@ public final class Query<T> {
       /** Creates a validated sort. */
       public Sort {
         indexedField = requireText(indexedField, "indexedField");
-        direction = Objects.requireNonNull(direction, "direction");
+        Objects.requireNonNull(direction, "direction");
       }
     }
 
