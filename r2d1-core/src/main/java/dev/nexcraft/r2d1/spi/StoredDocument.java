@@ -2,6 +2,7 @@ package dev.nexcraft.r2d1.spi;
 
 import java.util.Arrays;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /** Immutable serialized document content owned by the authoritative document store. */
 public final class StoredDocument {
@@ -28,7 +29,7 @@ public final class StoredDocument {
   }
 
   @Override
-  public boolean equals(Object other) {
+  public boolean equals(@Nullable Object other) {
     return this == other
         || (other instanceof StoredDocument that && Arrays.equals(content, that.content));
   }
