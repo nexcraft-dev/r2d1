@@ -1,12 +1,13 @@
 package dev.nexcraft.r2d1.spi;
 
 /**
- * Unchecked boundary for storage implementation failures.
+ * Unchecked exceptional-completion boundary for storage implementation failures.
  *
  * <p>This exception intentionally carries no retry semantics and prevents implementation-specific
- * exceptions from becoming part of the core SPI.
+ * exceptions from becoming part of the core SPI. Asynchronous storage operations complete
+ * exceptionally with this type rather than throwing it synchronously for operational failures.
  */
-public final class StorageException extends RuntimeException {
+public class StorageException extends RuntimeException {
 
   /**
    * Creates a storage failure with a detail message.

@@ -59,12 +59,21 @@ Queries are intentionally limited to fields that have been explicitly indexed.
 ### Technology-neutral storage SPI
 
 The core module separates authoritative document bytes from the derived index without exposing
-vendor-specific concepts:
+vendor-specific concepts. The user-facing API remains synchronous while storage I/O is modeled as
+an asynchronous contract:
 
 ```text
-DocumentStore (authoritative serialized documents)
-        ↑ DocumentKey(collection, id)
-IndexStore    (derived fields and queryable document identities)
+R2D1Collection / Query        synchronous public API
+              │
+              ▼
+Future sync façade            the only blocking boundary
+              │
+              ▼
+Future async orchestration    CompletionStage composition
+              │
+       ┌──────┴──────┐
+       ▼             ▼
+DocumentStore     IndexStore  asynchronous storage SPI
 ```
 
 Physical document locations are derived by adapters from `DocumentKey`; index entries do not keep
@@ -72,8 +81,12 @@ a competing storage reference. Index queries return document keys for later auth
 The two stores do not promise a shared atomic transaction, so future orchestration must tolerate
 temporary inconsistency and allow the index to be rebuilt.
 
-These contracts are available in `dev.nexcraft.r2d1.spi`. Cloudflare connectivity and the
-application-to-SPI translation layer are not implemented yet.
+These contracts are available in `dev.nexcraft.r2d1.spi` and expose `CompletionStage`, leaving
+`CompletableFuture` as an implementation detail. The SPI owns no executor or virtual thread and
+makes no callback-thread, cancellation, or timeout guarantee. The future R2 adapter is expected to
+use `S3AsyncClient`, while the future D1 adapter is expected to use an asynchronous HTTP client.
+Cloudflare connectivity, application-to-SPI translation, orchestration, and the sync façade are not
+implemented yet.
 
 ### R2 owns the document
 
