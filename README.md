@@ -83,10 +83,33 @@ temporary inconsistency and allow the index to be rebuilt.
 
 These contracts are available in `dev.nexcraft.r2d1.spi` and expose `CompletionStage`, leaving
 `CompletableFuture` as an implementation detail. The SPI owns no executor or virtual thread and
-makes no callback-thread, cancellation, or timeout guarantee. The future R2 adapter is expected to
-use `S3AsyncClient`, while the future D1 adapter is expected to use an asynchronous HTTP client.
-Cloudflare connectivity, application-to-SPI translation, orchestration, and the sync façade are not
-implemented yet.
+makes no callback-thread, cancellation, or timeout guarantee. The R2 module implements the
+authoritative `DocumentStore` with the AWS SDK v2 `S3AsyncClient` and its Netty transport:
+
+```text
+Synchronous public API
+        │
+        ▼
+Future sync façade
+        │
+        ▼
+Future async orchestration
+        │
+        ▼
+DocumentStore
+        │
+        ▼
+R2DocumentStore
+        │
+        ▼
+S3AsyncClient / Netty
+        │
+        ▼
+Cloudflare R2
+```
+
+The D1 adapter, application-to-SPI translation, orchestration, and sync façade are not implemented
+yet. No cross-store atomic transaction is implied by the R2 adapter.
 
 ### R2 owns the document
 
@@ -135,8 +158,9 @@ R2D1 will not download large numbers of R2 objects and perform filtering in appl
 
 ## Core Java API
 
-The core module defines the framework-independent contracts shown below. Storage adapters provide
-the collection factory; Cloudflare D1 and R2 implementations are not included yet.
+The core module defines the framework-independent contracts shown below. The R2 document adapter is
+available, but the collection factory, orchestration, serialization, and Cloudflare D1 adapter are
+not included yet.
 
 ```java
 R2D1 db = R2D1.builder()
@@ -199,10 +223,13 @@ r2d1-d1
     Cloudflare D1 integration
 
 r2d1-r2
-    Cloudflare R2 integration
+    Cloudflare R2 DocumentStore adapter using AWS SDK v2
 ```
 
 Framework-specific integrations will remain separate from the core library.
+
+Public Java packages use JSpecify `@NullMarked` semantics. Nullable API positions, such as a final
+page's absent `nextCursor`, are declared explicitly with `@Nullable`.
 
 Future modules may include:
 
@@ -217,9 +244,9 @@ The core API will not depend on Spring.
 
 🚧 **R2D1 is currently in the early design and development stage.**
 
-The first core API contracts are available but remain unstable. Storage integrations, the
-consistency model, and module internals are still being developed and may change significantly
-before the first release.
+The first core API contracts and the R2 document adapter are available but remain unstable. The D1
+integration, consistency model, orchestration, and module internals are still being developed and
+may change significantly before the first release.
 
 ## Requirements
 

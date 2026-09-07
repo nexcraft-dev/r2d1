@@ -2,6 +2,7 @@ package dev.nexcraft.r2d1;
 
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One immutable page of query results.
@@ -10,7 +11,7 @@ import java.util.Objects;
  * @param nextCursor opaque cursor for the next page, or {@code null} when this is the final page
  * @param <T> document type
  */
-public record Page<T>(List<T> items, String nextCursor) {
+public record Page<T>(List<T> items, @Nullable String nextCursor) {
 
   /** Creates a page and defensively copies its items. */
   public Page {

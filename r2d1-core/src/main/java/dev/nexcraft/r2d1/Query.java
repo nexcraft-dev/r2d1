@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Immutable builder for a restricted indexed query.
@@ -19,16 +20,16 @@ public final class Query<T> {
 
   private final Executor<T> executor;
   private final List<Request.Filter> filters;
-  private final Request.Sort sort;
-  private final Integer limit;
-  private final String cursor;
+  private final Request.@Nullable Sort sort;
+  private final @Nullable Integer limit;
+  private final @Nullable String cursor;
 
   private Query(
       Executor<T> executor,
       List<Request.Filter> filters,
-      Request.Sort sort,
-      Integer limit,
-      String cursor) {
+      Request.@Nullable Sort sort,
+      @Nullable Integer limit,
+      @Nullable String cursor) {
     this.executor = executor;
     this.filters = filters;
     this.sort = sort;
@@ -137,7 +138,10 @@ public final class Query<T> {
   }
 
   private Query<T> copy(
-      List<Request.Filter> filters, Request.Sort sort, Integer limit, String cursor) {
+      List<Request.Filter> filters,
+      Request.@Nullable Sort sort,
+      @Nullable Integer limit,
+      @Nullable String cursor) {
     return new Query<>(executor, filters, sort, limit, cursor);
   }
 
@@ -278,11 +282,22 @@ public final class Query<T> {
 
     /** Comparison operators representable by the public query API. */
     public enum ComparisonOperator {
+      /** Matches values that are equal to the comparison value. */
       EQUAL,
+
+      /** Matches values that are not equal to the comparison value. */
       NOT_EQUAL,
+
+      /** Matches values greater than the comparison value. */
       GREATER_THAN,
+
+      /** Matches values greater than or equal to the comparison value. */
       GREATER_THAN_OR_EQUAL,
+
+      /** Matches values less than the comparison value. */
       LESS_THAN,
+
+      /** Matches values less than or equal to the comparison value. */
       LESS_THAN_OR_EQUAL
     }
   }

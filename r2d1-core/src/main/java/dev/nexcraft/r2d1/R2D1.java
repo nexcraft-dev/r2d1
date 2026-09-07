@@ -1,6 +1,7 @@
 package dev.nexcraft.r2d1;
 
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /** Framework-independent entry point for working with R2D1 document collections. */
 public final class R2D1 {
@@ -39,7 +40,7 @@ public final class R2D1 {
   /** Builds framework-independent R2D1 clients from adapter-provided collection factories. */
   public static final class Builder {
 
-    private CollectionFactory collectionFactory;
+    private @Nullable CollectionFactory collectionFactory;
 
     private Builder() {}
 
