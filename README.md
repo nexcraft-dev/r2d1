@@ -101,14 +101,14 @@ is valid only when the queried and sorted fields have been configured appropriat
 
 R2D1 will not download large numbers of R2 objects and perform filtering in application memory.
 
-## Planned Java API
+## Core Java API
 
-The following illustrates the direction of the API. It is not yet considered stable.
+The core module defines the framework-independent contracts shown below. Storage adapters provide
+the collection factory; Cloudflare D1 and R2 implementations are not included yet.
 
 ```java
 R2D1 db = R2D1.builder()
-    .d1(d1Config)
-    .r2(r2Config)
+    .collectionFactory(collectionFactory)
     .build();
 
 R2D1Collection<User> users = db.collection(User.class);
@@ -150,6 +150,11 @@ public class User {
 
 Only indexed fields participate in filtering and sorting.
 
+Filters are combined with logical AND and support only equality, inequality, and ordered
+comparisons. A query requires a positive result limit and may contain one indexed-field sort and
+one opaque continuation cursor. The storage adapter is responsible for validating field metadata
+before executing a query.
+
 ## Modules
 
 R2D1 is organized as a modular project.
@@ -180,7 +185,9 @@ The core API will not depend on Spring.
 
 🚧 **R2D1 is currently in the early design and development stage.**
 
-The public API, storage model, consistency model, and module internals are still being defined and may change significantly before the first release.
+The first core API contracts are available but remain unstable. Storage integrations, the
+consistency model, and module internals are still being developed and may change significantly
+before the first release.
 
 ## Requirements
 
