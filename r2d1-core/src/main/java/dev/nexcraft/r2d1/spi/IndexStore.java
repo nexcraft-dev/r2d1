@@ -22,6 +22,20 @@ import org.jspecify.annotations.Nullable;
 public interface IndexStore {
 
   /**
+   * Asynchronously removes every derived index row for one collection.
+   *
+   * <p>This operation preserves the collection table, columns, and indexes. It exists only to
+   * replace rebuildable index contents from authoritative documents.
+   *
+   * @param collection non-blank collection name
+   * @return a non-null stage that completes with {@code null}, or exceptionally with {@link
+   *     StorageException} if the storage implementation cannot complete the operation
+   * @throws NullPointerException if {@code collection} is {@code null}
+   * @throws IllegalArgumentException if {@code collection} is blank
+   */
+  CompletionStage<@Nullable Void> clear(String collection);
+
+  /**
    * Asynchronously creates or replaces the derived index entry for a document.
    *
    * @param entry derived indexed fields

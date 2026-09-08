@@ -8,8 +8,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dev.nexcraft.r2d1.annotation.Document;
 import dev.nexcraft.r2d1.annotation.Id;
 import dev.nexcraft.r2d1.annotation.Index;
+import dev.nexcraft.r2d1.spi.DocumentCursor;
 import dev.nexcraft.r2d1.spi.DocumentKey;
 import dev.nexcraft.r2d1.spi.DocumentNotFoundException;
+import dev.nexcraft.r2d1.spi.DocumentPage;
 import dev.nexcraft.r2d1.spi.DocumentStore;
 import dev.nexcraft.r2d1.spi.IndexCursor;
 import dev.nexcraft.r2d1.spi.IndexEntry;
@@ -441,6 +443,19 @@ class PersistenceCollectionFactoryTest {
     }
 
     @Override
+    public CompletionStage<DocumentPage> list(
+        String collection, @Nullable DocumentCursor cursor, int limit) {
+      events.add("document.list");
+      return CompletableFuture.completedFuture(
+          new DocumentPage(
+              stored.keySet().stream()
+                  .filter(key -> key.collection().equals(collection))
+                  .limit(limit)
+                  .toList(),
+              Optional.empty()));
+    }
+
+    @Override
     public CompletionStage<@Nullable Void> put(DocumentKey key, StoredDocument document) {
       events.add("document.put");
       putCalls++;
@@ -500,6 +515,12 @@ class PersistenceCollectionFactoryTest {
 
     private FakeIndexStore(List<String> events) {
       this.events = events;
+    }
+
+    @Override
+    public CompletionStage<@Nullable Void> clear(String collection) {
+      events.add("index.clear");
+      return completedVoid();
     }
 
     @Override

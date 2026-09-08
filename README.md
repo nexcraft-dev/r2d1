@@ -187,6 +187,9 @@ Page<User> page = users.query()
     .fetch();
 
 users.delete("user-123");
+
+// Run explicitly during a maintenance window when the D1 projection must be recovered.
+users.rebuildIndex();
 ```
 
 Document metadata may be declared using annotations:
@@ -220,6 +223,28 @@ Filters are combined with logical AND and support only equality, inequality, and
 comparisons. A query requires a positive result limit and may contain one indexed-field sort and
 one opaque continuation cursor. The storage adapter is responsible for validating field metadata
 before executing a query.
+
+## Consistency Recovery
+
+R2 is the authoritative document store. D1 is a disposable materialized index that may become
+temporarily inconsistent when an R2 write or delete succeeds and the following D1 operation fails.
+R2D1 exposes an explicit collection-level recovery operation for this case:
+
+```java
+R2D1Collection<User> users = db.collection(User.class);
+users.rebuildIndex();
+```
+
+The rebuild lists R2 document keys in bounded pages, loads each authoritative document, derives its
+index entry through the normal metadata path, clears only the collection's D1 rows, and writes the
+replacement rows. D1 tables, columns, and SQLite indexes are preserved. Missing D1 rows are restored
+and stale D1 rows are removed, including when the authoritative collection is empty.
+
+Rebuilds are synchronous at the public API and asynchronously composed internally. They are
+idempotent for an unchanged R2 collection but are not atomic across R2 and D1. A failure after the D1
+rows are cleared can leave the index incomplete; resolve the failure and run `rebuildIndex()` again.
+Run this maintenance operation while application writes to the collection are paused. R2D1 does not
+add background reconciliation, automatic retries, distributed locks, queues, or Workers.
 
 ## Modules
 

@@ -23,6 +23,24 @@ import org.jspecify.annotations.Nullable;
 public interface DocumentStore {
 
   /**
+   * Asynchronously lists one bounded page of authoritative document identities for a collection.
+   *
+   * <p>The first page is requested with a {@code null} cursor. A returned cursor is opaque and is
+   * valid only when passed unchanged to the same store while continuing the same collection
+   * listing. Implementations must not return keys from another collection.
+   *
+   * @param collection non-blank collection name
+   * @param cursor opaque cursor returned by the preceding page, or {@code null} for the first page
+   * @param limit positive maximum number of document identities to return
+   * @return a non-null stage that completes with a bounded page, or exceptionally with {@link
+   *     StorageException} if the storage implementation cannot complete the operation
+   * @throws NullPointerException if {@code collection} is {@code null}
+   * @throws IllegalArgumentException if {@code collection} is blank or {@code limit} is not
+   *     positive
+   */
+  CompletionStage<DocumentPage> list(String collection, @Nullable DocumentCursor cursor, int limit);
+
+  /**
    * Asynchronously creates or replaces the document identified by {@code key}.
    *
    * @param key document identity

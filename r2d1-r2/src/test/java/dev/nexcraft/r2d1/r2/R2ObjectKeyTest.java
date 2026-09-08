@@ -1,6 +1,7 @@
 package dev.nexcraft.r2d1.r2;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import dev.nexcraft.r2d1.spi.DocumentKey;
@@ -30,6 +31,29 @@ class R2ObjectKeyTest {
     assertThat(collectionContainsSlash).isEqualTo("a%2Fb/c");
     assertThat(idContainsSlash).isEqualTo("a/b%2Fc");
     assertThat(collectionContainsSlash).isNotEqualTo(idContainsSlash);
+  }
+
+  @Test
+  void createsAnExactPrefixAndRoundTripsCanonicalObjectKeys() {
+    DocumentKey key = new DocumentKey("a/b", "café / %");
+
+    String objectKey = R2ObjectKey.from(key);
+
+    assertThat(R2ObjectKey.collectionPrefix("a/b")).isEqualTo("a%2Fb/");
+    assertThat(R2ObjectKey.toDocumentKey("a/b", objectKey)).isEqualTo(key);
+  }
+
+  @Test
+  void rejectsForeignNestedAndNonCanonicalObjectKeys() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> R2ObjectKey.toDocumentKey("users", "users_archive/user-1"))
+        .withMessage("object key is outside the requested collection");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> R2ObjectKey.toDocumentKey("users", "users/nested/user-1"))
+        .withMessage("object key does not contain one encoded document id");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> R2ObjectKey.toDocumentKey("users", "users/%75ser-1"))
+        .withMessage("object key does not use canonical segment encoding");
   }
 
   @Test

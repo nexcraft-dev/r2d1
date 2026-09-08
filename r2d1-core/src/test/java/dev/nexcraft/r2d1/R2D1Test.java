@@ -101,6 +101,11 @@ class R2D1Test {
     }
 
     @Override
+    public void rebuildIndex() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
     public Query<T> query() {
       throw new UnsupportedOperationException();
     }
