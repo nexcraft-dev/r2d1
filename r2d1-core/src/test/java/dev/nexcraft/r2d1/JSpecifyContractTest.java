@@ -33,4 +33,14 @@ class JSpecifyContractTest {
 
     assertThat(equals.getAnnotatedParameterTypes()[0].isAnnotationPresent(Nullable.class)).isTrue();
   }
+
+  @Test
+  void keepsPersistenceContractsInTheNullMarkedCorePackage() {
+    assertThat(DocumentCodec.class.getPackage().isAnnotationPresent(NullMarked.class)).isTrue();
+    assertThat(
+            PersistenceCollectionFactory.class.getPackage().isAnnotationPresent(NullMarked.class))
+        .isTrue();
+    assertThat(PersistenceException.class.getPackage().isAnnotationPresent(NullMarked.class))
+        .isTrue();
+  }
 }
