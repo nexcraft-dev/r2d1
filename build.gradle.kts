@@ -51,11 +51,14 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
+    }
+
+    tasks.named<Test>("test") {
         finalizedBy(tasks.named("jacocoTestReport"))
     }
 
-    tasks.withType<JacocoReport>().configureEach {
-        dependsOn(tasks.withType<Test>())
+    tasks.named<JacocoReport>("jacocoTestReport") {
+        dependsOn(tasks.named("test"))
         reports {
             xml.required = true
             html.required = true
