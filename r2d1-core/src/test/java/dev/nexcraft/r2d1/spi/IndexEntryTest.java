@@ -56,6 +56,7 @@ class IndexEntryTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsNullComponents() {
     assertThatNullPointerException()
         .isThrownBy(() -> new IndexEntry(null, Map.of()))

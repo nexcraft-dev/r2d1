@@ -12,6 +12,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
@@ -69,25 +70,23 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
   }
 
   @Override
-  public CompletionStage<Void> put(DocumentKey key, StoredDocument document) {
+  public CompletionStage<@Nullable Void> put(DocumentKey key, StoredDocument document) {
     Objects.requireNonNull(key, "key");
     Objects.requireNonNull(document, "document");
-    return execute(
+    return executeVoid(
         key,
         Operation.PUT,
         () -> {
           PutObjectRequest request =
               PutObjectRequest.builder().bucket(bucketName).key(R2ObjectKey.from(key)).build();
-          return client
-              .putObject(request, AsyncRequestBody.fromBytes(document.content()))
-              .thenApply(response -> (Void) null);
+          return client.putObject(request, AsyncRequestBody.fromBytes(document.content()));
         });
   }
 
   @Override
   public CompletionStage<StoredDocument> get(DocumentKey key) {
     Objects.requireNonNull(key, "key");
-    return execute(
+    return executeValue(
         key,
         Operation.GET,
         () -> {
@@ -100,15 +99,15 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
   }
 
   @Override
-  public CompletionStage<Void> delete(DocumentKey key) {
+  public CompletionStage<@Nullable Void> delete(DocumentKey key) {
     Objects.requireNonNull(key, "key");
-    return execute(
+    return executeVoid(
         key,
         Operation.DELETE,
         () -> {
           DeleteObjectRequest request =
               DeleteObjectRequest.builder().bucket(bucketName).key(R2ObjectKey.from(key)).build();
-          return client.deleteObject(request).thenApply(response -> (Void) null);
+          return client.deleteObject(request);
         });
   }
 
@@ -119,7 +118,7 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
     }
   }
 
-  private <T> CompletionStage<T> execute(
+  private <T> CompletionStage<T> executeValue(
       DocumentKey key, Operation operation, Supplier<CompletionStage<T>> invocation) {
     try {
       CompletionStage<T> stage =
@@ -130,30 +129,42 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
             if (failure == null) {
               result.complete(value);
             } else {
-              completeFailure(result, key, operation, unwrap(failure));
+              result.completeExceptionally(storageFailure(key, operation, unwrap(failure)));
             }
           });
       return result;
     } catch (RuntimeException failure) {
-      return recoverOrFail(key, operation, unwrap(failure));
+      return CompletableFuture.failedFuture(storageFailure(key, operation, unwrap(failure)));
     }
   }
 
-  private static <T> void completeFailure(
-      CompletableFuture<T> result, DocumentKey key, Operation operation, Throwable cause) {
-    if (operation == Operation.DELETE && isNotFound(cause)) {
-      result.complete(null);
-    } else {
-      result.completeExceptionally(storageFailure(key, operation, cause));
+  private CompletionStage<@Nullable Void> executeVoid(
+      DocumentKey key, Operation operation, Supplier<? extends CompletionStage<?>> invocation) {
+    try {
+      CompletionStage<?> stage =
+          Objects.requireNonNull(invocation.get(), "AWS SDK returned a null stage");
+      CompletableFuture<@Nullable Void> result = new CompletableFuture<>();
+      stage.whenComplete(
+          (ignored, failure) -> {
+            if (failure == null) {
+              result.complete(null);
+              return;
+            }
+            Throwable cause = unwrap(failure);
+            if (operation == Operation.DELETE && isNotFound(cause)) {
+              result.complete(null);
+            } else {
+              result.completeExceptionally(storageFailure(key, operation, cause));
+            }
+          });
+      return result;
+    } catch (RuntimeException failure) {
+      Throwable cause = unwrap(failure);
+      if (operation == Operation.DELETE && isNotFound(cause)) {
+        return CompletableFuture.<@Nullable Void>completedFuture(null);
+      }
+      return CompletableFuture.failedFuture(storageFailure(key, operation, cause));
     }
-  }
-
-  private <T> CompletionStage<T> recoverOrFail(
-      DocumentKey key, Operation operation, Throwable cause) {
-    if (operation == Operation.DELETE && isNotFound(cause)) {
-      return CompletableFuture.completedFuture(null);
-    }
-    return CompletableFuture.failedFuture(storageFailure(key, operation, cause));
   }
 
   private static StorageException storageFailure(

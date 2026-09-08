@@ -15,6 +15,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -34,7 +35,8 @@ class R2DocumentStoreTest {
     RecordingS3AsyncClient recordingClient = new RecordingS3AsyncClient();
     R2DocumentStore store = new R2DocumentStore(recordingClient.client(), BUCKET);
 
-    CompletionStage<Void> result = store.put(KEY, new StoredDocument(new byte[] {1, 2, 3}));
+    CompletionStage<@Nullable Void> result =
+        store.put(KEY, new StoredDocument(new byte[] {1, 2, 3}));
 
     assertThat(result.toCompletableFuture()).isCompletedWithValue(null);
     assertThat(recordingClient.putRequest().bucket()).isEqualTo(BUCKET);
@@ -64,7 +66,7 @@ class R2DocumentStoreTest {
     RecordingS3AsyncClient recordingClient = new RecordingS3AsyncClient();
     R2DocumentStore store = new R2DocumentStore(recordingClient.client(), BUCKET);
 
-    CompletionStage<Void> result = store.delete(KEY);
+    CompletionStage<@Nullable Void> result = store.delete(KEY);
 
     assertThat(result.toCompletableFuture()).isCompletedWithValue(null);
     assertThat(recordingClient.deleteRequest().bucket()).isEqualTo(BUCKET);
@@ -155,10 +157,11 @@ class R2DocumentStoreTest {
     getClient.throwOnGet(SdkClientException.create("get invocation failed"));
     deleteClient.throwOnDelete(SdkClientException.create("delete invocation failed"));
 
-    CompletionStage<Void> put =
+    CompletionStage<@Nullable Void> put =
         new R2DocumentStore(putClient.client(), BUCKET).put(KEY, new StoredDocument(new byte[0]));
     CompletionStage<StoredDocument> get = new R2DocumentStore(getClient.client(), BUCKET).get(KEY);
-    CompletionStage<Void> delete = new R2DocumentStore(deleteClient.client(), BUCKET).delete(KEY);
+    CompletionStage<@Nullable Void> delete =
+        new R2DocumentStore(deleteClient.client(), BUCKET).delete(KEY);
 
     assertThat(put).isNotNull();
     assertThat(get).isNotNull();
@@ -169,6 +172,7 @@ class R2DocumentStoreTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsNullInputsSynchronously() {
     R2DocumentStore store = new R2DocumentStore(new RecordingS3AsyncClient().client(), BUCKET);
     StoredDocument document = new StoredDocument(new byte[0]);
@@ -180,6 +184,7 @@ class R2DocumentStoreTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void validatesInjectedClientAndBucket() {
     RecordingS3AsyncClient recordingClient = new RecordingS3AsyncClient();
 

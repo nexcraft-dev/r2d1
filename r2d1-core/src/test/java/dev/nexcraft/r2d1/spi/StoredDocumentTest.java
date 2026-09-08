@@ -29,6 +29,7 @@ class StoredDocumentTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsNullContent() {
     assertThatNullPointerException()
         .isThrownBy(() -> new StoredDocument(null))

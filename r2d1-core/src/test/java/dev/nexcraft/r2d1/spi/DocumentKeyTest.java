@@ -25,6 +25,7 @@ class DocumentKeyTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsNullComponents() {
     assertThatNullPointerException()
         .isThrownBy(() -> new DocumentKey(null, "id"))

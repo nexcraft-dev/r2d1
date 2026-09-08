@@ -108,8 +108,9 @@ S3AsyncClient / Netty
 Cloudflare R2
 ```
 
-The D1 adapter, application-to-SPI translation, orchestration, and sync façade are not implemented
-yet. No cross-store atomic transaction is implied by the R2 adapter.
+Application-to-SPI translation, orchestration, and the sync façade are not implemented yet. The D1
+adapter implements the asynchronous index SPI, but no cross-store atomic transaction is implied by
+either storage adapter.
 
 ### R2 owns the document
 
@@ -124,12 +125,10 @@ R2
 
 D1
 └── users
-    ├── id
-    ├── r2_key
-    ├── version
+    ├── document_id
     ├── country
     ├── status
-    └── created_at
+    └── createdAt
 ```
 
 ### D1 is a rebuildable index
@@ -158,9 +157,9 @@ R2D1 will not download large numbers of R2 objects and perform filtering in appl
 
 ## Core Java API
 
-The core module defines the framework-independent contracts shown below. The R2 document adapter is
-available, but the collection factory, orchestration, serialization, and Cloudflare D1 adapter are
-not included yet.
+The core module defines the framework-independent contracts shown below. The R2 document adapter
+and D1 index adapter are available, but the collection factory, orchestration, and serialization
+are not included yet.
 
 ```java
 R2D1 db = R2D1.builder()
@@ -197,14 +196,17 @@ public class User {
     @Index
     private String status;
 
-    @Index(sortable = true)
-    private Instant createdAt;
+    @Index
+    private Long createdAt;
 
     private String name;
 }
 ```
 
-Only indexed fields participate in filtering and sorting.
+Only indexed fields participate in filtering and sorting. The D1 v1 adapter supports `String`,
+`Long`, `Double`, and `Boolean` index values and treats every `@Index` field as sortable. The
+existing `sortable` annotation member remains for public API compatibility but does not restrict D1
+sorting.
 
 Filters are combined with logical AND and support only equality, inequality, and ordered
 comparisons. A query requires a positive result limit and may contain one indexed-field sort and
@@ -240,13 +242,30 @@ r2d1-spring-boot-starter
 
 The core API will not depend on Spring.
 
+### D1 index adapter
+
+The D1 module uses the Cloudflare D1 REST API through Java's reusable asynchronous `HttpClient` and
+uses Avaje JSON-B generated adapters for the REST protocol. A document type's schema must be
+initialized before its index operations are used:
+
+```java
+D1IndexStore indexes =
+    new D1IndexStore(new D1Config(accountId, databaseId, apiToken));
+
+CompletionStage<Void> initialized = indexes.initialize(User.class);
+```
+
+The future orchestration layer will await that stage at the synchronous collection boundary. The
+D1 adapter itself does not block, create executors, retry requests, serialize complete documents,
+or manage Cloudflare infrastructure.
+
 ## Project Status
 
 🚧 **R2D1 is currently in the early design and development stage.**
 
-The first core API contracts and the R2 document adapter are available but remain unstable. The D1
-integration, consistency model, orchestration, and module internals are still being developed and
-may change significantly before the first release.
+The first core API contracts, the R2 document adapter, and the D1 index adapter are available but
+remain unstable. The consistency model, orchestration, and module internals are still being
+developed and may change significantly before the first release.
 
 ## Requirements
 
