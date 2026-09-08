@@ -103,6 +103,7 @@ class QueryTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsNullQueryInputs() {
     Query<String> query = successfulQuery();
 
@@ -137,6 +138,7 @@ class QueryTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsANullPageFromTheExecutor() {
     Query<String> query = Query.<String>create(request -> null).limit(1);
 

@@ -1,6 +1,7 @@
 package dev.nexcraft.r2d1.spi;
 
 import java.util.concurrent.CompletionStage;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Asynchronous authoritative persistence for serialized documents.
@@ -30,7 +31,7 @@ public interface DocumentStore {
    *     StorageException} if the storage implementation cannot complete the operation
    * @throws NullPointerException if {@code key} or {@code document} is {@code null}
    */
-  CompletionStage<Void> put(DocumentKey key, StoredDocument document);
+  CompletionStage<@Nullable Void> put(DocumentKey key, StoredDocument document);
 
   /**
    * Asynchronously retrieves an authoritative document using strict lookup semantics.
@@ -51,5 +52,5 @@ public interface DocumentStore {
    *     StorageException} if the storage implementation cannot complete the operation
    * @throws NullPointerException if {@code key} is {@code null}
    */
-  CompletionStage<Void> delete(DocumentKey key);
+  CompletionStage<@Nullable Void> delete(DocumentKey key);
 }

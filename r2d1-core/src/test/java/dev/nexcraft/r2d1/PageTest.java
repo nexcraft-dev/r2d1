@@ -29,6 +29,7 @@ class PageTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsNullItems() {
     assertThatNullPointerException()
         .isThrownBy(() -> new Page<String>(null, null))

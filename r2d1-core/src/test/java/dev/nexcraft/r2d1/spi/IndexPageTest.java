@@ -35,6 +35,7 @@ class IndexPageTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsNullComponents() {
     assertThatNullPointerException()
         .isThrownBy(() -> new IndexPage(null, Optional.empty()))

@@ -5,8 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Optional;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
+@NullMarked
 class R2D1Test {
 
   @Test
@@ -24,6 +27,7 @@ class R2D1Test {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsANullCollectionFactory() {
     assertThatNullPointerException()
         .isThrownBy(() -> R2D1.builder().collectionFactory(null))
@@ -42,6 +46,7 @@ class R2D1Test {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsANullDocumentType() {
     R2D1 client = R2D1.builder().collectionFactory(new TrackingFactory()).build();
 
@@ -55,6 +60,7 @@ class R2D1Test {
     R2D1.CollectionFactory factory =
         new R2D1.CollectionFactory() {
           @Override
+          @SuppressWarnings("DataFlowIssue")
           public <T> R2D1Collection<T> create(Class<T> documentType) {
             return null;
           }
@@ -68,7 +74,7 @@ class R2D1Test {
 
   private static final class TrackingFactory implements R2D1.CollectionFactory {
 
-    private Class<?> requestedType;
+    private @Nullable Class<?> requestedType;
 
     @Override
     public <T> R2D1Collection<T> create(Class<T> documentType) {

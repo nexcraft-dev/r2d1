@@ -57,6 +57,7 @@ class R2ConfigTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsNullAndBlankConfigurationValues() {
     assertThatNullPointerException()
         .isThrownBy(() -> new R2Config(null, "access", "secret", "documents"))

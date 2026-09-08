@@ -21,6 +21,7 @@ class DocumentNotFoundExceptionTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsANullDocumentKey() {
     assertThatNullPointerException()
         .isThrownBy(() -> new DocumentNotFoundException(null))

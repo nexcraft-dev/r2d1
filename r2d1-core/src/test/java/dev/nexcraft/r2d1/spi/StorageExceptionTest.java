@@ -20,4 +20,19 @@ class StorageExceptionTest {
 
     assertThat(exception).hasMessage("storage failed").hasCause(cause);
   }
+
+  @Test
+  void classifiesStorageFailuresWithoutChangingTheBaseType() {
+    RuntimeException cause = new RuntimeException("adapter failure");
+
+    assertThat(new StorageException.Access("access", cause))
+        .isInstanceOf(StorageException.class)
+        .hasCause(cause);
+    assertThat(new StorageException.Unavailable("unavailable", cause))
+        .isInstanceOf(StorageException.class)
+        .hasCause(cause);
+    assertThat(new StorageException.Operation("operation", cause))
+        .isInstanceOf(StorageException.class)
+        .hasCause(cause);
+  }
 }

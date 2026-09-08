@@ -33,6 +33,7 @@ class R2ObjectKeyTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsNullDocumentKey() {
     assertThatNullPointerException()
         .isThrownBy(() -> R2ObjectKey.from(null))

@@ -18,6 +18,7 @@ class IndexCursorTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsNullComponents() {
     DocumentKey key = new DocumentKey("users", "user-123");
 

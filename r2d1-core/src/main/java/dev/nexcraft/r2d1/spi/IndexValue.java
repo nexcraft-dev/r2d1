@@ -11,6 +11,7 @@ import java.util.Objects;
  */
 public sealed interface IndexValue
     permits IndexValue.BooleanValue,
+        IndexValue.DoubleValue,
         IndexValue.LongValue,
         IndexValue.StringValue,
         IndexValue.TimestampValue {
@@ -34,6 +35,13 @@ public sealed interface IndexValue
    * @param value integer value
    */
   record LongValue(long value) implements IndexValue {}
+
+  /**
+   * Double-precision floating-point index value.
+   *
+   * @param value floating-point value
+   */
+  record DoubleValue(double value) implements IndexValue {}
 
   /**
    * Boolean index value.

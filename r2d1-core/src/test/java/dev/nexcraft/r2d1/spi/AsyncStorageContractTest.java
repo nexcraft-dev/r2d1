@@ -3,6 +3,7 @@ package dev.nexcraft.r2d1.spi;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import java.lang.reflect.AnnotatedParameterizedType;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -14,25 +15,28 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
+@NullMarked
 class AsyncStorageContractTest {
 
   private static final DocumentKey KEY = new DocumentKey("users", "user-123");
 
   @Test
   void documentStoreExposesCompletionStageContracts() throws NoSuchMethodException {
-    assertStageSignature(
-        DocumentStore.class, "put", Void.class, DocumentKey.class, StoredDocument.class);
+    assertNullableVoidStageSignature(
+        DocumentStore.class, "put", DocumentKey.class, StoredDocument.class);
     assertStageSignature(DocumentStore.class, "get", StoredDocument.class, DocumentKey.class);
-    assertStageSignature(DocumentStore.class, "delete", Void.class, DocumentKey.class);
+    assertNullableVoidStageSignature(DocumentStore.class, "delete", DocumentKey.class);
   }
 
   @Test
   void indexStoreExposesCompletionStageContracts() throws NoSuchMethodException {
-    assertStageSignature(IndexStore.class, "upsert", Void.class, IndexEntry.class);
+    assertNullableVoidStageSignature(IndexStore.class, "upsert", IndexEntry.class);
     assertStageSignature(IndexStore.class, "query", IndexPage.class, IndexQuery.class);
-    assertStageSignature(IndexStore.class, "delete", Void.class, DocumentKey.class);
+    assertNullableVoidStageSignature(IndexStore.class, "delete", DocumentKey.class);
   }
 
   @Test
@@ -81,6 +85,7 @@ class AsyncStorageContractTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void storesRejectNullInputsSynchronously() {
     FakeDocumentStore documentStore = new FakeDocumentStore();
     FakeIndexStore indexStore = new FakeIndexStore(new IndexPage(List.of(), Optional.empty()));
@@ -112,8 +117,19 @@ class AsyncStorageContractTest {
     assertThat(method.getExceptionTypes()).isEmpty();
   }
 
+  private static void assertNullableVoidStageSignature(
+      Class<?> owner, String methodName, Class<?>... parameterTypes) throws NoSuchMethodException {
+    assertStageSignature(owner, methodName, Void.class, parameterTypes);
+    Method method = owner.getMethod(methodName, parameterTypes);
+    AnnotatedParameterizedType returnType =
+        (AnnotatedParameterizedType) method.getAnnotatedReturnType();
+
+    assertThat(returnType.getAnnotatedActualTypeArguments()[0].isAnnotationPresent(Nullable.class))
+        .isTrue();
+  }
+
   private static Throwable completedFailure(CompletionStage<?> stage) {
-    AtomicReference<Throwable> failure = new AtomicReference<>();
+    AtomicReference<@Nullable Throwable> failure = new AtomicReference<>();
     stage.whenComplete((ignored, throwable) -> failure.set(throwable));
 
     assertThat(stage.toCompletableFuture()).isCompletedExceptionally();
@@ -123,13 +139,13 @@ class AsyncStorageContractTest {
   private static final class FakeDocumentStore implements DocumentStore {
 
     private final Map<DocumentKey, StoredDocument> documents = new HashMap<>();
-    private StorageException deleteFailure;
+    private @Nullable StorageException deleteFailure;
 
     @Override
-    public CompletionStage<Void> put(DocumentKey key, StoredDocument document) {
+    public CompletionStage<@Nullable Void> put(DocumentKey key, StoredDocument document) {
       documents.put(
           Objects.requireNonNull(key, "key"), Objects.requireNonNull(document, "document"));
-      return CompletableFuture.completedFuture(null);
+      return CompletableFuture.<@Nullable Void>completedFuture(null);
     }
 
     @Override
@@ -143,13 +159,13 @@ class AsyncStorageContractTest {
     }
 
     @Override
-    public CompletionStage<Void> delete(DocumentKey key) {
+    public CompletionStage<@Nullable Void> delete(DocumentKey key) {
       Objects.requireNonNull(key, "key");
       if (deleteFailure != null) {
         return CompletableFuture.failedFuture(deleteFailure);
       }
       documents.remove(key);
-      return CompletableFuture.completedFuture(null);
+      return CompletableFuture.<@Nullable Void>completedFuture(null);
     }
 
     private void failDeletesWith(StorageException failure) {
@@ -166,9 +182,9 @@ class AsyncStorageContractTest {
     }
 
     @Override
-    public CompletionStage<Void> upsert(IndexEntry entry) {
+    public CompletionStage<@Nullable Void> upsert(IndexEntry entry) {
       Objects.requireNonNull(entry, "entry");
-      return CompletableFuture.completedFuture(null);
+      return CompletableFuture.<@Nullable Void>completedFuture(null);
     }
 
     @Override
@@ -178,9 +194,9 @@ class AsyncStorageContractTest {
     }
 
     @Override
-    public CompletionStage<Void> delete(DocumentKey key) {
+    public CompletionStage<@Nullable Void> delete(DocumentKey key) {
       Objects.requireNonNull(key, "key");
-      return CompletableFuture.completedFuture(null);
+      return CompletableFuture.<@Nullable Void>completedFuture(null);
     }
   }
 }

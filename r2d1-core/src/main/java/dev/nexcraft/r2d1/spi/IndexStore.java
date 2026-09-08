@@ -1,6 +1,7 @@
 package dev.nexcraft.r2d1.spi;
 
 import java.util.concurrent.CompletionStage;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Asynchronous, derived, rebuildable storage for indexed fields and document discovery.
@@ -28,7 +29,7 @@ public interface IndexStore {
    *     StorageException} if the storage implementation cannot complete the operation
    * @throws NullPointerException if {@code entry} is {@code null}
    */
-  CompletionStage<Void> upsert(IndexEntry entry);
+  CompletionStage<@Nullable Void> upsert(IndexEntry entry);
 
   /**
    * Asynchronously queries derived index data using filtering, sorting, and keyset pagination.
@@ -49,5 +50,5 @@ public interface IndexStore {
    *     StorageException} if the storage implementation cannot complete the operation
    * @throws NullPointerException if {@code key} is {@code null}
    */
-  CompletionStage<Void> delete(DocumentKey key);
+  CompletionStage<@Nullable Void> delete(DocumentKey key);
 }

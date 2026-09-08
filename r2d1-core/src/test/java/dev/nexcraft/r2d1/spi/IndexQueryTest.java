@@ -118,6 +118,7 @@ class IndexQueryTest {
   }
 
   @Test
+  @SuppressWarnings("DataFlowIssue")
   void rejectsNullComponents() {
     assertThatNullPointerException()
         .isThrownBy(() -> new IndexQuery(null, List.of(), Optional.empty(), 1, Optional.empty()))
