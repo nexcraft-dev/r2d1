@@ -36,6 +36,16 @@ public interface R2D1Collection<T> {
   void delete(String id);
 
   /**
+   * Rebuilds this collection's derived index from authoritative documents.
+   *
+   * <p>This synchronous maintenance operation is intended to run while application writes to the
+   * collection are paused. It is idempotent for an unchanged authoritative collection, but it is
+   * not atomic: a failure after index rows are cleared can leave the derived index incomplete.
+   * Resolve the failure and invoke this method again to restore the projection.
+   */
+  void rebuildIndex();
+
+  /**
    * Starts an immutable indexed query.
    *
    * @return a new query

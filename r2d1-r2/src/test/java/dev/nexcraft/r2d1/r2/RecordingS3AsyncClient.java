@@ -15,6 +15,8 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
@@ -29,14 +31,18 @@ final class RecordingS3AsyncClient implements InvocationHandler {
           ResponseBytes.fromByteArray(GetObjectResponse.builder().build(), new byte[0]));
   private CompletableFuture<DeleteObjectResponse> deleteResult =
       CompletableFuture.completedFuture(DeleteObjectResponse.builder().build());
+  private CompletableFuture<ListObjectsV2Response> listResult =
+      CompletableFuture.completedFuture(ListObjectsV2Response.builder().build());
   private @Nullable RuntimeException synchronousPutFailure;
   private @Nullable RuntimeException synchronousGetFailure;
   private @Nullable RuntimeException synchronousDeleteFailure;
+  private @Nullable RuntimeException synchronousListFailure;
   private @Nullable PutObjectRequest putRequest;
   private @Nullable AsyncRequestBody putBody;
   private @Nullable GetObjectRequest getRequest;
   private @Nullable AsyncResponseTransformer<?, ?> getTransformer;
   private @Nullable DeleteObjectRequest deleteRequest;
+  private @Nullable ListObjectsV2Request listRequest;
   private int putCalls;
   private int closeCalls;
 
@@ -57,6 +63,10 @@ final class RecordingS3AsyncClient implements InvocationHandler {
             ResponseBytes.fromByteArray(GetObjectResponse.builder().build(), content));
   }
 
+  void completeListWith(ListObjectsV2Response response) {
+    listResult = CompletableFuture.completedFuture(response);
+  }
+
   void failPutWith(Throwable failure) {
     putResult = CompletableFuture.failedFuture(failure);
   }
@@ -69,6 +79,10 @@ final class RecordingS3AsyncClient implements InvocationHandler {
     deleteResult = CompletableFuture.failedFuture(failure);
   }
 
+  void failListWith(Throwable failure) {
+    listResult = CompletableFuture.failedFuture(failure);
+  }
+
   void throwOnPut(RuntimeException failure) {
     synchronousPutFailure = failure;
   }
@@ -79,6 +93,10 @@ final class RecordingS3AsyncClient implements InvocationHandler {
 
   void throwOnDelete(RuntimeException failure) {
     synchronousDeleteFailure = failure;
+  }
+
+  void throwOnList(RuntimeException failure) {
+    synchronousListFailure = failure;
   }
 
   PutObjectRequest putRequest() {
@@ -101,6 +119,10 @@ final class RecordingS3AsyncClient implements InvocationHandler {
     return Objects.requireNonNull(deleteRequest, "no delete request recorded");
   }
 
+  ListObjectsV2Request listRequest() {
+    return Objects.requireNonNull(listRequest, "no list request recorded");
+  }
+
   int putCalls() {
     return putCalls;
   }
@@ -115,6 +137,7 @@ final class RecordingS3AsyncClient implements InvocationHandler {
       case "putObject" -> invokePut(requireArguments(method, arguments));
       case "getObject" -> invokeGet(requireArguments(method, arguments));
       case "deleteObject" -> invokeDelete(requireArguments(method, arguments));
+      case "listObjectsV2" -> invokeList(requireArguments(method, arguments));
       case "close" -> {
         closeCalls++;
         yield null;
@@ -156,5 +179,13 @@ final class RecordingS3AsyncClient implements InvocationHandler {
     }
     deleteRequest = (DeleteObjectRequest) arguments[0];
     return deleteResult;
+  }
+
+  private CompletableFuture<ListObjectsV2Response> invokeList(Object[] arguments) {
+    if (synchronousListFailure != null) {
+      throw synchronousListFailure;
+    }
+    listRequest = (ListObjectsV2Request) arguments[0];
+    return listResult;
   }
 }

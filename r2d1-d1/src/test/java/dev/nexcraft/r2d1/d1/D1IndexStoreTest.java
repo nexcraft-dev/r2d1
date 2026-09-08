@@ -2,6 +2,7 @@ package dev.nexcraft.r2d1.d1;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import dev.nexcraft.r2d1.annotation.Document;
 import dev.nexcraft.r2d1.annotation.Index;
@@ -30,6 +31,9 @@ class D1IndexStoreTest {
     assertThat(completedFailure(store.upsert(entry("user-1"))))
         .isInstanceOf(StorageException.Operation.class)
         .hasMessage("D1 collection is not initialized: users");
+    assertThat(completedFailure(store.clear("users")))
+        .isInstanceOf(StorageException.Operation.class)
+        .hasMessage("D1 collection is not initialized: users");
     assertThat(completedFailure(store.query(query())))
         .isInstanceOf(StorageException.Operation.class)
         .hasMessage("D1 collection is not initialized: users");
@@ -39,7 +43,7 @@ class D1IndexStoreTest {
   }
 
   @Test
-  void initializesThenExecutesUpsertQueryAndIdempotentDelete() {
+  void initializesThenExecutesUpsertQueryClearAndIdempotentDelete() {
     ScriptedD1Transport transport = new ScriptedD1Transport();
     expectCompatibleSchema(transport);
     transport.expect(
@@ -49,12 +53,14 @@ class D1IndexStoreTest {
         "SELECT \"document_id\" FROM \"users\" ORDER BY \"document_id\" ASC LIMIT ?1",
         List.of(
             Map.of("document_id", "a"), Map.of("document_id", "b"), Map.of("document_id", "c")));
+    transport.expect("DELETE FROM \"users\"");
     transport.expect("DELETE FROM \"users\" WHERE \"document_id\" = ?1");
     D1IndexStore store = new D1IndexStore(transport);
 
     store.initialize(User.class).toCompletableFuture().join();
     store.upsert(entry("user-1")).toCompletableFuture().join();
     IndexPage page = store.query(query()).toCompletableFuture().join();
+    store.clear("users").toCompletableFuture().join();
     store.delete(new DocumentKey("users", "absent")).toCompletableFuture().join();
 
     assertThat(page.documentKeys())
@@ -65,7 +71,34 @@ class D1IndexStoreTest {
             new D1Parameter.TextParameter("user-1"), new D1Parameter.TextParameter("NZ"));
     assertThat(transport.statements().get(5).parameters())
         .containsExactly(new D1Parameter.IntegerParameter(3));
+    assertThat(transport.statements().get(6).parameters()).isEmpty();
+    assertThat(transport.statements().get(6).sql()).doesNotContain("DROP");
     transport.assertExhausted();
+  }
+
+  @Test
+  void propagatesTheOriginalClearFailure() {
+    ScriptedD1Transport transport = new ScriptedD1Transport();
+    expectCompatibleSchema(transport);
+    StorageException failure = new StorageException.Unavailable("D1 unavailable");
+    transport.expectFailure("DELETE FROM \"users\"", failure);
+    D1IndexStore store = new D1IndexStore(transport);
+
+    store.initialize(User.class).toCompletableFuture().join();
+
+    assertThat(completedFailure(store.clear("users"))).isSameAs(failure);
+    transport.assertExhausted();
+  }
+
+  @Test
+  @SuppressWarnings("DataFlowIssue")
+  void validatesClearCollection() {
+    D1IndexStore store = new D1IndexStore(statement -> CompletableFuture.completedFuture(empty()));
+
+    assertThatNullPointerException().isThrownBy(() -> store.clear(null)).withMessage("collection");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> store.clear(" "))
+        .withMessage("collection must not be blank");
   }
 
   @Test

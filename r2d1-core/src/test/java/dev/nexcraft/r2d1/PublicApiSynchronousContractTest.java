@@ -14,6 +14,7 @@ class PublicApiSynchronousContractTest {
     assertReturnType(R2D1Collection.class, "put", void.class, Object.class);
     assertReturnType(R2D1Collection.class, "get", Optional.class, String.class);
     assertReturnType(R2D1Collection.class, "delete", void.class, String.class);
+    assertReturnType(R2D1Collection.class, "rebuildIndex", void.class);
     assertReturnType(R2D1Collection.class, "query", Query.class);
   }
 

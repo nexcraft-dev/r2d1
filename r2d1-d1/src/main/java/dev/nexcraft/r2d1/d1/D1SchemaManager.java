@@ -171,7 +171,7 @@ final class D1SchemaManager {
                 throw new StorageException.Operation(
                     "D1 row-existence query returned an invalid result");
               }
-              long value = requireLong(result.rows().get(0), "has_rows", "row existence");
+              long value = requireLong(result.rows().getFirst(), "has_rows", "row existence");
               if (value != 0L && value != 1L) {
                 throw new StorageException.Operation(
                     "D1 row-existence query returned an invalid value");

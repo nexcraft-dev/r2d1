@@ -106,6 +106,10 @@ final class DocumentMetadata<T> {
     return new IndexEntry(key, values);
   }
 
+  IndexEntry indexEntry(T document) {
+    return indexEntry(document, key(document));
+  }
+
   IndexQuery indexQuery(Request request) {
     List<IndexQuery.Filter> filters =
         request.filters().stream()
@@ -124,6 +128,10 @@ final class DocumentMetadata<T> {
 
   Class<T> documentType() {
     return documentType;
+  }
+
+  String collection() {
+    return collection;
   }
 
   private static IndexValue indexValue(String fieldName, @Nullable Object value) {

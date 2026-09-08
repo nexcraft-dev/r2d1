@@ -20,6 +20,11 @@ import org.jspecify.annotations.Nullable;
 /** Compiles D1/SQLite CRUD and keyset queries and maps results to the core SPI. */
 final class D1SqlCompiler {
 
+  D1Statement clear(D1CollectionMetadata metadata) {
+    Objects.requireNonNull(metadata, "metadata");
+    return D1Statement.of("DELETE FROM " + D1Metadata.quoteIdentifier(metadata.collection()));
+  }
+
   D1Statement upsert(D1CollectionMetadata metadata, IndexEntry entry) {
     Objects.requireNonNull(metadata, "metadata");
     Objects.requireNonNull(entry, "entry");

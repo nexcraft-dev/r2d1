@@ -1,6 +1,7 @@
 package dev.nexcraft.r2d1.spi;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import java.lang.reflect.AnnotatedParameterizedType;
@@ -26,6 +27,16 @@ class AsyncStorageContractTest {
 
   @Test
   void documentStoreExposesCompletionStageContracts() throws NoSuchMethodException {
+    assertStageSignature(
+        DocumentStore.class,
+        "list",
+        DocumentPage.class,
+        String.class,
+        DocumentCursor.class,
+        int.class);
+    Method list =
+        DocumentStore.class.getMethod("list", String.class, DocumentCursor.class, int.class);
+    assertThat(list.getAnnotatedParameterTypes()[1].isAnnotationPresent(Nullable.class)).isTrue();
     assertNullableVoidStageSignature(
         DocumentStore.class, "put", DocumentKey.class, StoredDocument.class);
     assertStageSignature(DocumentStore.class, "get", StoredDocument.class, DocumentKey.class);
@@ -34,6 +45,7 @@ class AsyncStorageContractTest {
 
   @Test
   void indexStoreExposesCompletionStageContracts() throws NoSuchMethodException {
+    assertNullableVoidStageSignature(IndexStore.class, "clear", String.class);
     assertNullableVoidStageSignature(IndexStore.class, "upsert", IndexEntry.class);
     assertStageSignature(IndexStore.class, "query", IndexPage.class, IndexQuery.class);
     assertNullableVoidStageSignature(IndexStore.class, "delete", DocumentKey.class);
@@ -46,6 +58,8 @@ class AsyncStorageContractTest {
 
     assertThat(store.put(KEY, document).toCompletableFuture()).isCompletedWithValue(null);
     assertThat(store.get(KEY).toCompletableFuture()).isCompletedWithValue(document);
+    assertThat(store.list("users", null, 20).toCompletableFuture())
+        .isCompletedWithValue(new DocumentPage(List.of(KEY), Optional.empty()));
     assertThat(store.delete(KEY).toCompletableFuture()).isCompletedWithValue(null);
   }
 
@@ -81,6 +95,7 @@ class AsyncStorageContractTest {
 
     assertThat(store.upsert(entry).toCompletableFuture()).isCompletedWithValue(null);
     assertThat(store.query(query).toCompletableFuture()).isCompletedWithValue(page);
+    assertThat(store.clear("users").toCompletableFuture()).isCompletedWithValue(null);
     assertThat(store.delete(KEY).toCompletableFuture()).isCompletedWithValue(null);
   }
 
@@ -99,9 +114,24 @@ class AsyncStorageContractTest {
         .withMessage("document");
     assertThatNullPointerException().isThrownBy(() -> documentStore.get(null)).withMessage("key");
     assertThatNullPointerException()
+        .isThrownBy(() -> documentStore.list(null, null, 1))
+        .withMessage("collection");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> documentStore.list(" ", null, 1))
+        .withMessage("collection must not be blank");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> documentStore.list("users", null, 0))
+        .withMessage("limit must be greater than zero");
+    assertThatNullPointerException()
         .isThrownBy(() -> documentStore.delete(null))
         .withMessage("key");
     assertThatNullPointerException().isThrownBy(() -> indexStore.upsert(null)).withMessage("entry");
+    assertThatNullPointerException()
+        .isThrownBy(() -> indexStore.clear(null))
+        .withMessage("collection");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> indexStore.clear(" "))
+        .withMessage("collection must not be blank");
     assertThatNullPointerException().isThrownBy(() -> indexStore.query(null)).withMessage("query");
     assertThatNullPointerException().isThrownBy(() -> indexStore.delete(null)).withMessage("key");
   }
@@ -142,6 +172,25 @@ class AsyncStorageContractTest {
     private @Nullable StorageException deleteFailure;
 
     @Override
+    public CompletionStage<DocumentPage> list(
+        String collection, @Nullable DocumentCursor cursor, int limit) {
+      Objects.requireNonNull(collection, "collection");
+      if (collection.isBlank()) {
+        throw new IllegalArgumentException("collection must not be blank");
+      }
+      if (limit <= 0) {
+        throw new IllegalArgumentException("limit must be greater than zero");
+      }
+      return CompletableFuture.completedFuture(
+          new DocumentPage(
+              documents.keySet().stream()
+                  .filter(key -> key.collection().equals(collection))
+                  .limit(limit)
+                  .toList(),
+              Optional.empty()));
+    }
+
+    @Override
     public CompletionStage<@Nullable Void> put(DocumentKey key, StoredDocument document) {
       documents.put(
           Objects.requireNonNull(key, "key"), Objects.requireNonNull(document, "document"));
@@ -179,6 +228,15 @@ class AsyncStorageContractTest {
 
     private FakeIndexStore(IndexPage queryResult) {
       this.queryResult = queryResult;
+    }
+
+    @Override
+    public CompletionStage<@Nullable Void> clear(String collection) {
+      Objects.requireNonNull(collection, "collection");
+      if (collection.isBlank()) {
+        throw new IllegalArgumentException("collection must not be blank");
+      }
+      return CompletableFuture.<@Nullable Void>completedFuture(null);
     }
 
     @Override

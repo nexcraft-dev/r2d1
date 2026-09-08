@@ -41,6 +41,7 @@ class D1SqlCompilerTest {
     D1Statement upsert =
         COMPILER.upsert(METADATA, new IndexEntry(new DocumentKey("users", "user-1"), values));
     D1Statement delete = COMPILER.delete(METADATA, new DocumentKey("users", "user-1"));
+    D1Statement clear = COMPILER.clear(METADATA);
 
     assertThat(upsert.sql())
         .isEqualTo(
@@ -58,6 +59,8 @@ class D1SqlCompilerTest {
             new D1Parameter.RealParameter(4.5));
     assertThat(delete.sql()).isEqualTo("DELETE FROM \"users\" WHERE \"document_id\" = ?1");
     assertThat(delete.parameters()).containsExactly(new D1Parameter.TextParameter("user-1"));
+    assertThat(clear.sql()).isEqualTo("DELETE FROM \"users\"").doesNotContain("DROP");
+    assertThat(clear.parameters()).isEmpty();
   }
 
   @Test

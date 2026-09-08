@@ -24,6 +24,9 @@ import org.jspecify.annotations.Nullable;
  * <p>{@link #initialize(Class)} must complete before a collection is used. Concurrent first
  * initialization calls for the same collection share one schema stage, and a failed initialization
  * is not retried automatically.
+ *
+ * <p>Clearing a collection removes only derived rows. Managed tables, columns, and SQLite indexes
+ * remain intact for replacement from authoritative documents.
  */
 public final class D1IndexStore implements IndexStore, AutoCloseable {
 
@@ -101,6 +104,20 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
   }
 
   @Override
+  public CompletionStage<@Nullable Void> clear(String collection) {
+    String validatedCollection = requireCollection(collection);
+    Registration registration = registrations.get(validatedCollection);
+    if (registration == null) {
+      return notInitialized(validatedCollection);
+    }
+    D1Statement statement = sqlCompiler.clear(registration.metadata());
+    return registration
+        .initialization()
+        .thenCompose(ignored -> execute(statement))
+        .thenAccept(ignored -> {});
+  }
+
+  @Override
   public CompletionStage<@Nullable Void> upsert(IndexEntry entry) {
     Objects.requireNonNull(entry, "entry");
     Registration registration = registrations.get(entry.documentKey().collection());
@@ -164,6 +181,14 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
   private static <T extends @Nullable Object> CompletionStage<T> notInitialized(String collection) {
     return CompletableFuture.failedFuture(
         new StorageException.Operation("D1 collection is not initialized: " + collection));
+  }
+
+  private static String requireCollection(String collection) {
+    Objects.requireNonNull(collection, "collection");
+    if (collection.isBlank()) {
+      throw new IllegalArgumentException("collection must not be blank");
+    }
+    return collection;
   }
 
   private record Registration(

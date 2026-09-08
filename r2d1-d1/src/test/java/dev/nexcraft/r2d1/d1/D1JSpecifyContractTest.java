@@ -36,10 +36,14 @@ class D1JSpecifyContractTest {
   }
 
   @Test
-  void marksTheInitializationCompletionValueAsNullable() throws NoSuchMethodException {
-    Method initialize = D1IndexStore.class.getMethod("initialize", Class.class);
+  void marksVoidCompletionValuesAsNullable() throws NoSuchMethodException {
+    assertNullableCompletionValue(D1IndexStore.class.getMethod("initialize", Class.class));
+    assertNullableCompletionValue(D1IndexStore.class.getMethod("clear", String.class));
+  }
+
+  private static void assertNullableCompletionValue(Method method) {
     AnnotatedParameterizedType returnType =
-        (AnnotatedParameterizedType) initialize.getAnnotatedReturnType();
+        (AnnotatedParameterizedType) method.getAnnotatedReturnType();
 
     assertThat(returnType.getAnnotatedActualTypeArguments()[0].isAnnotationPresent(Nullable.class))
         .isTrue();

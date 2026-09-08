@@ -1,16 +1,21 @@
 package dev.nexcraft.r2d1.r2;
 
+import dev.nexcraft.r2d1.spi.DocumentCursor;
 import dev.nexcraft.r2d1.spi.DocumentKey;
 import dev.nexcraft.r2d1.spi.DocumentNotFoundException;
+import dev.nexcraft.r2d1.spi.DocumentPage;
 import dev.nexcraft.r2d1.spi.DocumentStore;
 import dev.nexcraft.r2d1.spi.StorageException;
 import dev.nexcraft.r2d1.spi.StoredDocument;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
@@ -18,6 +23,8 @@ import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -35,6 +42,9 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
  * lookup for a missing document fails with {@link DocumentNotFoundException}; other AWS SDK
  * failures are translated to {@link StorageException}. The adapter defines no additional
  * cancellation or timeout guarantees.
+ *
+ * <p>Collection listings use bounded S3-compatible pagination and the same encoded key mapping as
+ * individual operations. Listing cursors remain opaque outside this adapter.
  *
  * <p>Credentials are used only to create the client and are never included in adapter-generated
  * strings, logs, or error messages.
@@ -67,6 +77,30 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
     this.client = Objects.requireNonNull(client, "client");
     this.bucketName = requireBucketName(bucketName);
     this.ownsClient = ownsClient;
+  }
+
+  @Override
+  public CompletionStage<DocumentPage> list(
+      String collection, @Nullable DocumentCursor cursor, int limit) {
+    String validatedCollection = requireText(collection, "collection");
+    if (limit <= 0) {
+      throw new IllegalArgumentException("limit must be greater than zero");
+    }
+    return executeValue(
+        () -> {
+          ListObjectsV2Request.Builder request =
+              ListObjectsV2Request.builder()
+                  .bucket(bucketName)
+                  .prefix(R2ObjectKey.collectionPrefix(validatedCollection))
+                  .maxKeys(limit);
+          if (cursor != null) {
+            request.continuationToken(cursor.value());
+          }
+          return client
+              .listObjectsV2(request.build())
+              .thenApply(response -> documentPage(validatedCollection, response));
+        },
+        failure -> collectionFailure(validatedCollection, Operation.LIST, failure));
   }
 
   @Override
@@ -120,6 +154,12 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
 
   private <T> CompletionStage<T> executeValue(
       DocumentKey key, Operation operation, Supplier<CompletionStage<T>> invocation) {
+    return executeValue(invocation, failure -> storageFailure(key, operation, failure));
+  }
+
+  private <T> CompletionStage<T> executeValue(
+      Supplier<CompletionStage<T>> invocation,
+      Function<Throwable, RuntimeException> failureMapper) {
     try {
       CompletionStage<T> stage =
           Objects.requireNonNull(invocation.get(), "AWS SDK returned a null stage");
@@ -129,12 +169,12 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
             if (failure == null) {
               result.complete(value);
             } else {
-              result.completeExceptionally(storageFailure(key, operation, unwrap(failure)));
+              result.completeExceptionally(failureMapper.apply(unwrap(failure)));
             }
           });
       return result;
     } catch (RuntimeException failure) {
-      return CompletableFuture.failedFuture(storageFailure(key, operation, unwrap(failure)));
+      return CompletableFuture.failedFuture(failureMapper.apply(unwrap(failure)));
     }
   }
 
@@ -179,6 +219,27 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
         cause);
   }
 
+  private static StorageException collectionFailure(
+      String collection, Operation operation, Throwable cause) {
+    return new StorageException(
+        "R2 " + operation.label + " failed for collection: " + collection, cause);
+  }
+
+  private static DocumentPage documentPage(String collection, ListObjectsV2Response response) {
+    Objects.requireNonNull(response, "AWS SDK returned a null list response");
+    List<DocumentKey> keys =
+        response.contents().stream()
+            .map(object -> R2ObjectKey.toDocumentKey(collection, object.key()))
+            .toList();
+    Optional<DocumentCursor> nextCursor =
+        Optional.ofNullable(response.nextContinuationToken()).map(DocumentCursor::new);
+    if (Boolean.TRUE.equals(response.isTruncated()) && nextCursor.isEmpty()) {
+      throw new StorageException.Operation(
+          "R2 list response is truncated without a continuation cursor");
+    }
+    return new DocumentPage(keys, nextCursor);
+  }
+
   private static boolean isNotFound(Throwable cause) {
     return cause instanceof NoSuchKeyException
         || (cause instanceof S3Exception serviceFailure && serviceFailure.statusCode() == 404);
@@ -195,17 +256,22 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
   }
 
   private static String requireBucketName(String bucketName) {
-    Objects.requireNonNull(bucketName, "bucketName");
-    if (bucketName.isBlank()) {
-      throw new IllegalArgumentException("bucketName must not be blank");
+    return requireText(bucketName, "bucketName");
+  }
+
+  private static String requireText(String value, String name) {
+    Objects.requireNonNull(value, name);
+    if (value.isBlank()) {
+      throw new IllegalArgumentException(name + " must not be blank");
     }
-    return bucketName;
+    return value;
   }
 
   private enum Operation {
     PUT("put"),
     GET("get"),
-    DELETE("delete");
+    DELETE("delete"),
+    LIST("list");
 
     private final String label;
 
