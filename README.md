@@ -37,7 +37,7 @@ R2D1 aims to provide:
 - Indexed filtering
 - Indexed sorting
 - Cursor-based pagination
-- Asynchronous index updates
+- Asynchronous storage orchestration
 - A small and predictable query API
 - A framework-independent Java API
 - Optional integrations for frameworks such as Spring
@@ -66,10 +66,10 @@ an asynchronous contract:
 R2D1Collection / Query        synchronous public API
               │
               ▼
-Future sync façade            the only blocking boundary
+Sync façade                   the only blocking boundary
               │
               ▼
-Future async orchestration    CompletionStage composition
+Async orchestration           CompletionStage composition
               │
        ┌──────┴──────┐
        ▼             ▼
@@ -90,10 +90,10 @@ authoritative `DocumentStore` with the AWS SDK v2 `S3AsyncClient` and its Netty 
 Synchronous public API
         │
         ▼
-Future sync façade
+Sync façade
         │
         ▼
-Future async orchestration
+Async orchestration
         │
         ▼
 DocumentStore
@@ -108,9 +108,9 @@ S3AsyncClient / Netty
 Cloudflare R2
 ```
 
-Application-to-SPI translation, orchestration, and the sync façade are not implemented yet. The D1
-adapter implements the asynchronous index SPI, but no cross-store atomic transaction is implied by
-either storage adapter.
+`PersistenceCollectionFactory` supplies application-to-SPI translation, orchestration, and the
+synchronous façade. The D1 adapter implements the asynchronous index SPI, but no cross-store atomic
+transaction is implied by either storage adapter.
 
 ### R2 owns the document
 
@@ -157,13 +157,21 @@ R2D1 will not download large numbers of R2 objects and perform filtering in appl
 
 ## Core Java API
 
-The core module defines the framework-independent contracts shown below. The R2 document adapter
-and D1 index adapter are available, but the collection factory, orchestration, and serialization
-are not included yet.
+The core module defines the framework-independent contracts shown below. The R2 document adapter,
+D1 index adapter, and cross-store collection factory are available. Applications supply a
+`DocumentCodec` so domain serialization remains independent of any JSON library.
 
 ```java
+R2DocumentStore documentStore = configuredR2DocumentStore;
+D1IndexStore indexStore = configuredD1IndexStore;
+DocumentCodec documentCodec = applicationDocumentCodec;
+
 R2D1 db = R2D1.builder()
-    .collectionFactory(collectionFactory)
+    .collectionFactory(new PersistenceCollectionFactory(
+        documentStore,
+        indexStore,
+        documentCodec,
+        indexStore::initialize))
     .build();
 
 R2D1Collection<User> users = db.collection(User.class);
@@ -255,17 +263,19 @@ D1IndexStore indexes =
 CompletionStage<Void> initialized = indexes.initialize(User.class);
 ```
 
-The future orchestration layer will await that stage at the synchronous collection boundary. The
-D1 adapter itself does not block, create executors, retry requests, serialize complete documents,
-or manage Cloudflare infrastructure.
+`PersistenceCollectionFactory` invokes this initialization through the supplied collection
+initializer and waits for it at the synchronous collection boundary. The D1 adapter itself does not
+block, create executors, retry requests, serialize complete documents, or manage Cloudflare
+infrastructure.
 
 ## Project Status
 
 🚧 **R2D1 is currently in the early design and development stage.**
 
-The first core API contracts, the R2 document adapter, and the D1 index adapter are available but
-remain unstable. The consistency model, orchestration, and module internals are still being
-developed and may change significantly before the first release.
+The first core API contracts, the R2 document adapter, the D1 index adapter, and synchronous
+persistence orchestration are available but remain unstable. Automated reconciliation and background
+index repair are not implemented yet, and module internals may change significantly before the
+first release.
 
 ## Requirements
 
