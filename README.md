@@ -324,6 +324,36 @@ Format Java sources with:
 ./gradlew spotlessApply
 ```
 
+### Cloudflare integration tests
+
+Live integration tests are isolated in the `r2d1-integration-tests` module and are never run by
+the standard `build` or `check` tasks. They must use an R2 bucket and D1 database dedicated to
+R2D1 integration testing. Do not point them at production resources or resources shared with an
+application.
+
+Set every required environment variable before running the opt-in task:
+
+```shell
+export R2D1_IT_R2_ENDPOINT="https://<account-id>.r2.cloudflarestorage.com"
+export R2D1_IT_R2_ACCESS_KEY_ID="<dedicated-r2-access-key-id>"
+export R2D1_IT_R2_SECRET_ACCESS_KEY="<dedicated-r2-secret-access-key>"
+export R2D1_IT_R2_BUCKET_NAME="<dedicated-r2-bucket>"
+export R2D1_IT_D1_ACCOUNT_ID="<cloudflare-account-id>"
+export R2D1_IT_D1_DATABASE_ID="<dedicated-d1-database-id>"
+export R2D1_IT_D1_API_TOKEN="<dedicated-d1-api-token>"
+export R2D1_IT_CONFIRM_DEDICATED_RESOURCES="true"
+
+GRADLE_USER_HOME=/tmp/r2d1-gradle-home \
+  ./gradlew :r2d1-integration-tests:integrationTest
+```
+
+An explicit integration-test run fails when any variable is missing or the dedicated-resource
+confirmation is not exactly `true`. The tests never print credential values. They delete only
+objects and rows in their versioned test collections before and after each scenario; D1 tables,
+columns, and SQLite indexes are retained. The first run creates the managed D1 schemas when they do
+not exist, and later runs validate and reuse those schemas. Resource provisioning and deletion are
+deliberately outside the test suite.
+
 ## License
 
 R2D1 is licensed under the [Apache License 2.0](LICENSE).
