@@ -1,33 +1,59 @@
-# R2D1
+<p align="center">
+  <img src="docs/assets/r2d1-logo.png" alt="R2D1 logo" width="120">
+</p>
 
-> A lightweight Java document store powered by Cloudflare R2 for storage and D1 for indexing, filtering, sorting, and pagination.
+<h1 align="center">R2D1</h1>
 
-R2D1 is a Java library that combines **Cloudflare R2** and **Cloudflare D1** to provide a simple document-oriented data store.
+<p align="center">
+  A lightweight Java document store powered by Cloudflare R2 for storage and D1 for indexing,
+  filtering, sorting, and pagination.
+</p>
+
+R2D1 is a framework-independent Java library that combines **Cloudflare R2** and **Cloudflare D1**
+to provide a simple document-oriented data store.
 
 The idea is simple:
 
-- **R2 stores the actual documents.**
-- **D1 stores the indexes required to find them.**
+- **R2 is the authoritative document store.**
+- **D1 is a rebuildable index projection used to find documents.**
 
-R2D1 is intentionally designed around a small and predictable query model rather than trying to provide a full SQL database or ORM.
+R2D1 is intentionally designed around a small and predictable query model rather than trying to
+provide a full SQL database or ORM.
 
 ## Architecture
 
 ```text
-                       R2D1
-                         │
-              ┌──────────┴──────────┐
-              │                     │
-              ▼                     ▼
-       Cloudflare D1          Cloudflare R2
-       ─────────────          ─────────────
-       Indexes                Documents
-       Filtering              JSON / Data
-       Sorting
-       Pagination
+R2D1Collection / Query              synchronous public API
+              │
+              ▼
+Synchronous collection façade      blocking boundary
+              │
+              ▼
+CompletionStage orchestration      asynchronous composition
+              │
+       ┌──────┴──────┐
+       ▼             ▼
+DocumentStore     IndexStore        technology-neutral SPI
+       │             │
+       ▼             ▼
+Cloudflare R2    Cloudflare D1
+Documents        Indexes and queries
 ```
 
-R2 acts as the primary document storage layer, while D1 provides the metadata and indexes necessary for efficient document discovery.
+The public collection API is synchronous. Storage I/O is composed asynchronously, and
+`StageSupport.await()` is used only at the synchronous boundary. The storage SPI exposes
+`CompletionStage` without leaking AWS or Cloudflare transport types and does not define an
+executor, callback thread, cancellation guarantee, or timeout policy.
+
+Persistence operations follow these paths:
+
+- `put`: serialize the document, write R2, then upsert the D1 index row.
+- `get`: read the authoritative document from R2 only.
+- `query`: query D1, then fetch the matching R2 documents concurrently while preserving D1 order.
+- `delete`: delete the R2 document, then delete the D1 index row.
+
+R2 and D1 do not share an atomic transaction. A successful R2 mutation followed by a failed D1
+mutation is reported as a partial failure and may require an explicit index rebuild.
 
 ## Goals
 
@@ -54,63 +80,7 @@ R2D1 is not intended to be:
 
 Queries are intentionally limited to fields that have been explicitly indexed.
 
-## Design Philosophy
-
-### Technology-neutral storage SPI
-
-The core module separates authoritative document bytes from the derived index without exposing
-vendor-specific concepts. The user-facing API remains synchronous while storage I/O is modeled as
-an asynchronous contract:
-
-```text
-R2D1Collection / Query        synchronous public API
-              │
-              ▼
-Sync façade                   the only blocking boundary
-              │
-              ▼
-Async orchestration           CompletionStage composition
-              │
-       ┌──────┴──────┐
-       ▼             ▼
-DocumentStore     IndexStore  asynchronous storage SPI
-```
-
-Physical document locations are derived by adapters from `DocumentKey`; index entries do not keep
-a competing storage reference. Index queries return document keys for later authoritative reads.
-The two stores do not promise a shared atomic transaction, so future orchestration must tolerate
-temporary inconsistency and allow the index to be rebuilt.
-
-These contracts are available in `dev.nexcraft.r2d1.spi` and expose `CompletionStage`, leaving
-`CompletableFuture` as an implementation detail. The SPI owns no executor or virtual thread and
-makes no callback-thread, cancellation, or timeout guarantee. The R2 module implements the
-authoritative `DocumentStore` with the AWS SDK v2 `S3AsyncClient` and its Netty transport:
-
-```text
-Synchronous public API
-        │
-        ▼
-Sync façade
-        │
-        ▼
-Async orchestration
-        │
-        ▼
-DocumentStore
-        │
-        ▼
-R2DocumentStore
-        │
-        ▼
-S3AsyncClient / Netty
-        │
-        ▼
-Cloudflare R2
-```
-
-`PersistenceCollectionFactory` supplies application-to-SPI translation, orchestration, and the
-synchronous façade. The D1 adapter implements the asynchronous index SPI, but no cross-store atomic
-transaction is implied by either storage adapter.
+## Storage and Query Model
 
 ### R2 owns the document
 
@@ -133,11 +103,12 @@ D1
 
 ### D1 is a rebuildable index
 
-D1 is treated as an index over the documents stored in R2 rather than the authoritative document store.
+D1 is treated as an index over the documents stored in R2 rather than the authoritative document
+store.
 
 This allows the indexing layer to be rebuilt from the underlying document data when necessary.
 
-### Queries should be predictable
+### Queries are predictable
 
 R2D1 deliberately avoids querying unindexed document fields.
 
@@ -157,9 +128,9 @@ R2D1 will not download large numbers of R2 objects and perform filtering in appl
 
 ## Core Java API
 
-The core module defines the framework-independent contracts shown below. The R2 document adapter,
-D1 index adapter, and cross-store collection factory are available. Applications supply a
-`DocumentCodec` so domain serialization remains independent of any JSON library.
+The core module defines the framework-independent contracts shown below. Applications configure the
+R2 and D1 adapters and supply a `DocumentCodec`, keeping domain serialization independent of any
+specific JSON library.
 
 ```java
 R2DocumentStore documentStore = configuredR2DocumentStore;
@@ -176,9 +147,10 @@ R2D1 db = R2D1.builder()
 
 R2D1Collection<User> users = db.collection(User.class);
 
-users.put(user);
+User document = applicationUser;
+users.put(document);
 
-Optional<User> user = users.get("user-123");
+Optional<User> storedUser = users.get("user-123");
 
 Page<User> page = users.query()
     .where("country").eq("NZ")
@@ -191,6 +163,9 @@ users.delete("user-123");
 // Run explicitly during a maintenance window when the D1 projection must be recovered.
 users.rebuildIndex();
 ```
+
+`R2DocumentStore` and `D1IndexStore` implement `AutoCloseable`. The application owns their lifecycle;
+`PersistenceCollectionFactory` does not close them.
 
 Document metadata may be declared using annotations:
 
@@ -259,6 +234,9 @@ r2d1-d1
 
 r2d1-r2
     Cloudflare R2 DocumentStore adapter using AWS SDK v2
+
+r2d1-integration-tests
+    Opt-in live tests against dedicated Cloudflare R2 and D1 resources
 ```
 
 Framework-specific integrations will remain separate from the core library.
@@ -275,7 +253,7 @@ r2d1-spring-boot-starter
 
 The core API will not depend on Spring.
 
-### D1 index adapter
+## D1 Schema Initialization
 
 The D1 module uses the Cloudflare D1 REST API through Java's reusable asynchronous `HttpClient` and
 uses Avaje JSON-B generated adapters for the REST protocol. A document type's schema must be
@@ -298,9 +276,9 @@ infrastructure.
 🚧 **R2D1 is currently in the early design and development stage.**
 
 The first core API contracts, the R2 document adapter, the D1 index adapter, and synchronous
-persistence orchestration are available but remain unstable. Automated reconciliation and background
-index repair are not implemented yet, and module internals may change significantly before the
-first release.
+persistence orchestration are available but remain unstable. Explicit index recovery through
+`rebuildIndex()` is available, but automatic reconciliation and background repair are not. Module
+internals may change significantly before the first release.
 
 ## Requirements
 
@@ -314,8 +292,8 @@ first release.
 Build and verify the complete project from the repository root:
 
 ```shell
-./gradlew build
-./gradlew check
+./gradlew clean check
+./gradlew javadoc
 ```
 
 Format Java sources with:
@@ -330,6 +308,21 @@ Live integration tests are isolated in the `r2d1-integration-tests` module and a
 the standard `build` or `check` tasks. They must use an R2 bucket and D1 database dedicated to
 R2D1 integration testing. Do not point them at production resources or resources shared with an
 application.
+
+Create the dedicated R2 bucket and D1 database manually before the first run. The test suite does
+not provision or delete Cloudflare resources.
+
+The integration-test task reads the process environment directly and does not load a `.env` file.
+If you keep the variables in a local file, source it before running Gradle:
+
+```shell
+set -a
+source /absolute/path/to/r2d1-integration.env
+set +a
+```
+
+This repository does not ignore `.env` files. Keep credential files outside the checkout or add
+them to your local Git exclude configuration, and never commit Cloudflare credentials.
 
 Set every required environment variable before running the opt-in task:
 
@@ -351,8 +344,7 @@ An explicit integration-test run fails when any variable is missing or the dedic
 confirmation is not exactly `true`. The tests never print credential values. They delete only
 objects and rows in their versioned test collections before and after each scenario; D1 tables,
 columns, and SQLite indexes are retained. The first run creates the managed D1 schemas when they do
-not exist, and later runs validate and reuse those schemas. Resource provisioning and deletion are
-deliberately outside the test suite.
+not exist, and later runs validate and reuse those schemas.
 
 ## License
 
