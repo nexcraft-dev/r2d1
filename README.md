@@ -35,9 +35,10 @@ CompletionStage orchestration      asynchronous composition
        ▼             ▼
 DocumentStore     IndexStore        technology-neutral SPI
        │             │
-       ▼             ▼
-Cloudflare R2    Cloudflare D1
-Documents        Indexes and queries
+       ▼             ├──────────────┐
+Cloudflare R2         ▼              ▼
+Documents        Cloudflare D1   JDBC foundation
+                 Indexes         Future local indexes
 ```
 
 The public collection API is synchronous. Storage I/O is composed asynchronously, and
@@ -235,6 +236,9 @@ r2d1-d1
 r2d1-r2
     Cloudflare R2 DocumentStore adapter using AWS SDK v2
 
+r2d1-jdbc
+    Bounded JDBC execution and internal dialect foundation for IndexStore adapters
+
 r2d1-integration-tests
     Opt-in live tests against dedicated Cloudflare R2 and D1 resources
 ```
@@ -271,14 +275,37 @@ initializer and waits for it at the synchronous collection boundary. The D1 adap
 block, create executors, retry requests, serialize complete documents, or manage Cloudflare
 infrastructure.
 
+## JDBC Foundation
+
+The optional `r2d1-jdbc` module adapts blocking JDBC operations to the asynchronous `IndexStore`
+contract through an explicitly owned, bounded execution resource:
+
+```java
+try (JdbcExecution execution = JdbcExecution.create(8, 128)) {
+    JdbcIndexStore indexes = new JdbcIndexStore(applicationDataSource, execution);
+    // Supply indexes and indexes::initialize to PersistenceCollectionFactory.
+}
+```
+
+`JdbcIndexStore` owns neither the standard `DataSource` nor `JdbcExecution`. A caller that wraps its
+own executor also retains that executor's lifecycle. JDBC connections are scoped to individual
+operations, while database-specific SQL and schema behavior remain behind an internal dialect
+boundary.
+
+This foundation release deliberately includes no JDBC driver or built-in database dialect. H2,
+HSQLDB, and SQLite support will be added separately; until then, database detection fails before any
+schema mutation. The module does not provide connection pooling, retries, virtual-thread execution,
+Spring integration, or a public dialect extension SPI.
+
 ## Project Status
 
 🚧 **R2D1 is currently in the early design and development stage.**
 
-The first core API contracts, the R2 document adapter, the D1 index adapter, and synchronous
-persistence orchestration are available but remain unstable. Explicit index recovery through
-`rebuildIndex()` is available, but automatic reconciliation and background repair are not. Module
-internals may change significantly before the first release.
+The first core API contracts, the R2 document adapter, the D1 index adapter, synchronous persistence
+orchestration, and the JDBC adapter foundation are available but remain unstable. Explicit index
+recovery through `rebuildIndex()` is available, but automatic reconciliation and background repair
+are not. JDBC database dialects are not implemented yet. Module internals may change significantly
+before the first release.
 
 ## Requirements
 

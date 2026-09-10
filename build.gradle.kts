@@ -1,4 +1,7 @@
 import com.diffplug.gradle.spotless.SpotlessExtension
+import com.diffplug.gradle.spotless.SpotlessTask
+import org.gradle.api.services.BuildService
+import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.testing.Test
@@ -9,6 +12,18 @@ plugins {
     base
     id("com.diffplug.spotless") version "8.10.2" apply false
 }
+
+abstract class SpotlessSerializationService : BuildService<BuildServiceParameters.None>, AutoCloseable {
+    override fun close() {}
+}
+
+val spotlessSerializationService =
+    gradle.sharedServices.registerIfAbsent(
+        "spotlessSerializationService",
+        SpotlessSerializationService::class,
+    ) {
+        maxParallelUsages.set(1)
+    }
 
 allprojects {
     group = "dev.nexcraft"
@@ -35,6 +50,10 @@ subprojects {
             target("src/**/*.java")
             googleJavaFormat("1.36.1")
         }
+    }
+
+    tasks.withType<SpotlessTask>().configureEach {
+        usesService(spotlessSerializationService)
     }
 
     dependencies {
