@@ -14,4 +14,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "r2d1"
 
-include("r2d1-core", "r2d1-d1", "r2d1-r2", "r2d1-integration-tests")
+include("r2d1-core", "r2d1-d1", "r2d1-r2", "r2d1-jdbc", "r2d1-integration-tests")
