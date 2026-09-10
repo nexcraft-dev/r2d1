@@ -11,7 +11,10 @@ final class JdbcDialects {
   private JdbcDialects() {}
 
   static JdbcDialect detect(DatabaseMetaData metadata) throws SQLException {
-    Objects.requireNonNull(metadata, "metadata").getDatabaseProductName();
+    String productName = Objects.requireNonNull(metadata, "metadata").getDatabaseProductName();
+    if ("H2".equals(productName)) {
+      return new H2Dialect();
+    }
     throw new StorageException.Operation("JDBC database is not supported");
   }
 

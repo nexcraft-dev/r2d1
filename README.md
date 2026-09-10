@@ -5,20 +5,19 @@
 <h1 align="center">R2D1</h1>
 
 <p align="center">
-  A lightweight Java document store powered by Cloudflare R2 for storage and D1 for indexing,
+  A Java document store using Cloudflare R2 for storage and D1 for indexing,
   filtering, sorting, and pagination.
 </p>
 
 R2D1 is a framework-independent Java library that combines **Cloudflare R2** and **Cloudflare D1**
-to provide a simple document-oriented data store.
+for document storage and indexed queries.
 
-The idea is simple:
+The storage model has two parts:
 
 - **R2 is the authoritative document store.**
 - **D1 is a rebuildable index projection used to find documents.**
 
-R2D1 is intentionally designed around a small and predictable query model rather than trying to
-provide a full SQL database or ORM.
+R2D1 exposes a limited query model. It is not a SQL database or ORM.
 
 ## Architecture
 
@@ -37,8 +36,8 @@ DocumentStore     IndexStore        technology-neutral SPI
        │             │
        ▼             ├──────────────┐
 Cloudflare R2         ▼              ▼
-Documents        Cloudflare D1   JDBC foundation
-                 Indexes         Future local indexes
+Documents        Cloudflare D1   H2 via JDBC
+                 Indexes         Local indexes
 ```
 
 The public collection API is synchronous. Storage I/O is composed asynchronously, and
@@ -56,9 +55,9 @@ Persistence operations follow these paths:
 R2 and D1 do not share an atomic transaction. A successful R2 mutation followed by a failed D1
 mutation is reported as a partial failure and may require an explicit index rebuild.
 
-## Goals
+## Design Goals
 
-R2D1 aims to provide:
+The project focuses on:
 
 - Simple CRUD operations
 - Indexed filtering
@@ -69,9 +68,9 @@ R2D1 aims to provide:
 - A framework-independent Java API
 - Optional integrations for frameworks such as Spring
 
-## Non-Goals
+## Out of Scope
 
-R2D1 is not intended to be:
+R2D1 does not provide:
 
 - A relational database
 - A general-purpose SQL abstraction
@@ -79,7 +78,7 @@ R2D1 is not intended to be:
 - A replacement for complex query engines
 - A system for joins or arbitrary aggregations
 
-Queries are intentionally limited to fields that have been explicitly indexed.
+Queries can use only fields that have been explicitly indexed.
 
 ## Storage and Query Model
 
@@ -104,14 +103,12 @@ D1
 
 ### D1 is a rebuildable index
 
-D1 is treated as an index over the documents stored in R2 rather than the authoritative document
-store.
+D1 is an index over the documents stored in R2, not an authoritative document store. The index can
+be rebuilt from the R2 documents when necessary.
 
-This allows the indexing layer to be rebuilt from the underlying document data when necessary.
+### Query constraints
 
-### Queries are predictable
-
-R2D1 deliberately avoids querying unindexed document fields.
+R2D1 does not query unindexed document fields.
 
 A query such as:
 
@@ -125,7 +122,7 @@ users.query()
 
 is valid only when the queried and sorted fields have been configured appropriately for indexing.
 
-R2D1 will not download large numbers of R2 objects and perform filtering in application memory.
+R2D1 does not download R2 objects for filtering in application memory.
 
 ## Core Java API
 
@@ -237,7 +234,7 @@ r2d1-r2
     Cloudflare R2 DocumentStore adapter using AWS SDK v2
 
 r2d1-jdbc
-    Bounded JDBC execution and internal dialect foundation for IndexStore adapters
+    Optional JDBC IndexStore adapter with bounded execution and built-in H2 support
 
 r2d1-integration-tests
     Opt-in live tests against dedicated Cloudflare R2 and D1 resources
@@ -275,44 +272,30 @@ initializer and waits for it at the synchronous collection boundary. The D1 adap
 block, create executors, retry requests, serialize complete documents, or manage Cloudflare
 infrastructure.
 
-## JDBC Foundation
+## JDBC Module
 
-The optional `r2d1-jdbc` module adapts blocking JDBC operations to the asynchronous `IndexStore`
-contract through an explicitly owned, bounded execution resource:
+The optional `r2d1-jdbc` module adapts blocking JDBC databases to the asynchronous `IndexStore`
+contract through a bounded execution resource. It currently supports H2. The module detects the
+database from the caller-provided `DataSource`, keeps database-specific behavior behind an internal
+dialect boundary, and does not bundle a JDBC driver.
 
-```java
-try (JdbcExecution execution = JdbcExecution.create(8, 128)) {
-    JdbcIndexStore indexes = new JdbcIndexStore(applicationDataSource, execution);
-    // Supply indexes and indexes::initialize to PersistenceCollectionFactory.
-}
-```
-
-`JdbcIndexStore` owns neither the standard `DataSource` nor `JdbcExecution`. A caller that wraps its
-own executor also retains that executor's lifecycle. JDBC connections are scoped to individual
-operations, while database-specific SQL and schema behavior remain behind an internal dialect
-boundary.
-
-This foundation release deliberately includes no JDBC driver or built-in database dialect. H2,
-HSQLDB, and SQLite support will be added separately; until then, database detection fails before any
-schema mutation. The module does not provide connection pooling, retries, virtual-thread execution,
-Spring integration, or a public dialect extension SPI.
+See the [JDBC module guide](r2d1-jdbc/README.md) for supported databases, Gradle and Maven
+dependencies, H2 configuration, lifecycle ownership, schema behavior, and query semantics.
 
 ## Project Status
 
-🚧 **R2D1 is currently in the early design and development stage.**
-
-The first core API contracts, the R2 document adapter, the D1 index adapter, synchronous persistence
-orchestration, and the JDBC adapter foundation are available but remain unstable. Explicit index
-recovery through `rebuildIndex()` is available, but automatic reconciliation and background repair
-are not. JDBC database dialects are not implemented yet. Module internals may change significantly
-before the first release.
+R2D1 is under active development. The core API, R2 and D1 adapters, persistence orchestration, and
+the H2 JDBC adapter are available but remain unstable. Explicit index recovery through
+`rebuildIndex()` is available, but automatic reconciliation and background repair are not. Other
+JDBC databases are not yet supported. Module internals may change before the first release.
 
 ## Requirements
 
 - Java 21+
-- Cloudflare account
-- Cloudflare R2
-- Cloudflare D1
+- Adapter-specific infrastructure:
+  - Cloudflare account and R2 bucket for `r2d1-r2`
+  - Cloudflare account and D1 database for `r2d1-d1`
+  - Application-provided H2 driver and `DataSource` for the `r2d1-jdbc` H2 backend
 
 ## Development
 

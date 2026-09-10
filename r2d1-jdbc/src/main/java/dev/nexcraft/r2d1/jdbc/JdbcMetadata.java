@@ -11,11 +11,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /** Converts core annotations to database-neutral metadata used inside the JDBC adapter. */
 final class JdbcMetadata {
 
   static final String DOCUMENT_ID = "document_id";
+  private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
   private JdbcMetadata() {}
 
@@ -26,10 +28,7 @@ final class JdbcMetadata {
       throw new IllegalArgumentException(
           "document type must be annotated with @Document: " + documentType.getName());
     }
-    if (document.value().isBlank()) {
-      throw new IllegalArgumentException(
-          "document collection must not be blank: " + documentType.getName());
-    }
+    String collection = requireIdentifier(document.value(), "document collection");
 
     Map<String, IndexedField> indexedFields = new LinkedHashMap<>();
     for (Class<?> current : hierarchy(documentType)) {
@@ -37,7 +36,7 @@ final class JdbcMetadata {
         if (field.isSynthetic() || !field.isAnnotationPresent(Index.class)) {
           continue;
         }
-        String name = field.getName();
+        String name = requireIdentifier(field.getName(), "indexed field");
         if (DOCUMENT_ID.equals(name)) {
           throw new IllegalArgumentException(
               "indexed field name is reserved by R2D1: " + DOCUMENT_ID);
@@ -51,7 +50,16 @@ final class JdbcMetadata {
     }
     List<IndexedField> ordered =
         indexedFields.values().stream().sorted(Comparator.comparing(IndexedField::name)).toList();
-    return new CollectionMetadata(documentType, document.value(), ordered);
+    return new CollectionMetadata(documentType, collection, ordered);
+  }
+
+  static String requireIdentifier(String value, String description) {
+    Objects.requireNonNull(value, description);
+    if (!IDENTIFIER.matcher(value).matches()) {
+      throw new IllegalArgumentException(
+          description + " must match " + IDENTIFIER.pattern() + ": " + value);
+    }
+    return value;
   }
 
   private static List<Class<?>> hierarchy(Class<?> documentType) {
@@ -77,6 +85,15 @@ final class JdbcMetadata {
 
     boolean hasSameSchema(CollectionMetadata other) {
       return collection.equals(other.collection) && indexedFields.equals(other.indexedFields);
+    }
+
+    IndexedField requireIndexedField(String name) {
+      for (IndexedField field : indexedFields) {
+        if (field.name().equals(name)) {
+          return field;
+        }
+      }
+      throw new IllegalArgumentException("field is not indexed: " + name);
     }
   }
 
