@@ -27,9 +27,8 @@ import org.jspecify.annotations.Nullable;
  * operation. The execution resource must be closed by the caller that created it.
  *
  * <p>{@link #initialize(Class)} must complete before a collection is used. Database detection runs
- * through {@link DatabaseMetaData} before a dialect can mutate schema. This foundation release does
- * not yet include an H2, HSQLDB, or SQLite dialect, so unsupported databases fail safely before
- * schema initialization.
+ * through {@link DatabaseMetaData} before a dialect can mutate schema. H2 is supported as a
+ * persistent embedded index database. Other databases fail safely before schema initialization.
  */
 public final class JdbcIndexStore implements IndexStore {
 
@@ -164,7 +163,11 @@ public final class JdbcIndexStore implements IndexStore {
               Objects.requireNonNull(
                   dialectResolver.detect(connection.getMetaData()),
                   "JDBC dialect resolver returned null");
-          dialect.initialize(connection, registration.metadata());
+          try {
+            dialect.initialize(connection, registration.metadata());
+          } catch (SQLException failure) {
+            throw translate("schema initialization", dialect, failure);
+          }
           registration.dialect(dialect);
           return null;
         });

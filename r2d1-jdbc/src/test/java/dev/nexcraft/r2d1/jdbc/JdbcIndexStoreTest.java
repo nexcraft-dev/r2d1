@@ -3,6 +3,7 @@ package dev.nexcraft.r2d1.jdbc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.nexcraft.r2d1.annotation.Document;
 import dev.nexcraft.r2d1.annotation.Index;
@@ -33,6 +34,17 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 class JdbcIndexStoreTest {
+
+  @Test
+  void detectsTheBuiltInH2DialectByExactProductName() throws SQLException {
+    DatabaseMetaData h2 = proxy(DatabaseMetaData.class, new MetadataHandler("H2"));
+    DatabaseMetaData lowerCase = proxy(DatabaseMetaData.class, new MetadataHandler("h2"));
+
+    assertThat(JdbcDialects.detect(h2)).isInstanceOf(H2Dialect.class);
+    assertThatThrownBy(() -> JdbcDialects.detect(lowerCase))
+        .isInstanceOf(StorageException.Operation.class)
+        .hasMessage("JDBC database is not supported");
+  }
 
   @Test
   void initializesOnceAndRoutesEveryOperationThroughJdbcExecution() {
@@ -167,6 +179,25 @@ class JdbcIndexStoreTest {
   }
 
   @Test
+  void usesTheDetectedDialectToTranslateSchemaInitializationFailures() {
+    RecordingDataSource dataSource = new RecordingDataSource("Test Database");
+    RecordingDialect dialect = new RecordingDialect();
+    SQLException cause = new SQLException("schema lock detail", "HYT00");
+    dialect.sqlFailure = cause;
+    dialect.translatedFailure =
+        new StorageException.Unavailable("JDBC schema initialization failed", cause);
+
+    try (JdbcExecution execution = JdbcExecution.create(1, 1)) {
+      JdbcIndexStore store = new JdbcIndexStore(dataSource, execution, ignored -> dialect);
+
+      assertThat(completedFailure(store.initialize(User.class)))
+          .isInstanceOf(StorageException.Unavailable.class)
+          .hasMessage("JDBC schema initialization failed")
+          .hasCause(cause);
+    }
+  }
+
+  @Test
   void convertsDialectRuntimeFailureAndExecutionShutdownToExceptionalStages() {
     RecordingDataSource dataSource = new RecordingDataSource("Test Database");
     RecordingDialect dialect = new RecordingDialect();
@@ -240,6 +271,7 @@ class JdbcIndexStoreTest {
     private CollectionMetadata metadata = JdbcMetadata.inspect(User.class);
     private IndexPage page = new IndexPage(List.of(), Optional.empty());
     private @Nullable SQLException sqlFailure;
+    private @Nullable StorageException translatedFailure;
     private @Nullable RuntimeException runtimeFailure;
 
     @Override
@@ -270,6 +302,12 @@ class JdbcIndexStoreTest {
     public void delete(Connection connection, CollectionMetadata metadata, DocumentKey key)
         throws SQLException {
       record("delete");
+    }
+
+    @Override
+    public StorageException translate(String operation, SQLException failure) {
+      StorageException translated = translatedFailure;
+      return translated == null ? JdbcDialect.super.translate(operation, failure) : translated;
     }
 
     private void record(String operation) throws SQLException {

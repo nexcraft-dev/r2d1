@@ -48,7 +48,13 @@ class JdbcMetadataTest {
         .withMessageContaining("must be annotated with @Document");
     assertThatIllegalArgumentException()
         .isThrownBy(() -> JdbcMetadata.inspect(BlankCollection.class))
-        .withMessageContaining("collection must not be blank");
+        .withMessageContaining("document collection must match [A-Za-z_][A-Za-z0-9_]*");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> JdbcMetadata.inspect(InvalidCollection.class))
+        .withMessageContaining("document collection must match [A-Za-z_][A-Za-z0-9_]*");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> JdbcMetadata.inspect(InvalidField.class))
+        .withMessageContaining("indexed field must match [A-Za-z_][A-Za-z0-9_]*");
     assertThatIllegalArgumentException()
         .isThrownBy(() -> JdbcMetadata.inspect(UnsupportedValue.class))
         .withMessageContaining("uses unsupported type: java.lang.Integer");
@@ -98,6 +104,14 @@ class JdbcMetadataTest {
 
   @Document(" ")
   private static final class BlankCollection {}
+
+  @Document("invalid-name")
+  private static final class InvalidCollection {}
+
+  @Document("events")
+  private static final class InvalidField {
+    @Index private String $invalid;
+  }
 
   @Document("events")
   private static final class UnsupportedValue {
