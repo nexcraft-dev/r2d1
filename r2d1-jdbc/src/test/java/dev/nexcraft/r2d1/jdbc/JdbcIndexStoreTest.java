@@ -7,7 +7,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.nexcraft.r2d1.annotation.Document;
 import dev.nexcraft.r2d1.annotation.Index;
-import dev.nexcraft.r2d1.jdbc.JdbcMetadata.CollectionMetadata;
+import dev.nexcraft.r2d1.jdbc.internal.database.JdbcDatabase;
+import dev.nexcraft.r2d1.jdbc.internal.database.JdbcDialects;
+import dev.nexcraft.r2d1.jdbc.internal.metadata.JdbcMetadata;
+import dev.nexcraft.r2d1.jdbc.internal.metadata.JdbcMetadata.CollectionMetadata;
 import dev.nexcraft.r2d1.spi.DocumentKey;
 import dev.nexcraft.r2d1.spi.IndexEntry;
 import dev.nexcraft.r2d1.spi.IndexPage;
@@ -42,8 +45,8 @@ class JdbcIndexStoreTest {
         proxy(DatabaseMetaData.class, new MetadataHandler("HSQL Database Engine"));
     DatabaseMetaData lowerCase = proxy(DatabaseMetaData.class, new MetadataHandler("h2"));
 
-    assertThat(JdbcDialects.detect(h2)).isInstanceOf(H2Dialect.class);
-    assertThat(JdbcDialects.detect(hsqldb)).isInstanceOf(HsqldbDialect.class);
+    assertThat(JdbcDialects.detect(h2).getClass().getSimpleName()).isEqualTo("H2Dialect");
+    assertThat(JdbcDialects.detect(hsqldb).getClass().getSimpleName()).isEqualTo("HsqldbDialect");
     assertThatThrownBy(() -> JdbcDialects.detect(lowerCase))
         .isInstanceOf(StorageException.Operation.class)
         .hasMessage("JDBC database is not supported");
@@ -267,7 +270,7 @@ class JdbcIndexStoreTest {
     }
   }
 
-  private static final class RecordingDialect implements JdbcDialect {
+  private static final class RecordingDialect implements JdbcDatabase {
 
     private final List<String> operations = new ArrayList<>();
     private final List<Thread> operationThreads = new ArrayList<>();
@@ -310,7 +313,7 @@ class JdbcIndexStoreTest {
     @Override
     public StorageException translate(String operation, SQLException failure) {
       StorageException translated = translatedFailure;
-      return translated == null ? JdbcDialect.super.translate(operation, failure) : translated;
+      return translated == null ? JdbcDatabase.super.translate(operation, failure) : translated;
     }
 
     private void record(String operation) throws SQLException {

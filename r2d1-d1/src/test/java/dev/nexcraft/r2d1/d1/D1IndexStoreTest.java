@@ -6,6 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import dev.nexcraft.r2d1.annotation.Document;
 import dev.nexcraft.r2d1.annotation.Index;
+import dev.nexcraft.r2d1.d1.internal.sql.D1Parameter;
+import dev.nexcraft.r2d1.d1.internal.sql.D1Result;
+import dev.nexcraft.r2d1.d1.internal.transport.D1Transport;
+import dev.nexcraft.r2d1.d1.internal.transport.ScriptedD1Transport;
 import dev.nexcraft.r2d1.spi.DocumentKey;
 import dev.nexcraft.r2d1.spi.IndexEntry;
 import dev.nexcraft.r2d1.spi.IndexPage;

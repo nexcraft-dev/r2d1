@@ -1,5 +1,6 @@
 package dev.nexcraft.r2d1;
 
+import dev.nexcraft.r2d1.internal.persistence.PersistenceRuntime;
 import dev.nexcraft.r2d1.spi.DocumentStore;
 import dev.nexcraft.r2d1.spi.IndexStore;
 import java.util.Objects;
@@ -43,12 +44,12 @@ public final class PersistenceCollectionFactory implements R2D1.CollectionFactor
 
   @Override
   public <T> R2D1Collection<T> create(Class<T> documentType) {
-    Objects.requireNonNull(documentType, "documentType");
-    DocumentMetadata<T> metadata = DocumentMetadata.inspect(documentType);
-    CompletionStage<@Nullable Void> initialization =
-        StageSupport.invoke(() -> collectionInitializer.initialize(documentType));
-    StageSupport.await(initialization);
-    return new PersistentR2D1Collection<>(metadata, documentStore, indexStore, documentCodec);
+    return PersistenceRuntime.create(
+        Objects.requireNonNull(documentType, "documentType"),
+        documentStore,
+        indexStore,
+        documentCodec,
+        collectionInitializer);
   }
 
   /** Asynchronously initializes or validates storage metadata for one document collection. */

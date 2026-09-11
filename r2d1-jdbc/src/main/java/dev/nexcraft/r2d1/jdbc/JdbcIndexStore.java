@@ -1,7 +1,10 @@
 package dev.nexcraft.r2d1.jdbc;
 
-import dev.nexcraft.r2d1.jdbc.JdbcDialects.Resolver;
-import dev.nexcraft.r2d1.jdbc.JdbcMetadata.CollectionMetadata;
+import dev.nexcraft.r2d1.jdbc.internal.database.JdbcDatabase;
+import dev.nexcraft.r2d1.jdbc.internal.database.JdbcDialects;
+import dev.nexcraft.r2d1.jdbc.internal.database.JdbcDialects.Resolver;
+import dev.nexcraft.r2d1.jdbc.internal.metadata.JdbcMetadata;
+import dev.nexcraft.r2d1.jdbc.internal.metadata.JdbcMetadata.CollectionMetadata;
 import dev.nexcraft.r2d1.spi.DocumentKey;
 import dev.nexcraft.r2d1.spi.IndexEntry;
 import dev.nexcraft.r2d1.spi.IndexPage;
@@ -159,7 +162,7 @@ public final class JdbcIndexStore implements IndexStore {
         "schema initialization",
         null,
         connection -> {
-          JdbcDialect dialect =
+          JdbcDatabase dialect =
               Objects.requireNonNull(
                   dialectResolver.detect(connection.getMetaData()),
                   "JDBC dialect resolver returned null");
@@ -179,7 +182,7 @@ public final class JdbcIndexStore implements IndexStore {
         .initialization()
         .thenCompose(
             ignored -> {
-              JdbcDialect dialect =
+              JdbcDatabase dialect =
                   Objects.requireNonNull(
                       registration.dialect(), "initialized JDBC registration has no dialect");
               return execute(
@@ -188,7 +191,7 @@ public final class JdbcIndexStore implements IndexStore {
   }
 
   private <T extends @Nullable Object> CompletionStage<T> execute(
-      String operation, @Nullable JdbcDialect dialect, ConnectedOperation<T> invocation) {
+      String operation, @Nullable JdbcDatabase dialect, ConnectedOperation<T> invocation) {
     return execution.execute(
         () -> {
           try (Connection connection =
@@ -206,9 +209,9 @@ public final class JdbcIndexStore implements IndexStore {
   }
 
   private static StorageException translate(
-      String operation, @Nullable JdbcDialect dialect, SQLException failure) {
+      String operation, @Nullable JdbcDatabase dialect, SQLException failure) {
     if (dialect == null) {
-      return JdbcExceptions.translateBeforeDetection(operation, failure);
+      return JdbcDialects.translateBeforeDetection(operation, failure);
     }
     try {
       StorageException translated =
@@ -260,7 +263,7 @@ public final class JdbcIndexStore implements IndexStore {
 
     private final CollectionMetadata metadata;
     private final CompletableFuture<@Nullable Void> initialization;
-    private volatile @Nullable JdbcDialect dialect;
+    private volatile @Nullable JdbcDatabase dialect;
 
     private Registration(
         CollectionMetadata metadata, CompletableFuture<@Nullable Void> initialization) {
@@ -276,11 +279,11 @@ public final class JdbcIndexStore implements IndexStore {
       return initialization;
     }
 
-    private @Nullable JdbcDialect dialect() {
+    private @Nullable JdbcDatabase dialect() {
       return dialect;
     }
 
-    private void dialect(JdbcDialect value) {
+    private void dialect(JdbcDatabase value) {
       dialect = Objects.requireNonNull(value, "value");
     }
   }
@@ -294,6 +297,6 @@ public final class JdbcIndexStore implements IndexStore {
   @FunctionalInterface
   private interface ConnectedDialectOperation<T extends @Nullable Object> {
 
-    T execute(Connection connection, JdbcDialect dialect) throws SQLException;
+    T execute(Connection connection, JdbcDatabase dialect) throws SQLException;
   }
 }

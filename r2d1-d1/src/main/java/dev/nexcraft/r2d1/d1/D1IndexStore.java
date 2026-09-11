@@ -1,5 +1,12 @@
 package dev.nexcraft.r2d1.d1;
 
+import dev.nexcraft.r2d1.d1.internal.metadata.D1CollectionMetadata;
+import dev.nexcraft.r2d1.d1.internal.metadata.D1Metadata;
+import dev.nexcraft.r2d1.d1.internal.schema.D1SchemaManager;
+import dev.nexcraft.r2d1.d1.internal.sql.D1Result;
+import dev.nexcraft.r2d1.d1.internal.sql.D1SqlCompiler;
+import dev.nexcraft.r2d1.d1.internal.sql.D1Statement;
+import dev.nexcraft.r2d1.d1.internal.transport.D1Transport;
 import dev.nexcraft.r2d1.spi.DocumentKey;
 import dev.nexcraft.r2d1.spi.IndexEntry;
 import dev.nexcraft.r2d1.spi.IndexPage;
@@ -44,7 +51,7 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
    * @throws NullPointerException if {@code config} is {@code null}
    */
   public D1IndexStore(D1Config config) {
-    this(new RestD1Transport(Objects.requireNonNull(config, "config")), true);
+    this(D1Transport.rest(Objects.requireNonNull(config, "config")), true);
   }
 
   D1IndexStore(D1Transport transport) {

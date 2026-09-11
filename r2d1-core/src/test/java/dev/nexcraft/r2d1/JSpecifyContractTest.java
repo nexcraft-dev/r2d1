@@ -3,6 +3,7 @@ package dev.nexcraft.r2d1;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.nexcraft.r2d1.annotation.Document;
+import dev.nexcraft.r2d1.internal.persistence.PersistenceRuntime;
 import dev.nexcraft.r2d1.spi.DocumentStore;
 import dev.nexcraft.r2d1.spi.StoredDocument;
 import java.lang.reflect.Method;
@@ -41,6 +42,8 @@ class JSpecifyContractTest {
             PersistenceCollectionFactory.class.getPackage().isAnnotationPresent(NullMarked.class))
         .isTrue();
     assertThat(PersistenceException.class.getPackage().isAnnotationPresent(NullMarked.class))
+        .isTrue();
+    assertThat(PersistenceRuntime.class.getPackage().isAnnotationPresent(NullMarked.class))
         .isTrue();
   }
 }

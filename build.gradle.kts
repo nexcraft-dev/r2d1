@@ -5,6 +5,7 @@ import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.testing.Test
+import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.testing.jacoco.plugins.JacocoPluginExtension
 import org.gradle.testing.jacoco.tasks.JacocoReport
 
@@ -83,5 +84,9 @@ subprojects {
             html.required = true
             csv.required = false
         }
+    }
+
+    tasks.withType<Javadoc>().configureEach {
+        exclude("**/internal/**")
     }
 }

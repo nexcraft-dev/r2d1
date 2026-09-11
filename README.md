@@ -240,7 +240,18 @@ r2d1-integration-tests
     Opt-in live tests against dedicated Cloudflare R2 and D1 resources
 ```
 
+Integration tests are grouped by purpose: Cloudflare resource scenarios use
+`dev.nexcraft.r2d1.integration.cloudflare`, end-to-end consistency flows use
+`dev.nexcraft.r2d1.integration.persistence`, and reusable fixtures live under
+`dev.nexcraft.r2d1.integration.support`.
+
 Framework-specific integrations will remain separate from the core library.
+
+Implementation details are grouped below the supported public packages. Core persistence
+orchestration uses `dev.nexcraft.r2d1.internal.persistence`; the D1 adapter separates metadata,
+SQL, transport, and schema code under `dev.nexcraft.r2d1.d1.internal`; and JDBC keeps metadata and
+database mechanics under `dev.nexcraft.r2d1.jdbc.internal`. These internal packages are excluded
+from the supported API and may change between releases.
 
 Public Java packages use JSpecify `@NullMarked` semantics. Nullable API positions, such as a final
 page's absent `nextCursor`, are declared explicitly with `@Nullable`.
