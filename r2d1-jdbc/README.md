@@ -8,6 +8,10 @@ The module keeps database-specific SQL and schema behavior behind an internal di
 Applications use the same `JdbcIndexStore(DataSource, JdbcExecution)` API for every supported
 database and provide the JDBC driver themselves.
 
+The implementation is organized under `dev.nexcraft.r2d1.jdbc.internal`. Metadata conversion and
+database mechanics are implementation details; the internal `JdbcDatabase` bridge is not a
+supported extension SPI, and applications should continue to use `JdbcIndexStore`.
+
 ## Supported databases
 
 | Database | Status | Covered mode |

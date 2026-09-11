@@ -2,6 +2,8 @@ package dev.nexcraft.r2d1.jdbc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.nexcraft.r2d1.jdbc.internal.database.JdbcDatabase;
+import dev.nexcraft.r2d1.jdbc.internal.metadata.JdbcMetadata;
 import java.lang.reflect.AnnotatedParameterizedType;
 import java.lang.reflect.Method;
 import org.jspecify.annotations.NullMarked;
@@ -13,6 +15,8 @@ class JdbcJSpecifyContractTest {
   @Test
   void nullMarksTheJdbcAdapterPackage() {
     assertThat(JdbcIndexStore.class.getPackage().isAnnotationPresent(NullMarked.class)).isTrue();
+    assertThat(JdbcDatabase.class.getPackage().isAnnotationPresent(NullMarked.class)).isTrue();
+    assertThat(JdbcMetadata.class.getPackage().isAnnotationPresent(NullMarked.class)).isTrue();
   }
 
   @Test
