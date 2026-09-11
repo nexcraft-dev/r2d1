@@ -18,6 +18,7 @@ supported extension SPI, and applications should continue to use `JdbcIndexStore
 | --- | --- | --- |
 | H2 | Built-in | Persistent embedded file database |
 | HSQLDB | Built-in | Persistent embedded file database |
+| SQLite | Built-in | Local persistent file database |
 
 The dialect is selected from the exact JDBC product name. Unknown databases fail before schema
 mutation.
@@ -28,8 +29,8 @@ mutation.
 `r2d1-core` separately. A concrete `DocumentStore`, such as `r2d1-r2` or an application
 implementation, is still required for complete document persistence.
 
-The H2 and HSQLDB drivers are not bundled or exposed transitively. Applications must provide the
-driver for the database selected by their `DataSource`.
+The H2, HSQLDB, and SQLite drivers are not bundled or exposed transitively. Applications must
+provide the driver for the database selected by their `DataSource`.
 
 ### Gradle
 
@@ -64,6 +65,18 @@ dependencies {
 
 If application source code imports `org.hsqldb.jdbc.JDBCDataSource`, use
 `implementation("org.hsqldb:hsqldb:2.7.4")` instead.
+
+For SQLite, the integration-tested Xerial driver version is `3.53.4.0`:
+
+```kotlin
+dependencies {
+    implementation("dev.nexcraft:r2d1-jdbc:<version>")
+    runtimeOnly("org.xerial:sqlite-jdbc:3.53.4.0")
+}
+```
+
+Use `implementation("org.xerial:sqlite-jdbc:3.53.4.0")` when application source imports
+`org.sqlite.SQLiteDataSource` directly.
 
 ### Maven
 
@@ -100,6 +113,19 @@ The equivalent HSQLDB runtime dependency is:
 ```
 
 Omit `<scope>runtime</scope>` when application source code directly imports HSQLDB classes.
+
+The equivalent SQLite runtime dependency is:
+
+```xml
+<dependency>
+  <groupId>org.xerial</groupId>
+  <artifactId>sqlite-jdbc</artifactId>
+  <version>3.53.4.0</version>
+  <scope>runtime</scope>
+</dependency>
+```
+
+Omit `<scope>runtime</scope>` when application source code directly imports Xerial classes.
 
 ## Configure H2
 
@@ -179,10 +205,49 @@ stop admitting new operations, retain and await every in-flight `CompletionStage
 only after that close the lifecycle-bearing DataSource or pool. `JdbcExecution.close()` does not
 wait for submitted work. A later DataSource can reopen the same path.
 
+## Configure SQLite
+
+### Local persistent file database
+
+Use a distinct absolute local file path for the index database:
+
+```text
+jdbc:sqlite:/absolute/path/to/r2d1-index.db
+```
+
+The built-in SQLite dialect requires the connection's `main` database to identify a persistent
+file. In-memory and temporary main databases are rejected. Network-mounted filesystems,
+distributed access, and remote SQLite services are outside the support boundary.
+
+When Xerial is a compile dependency, an application can create its own `SQLiteDataSource`:
+
+```java
+import org.sqlite.SQLiteDataSource;
+
+SQLiteDataSource dataSource = new SQLiteDataSource();
+dataSource.setUrl("jdbc:sqlite:/absolute/path/to/r2d1-index.db");
+```
+
+R2D1 applies `PRAGMA busy_timeout=5000` to every SQLite connection used for an operation. This is
+a bounded lock wait, not an R2D1 retry policy. The dialect does not change `journal_mode` or enable
+unrelated PRAGMAs. An application may opt in to WAL through its own DataSource or database setup;
+R2D1 preserves that setting. WAL remains limited to a single host and does not make network
+filesystems supported.
+
+SQLite allows multiple readers but only one writer. One `JdbcIndexStore` instance serializes its
+schema changes, upserts, deletes, and clears across all initialized collections. Queries do not use
+that write coordinator. Separate store instances and external processes coordinate through SQLite
+locking and the configured busy timeout; no automatic retry or backoff is performed.
+
+`JdbcIndexStore` closes every operation connection. Before releasing an application-owned
+DataSource, stop admitting work, retain and await in-flight stages, and then close `JdbcExecution`.
+After all connections close, a new DataSource can reopen the same database file, schema, indexes,
+and rows.
+
 ## Connect a JDBC backend to R2D1
 
 Create one bounded execution resource for blocking JDBC work and pass the selected database's
-`DataSource` to `JdbcIndexStore`. The same code works for H2 and HSQLDB. Supply
+`DataSource` to `JdbcIndexStore`. The same code works for H2, HSQLDB, and SQLite. Supply
 `indexStore::initialize` as the collection initializer:
 
 ```java
@@ -227,9 +292,10 @@ the following sequence:
 1. Inspect the document type and validate its collection and indexed fields.
 2. Open a connection through the supplied `DataSource` on `JdbcExecution`.
 3. Read `DatabaseMetaData.getDatabaseProductName()`.
-4. Select the internal H2 dialect for exactly `H2`, or the HSQLDB dialect for exactly
-   `HSQL Database Engine`.
-5. Capture the active catalog and schema, then create or validate the collection schema.
+4. Select the internal H2 dialect for exactly `H2`, the HSQLDB dialect for exactly
+   `HSQL Database Engine`, or the SQLite dialect for exactly `SQLite`.
+5. Capture the active catalog and schema, or SQLite `main` database file, then create or validate
+   the collection schema.
 6. Cache the initialized dialect for later operations on that collection.
 
 Concurrent first initialization calls for the same collection share one initialization stage. A
@@ -277,9 +343,23 @@ HSQLDB uses the same logical values and constraints:
 | `boolean` or `Boolean` | `BOOLEAN` | Non-null |
 | `Instant` | Not supported | Initialization fails before HSQLDB schema mutation |
 
-H2 and HSQLDB use the same one-table-per-collection schema, complete replacement semantics, and
-query operators. The dialect keeps the physical type declarations and UPSERT syntax database
-specific.
+SQLite maps the same logical values to exact physical declarations in an ordinary table:
+
+| Java field type | SQLite column type | Notes |
+| --- | --- | --- |
+| `String` | `TEXT` | Non-null |
+| `long` or `Long` | `INTEGER` | Non-null |
+| `double` or `Double` | `REAL` | Non-null and finite |
+| `boolean` or `Boolean` | `INTEGER` | Non-null; explicitly stored and read as `0` or `1` |
+| `Instant` | Not supported | Initialization fails before SQLite schema mutation |
+
+SQLite's dynamic typing does not loosen schema validation. Existing columns must declare the exact
+`TEXT`, `INTEGER`, or `REAL` type required by the logical field. The dialect does not require
+SQLite `STRICT` tables, preserving compatibility with ordinary existing file databases.
+
+All three databases use the same one-table-per-collection schema, complete replacement semantics,
+and query operators. The dialect keeps physical declarations, schema inspection, and UPSERT syntax
+database specific.
 
 ## Schema behavior
 
@@ -291,6 +371,8 @@ Each collection maps to one table in the active database schema:
 - Repeated initialization validates and reuses a compatible schema.
 - A missing table, required columns on an empty table, and missing required indexes are created.
 - A populated table that is missing a required column fails without changing its columns.
+- SQLite adds a required column only to an empty table and uses a type-appropriate non-null default
+  because SQLite requires one for `ALTER TABLE ... ADD COLUMN ... NOT NULL`.
 - Incompatible column types, nullability, primary keys, and required indexes fail initialization.
 - Extra columns and indexes are preserved.
 - Initialization never drops or renames objects, converts column types, or creates defaults for
@@ -298,8 +380,9 @@ Each collection maps to one table in the active database schema:
 
 ## Write, delete, and clear behavior
 
-- Upsert uses the database dialect's `MERGE` keyed by `document_id`. A write replaces the complete
-  indexed projection.
+- Upsert uses H2/HSQLDB `MERGE` or SQLite `INSERT ... ON CONFLICT(document_id) DO UPDATE`, keyed by
+  `document_id`. A write replaces the complete indexed projection without SQLite delete-and-insert
+  replacement semantics.
 - Delete is idempotent. Deleting a missing document identifier succeeds.
 - Clear deletes all rows from the collection table and preserves its schema and indexes.
 - User identifiers and values are bound through prepared statements rather than interpolated into
@@ -361,9 +444,8 @@ Do not run collection operations after closing their execution resource.
 JDBC failures are exposed through the storage exception hierarchy:
 
 - Authentication and authorization failures map to `StorageException.Access`.
-- Connection failures, database timeouts, transaction rollbacks, and HSQLDB file-lock failures
-  map to
-  `StorageException.Unavailable`.
+- Connection failures, database timeouts, transaction rollbacks, HSQLDB file locks, and SQLite
+  `BUSY` or `LOCKED` results map to `StorageException.Unavailable`.
 - Other SQL and schema failures map to `StorageException.Operation`.
 
 The original `SQLException` remains available as the cause. Public failure messages do not include
@@ -373,5 +455,5 @@ the JDBC URL, SQL text, credentials, or bound values.
 
 The module does not provide a connection pool, retry policy, virtual-thread mode, framework
 integration, or public dialect SPI. Applications own those choices outside R2D1. H2 and HSQLDB
-persistent embedded file mode are the current integration-tested configurations. SQLite and other
-databases are not supported.
+persistent embedded file mode and SQLite local persistent file mode are the current
+integration-tested configurations. Other databases are not supported.

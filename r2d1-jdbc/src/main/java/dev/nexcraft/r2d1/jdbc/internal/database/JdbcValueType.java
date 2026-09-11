@@ -8,7 +8,7 @@ import java.sql.SQLException;
 import java.util.Objects;
 
 /** Logical R2D1 index values and their profile-specific JDBC representations. */
-enum JdbcValueType {
+public enum JdbcValueType {
   STRING,
   LONG,
   DOUBLE,
@@ -60,7 +60,7 @@ enum JdbcValueType {
     };
   }
 
-  void requireCompatible(String fieldName, IndexValue value) {
+  public void requireCompatible(String fieldName, IndexValue value) {
     Objects.requireNonNull(value, "value");
     boolean compatible =
         switch (this) {

@@ -43,10 +43,12 @@ class JdbcIndexStoreTest {
     DatabaseMetaData h2 = proxy(DatabaseMetaData.class, new MetadataHandler("H2"));
     DatabaseMetaData hsqldb =
         proxy(DatabaseMetaData.class, new MetadataHandler("HSQL Database Engine"));
+    DatabaseMetaData sqlite = proxy(DatabaseMetaData.class, new MetadataHandler("SQLite"));
     DatabaseMetaData lowerCase = proxy(DatabaseMetaData.class, new MetadataHandler("h2"));
 
     assertThat(JdbcDialects.detect(h2).getClass().getSimpleName()).isEqualTo("H2Dialect");
     assertThat(JdbcDialects.detect(hsqldb).getClass().getSimpleName()).isEqualTo("HsqldbDialect");
+    assertThat(JdbcDialects.detect(sqlite).getClass().getSimpleName()).isEqualTo("SqliteDialect");
     assertThatThrownBy(() -> JdbcDialects.detect(lowerCase))
         .isInstanceOf(StorageException.Operation.class)
         .hasMessage("JDBC database is not supported");

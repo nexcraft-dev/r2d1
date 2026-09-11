@@ -25,15 +25,22 @@ import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
 /** Shared JDBC implementation for the supported built-in database dialects. */
-abstract class StandardJdbcDialect implements JdbcDialect {
+public abstract class StandardJdbcDialect implements JdbcDialect {
 
   private final JdbcSchemaProfile profile;
-  private final JdbcSchemaManager schemaManager;
+  private final JdbcSchema schema;
+  private final JdbcWriteCoordinator writeCoordinator;
   private volatile @Nullable JdbcDatabaseScope databaseScope;
 
-  StandardJdbcDialect(JdbcSchemaProfile profile) {
+  protected StandardJdbcDialect(JdbcSchemaProfile profile) {
+    this(profile, new JdbcSchemaManager(profile), JdbcWriteCoordinator.direct());
+  }
+
+  protected StandardJdbcDialect(
+      JdbcSchemaProfile profile, JdbcSchema schema, JdbcWriteCoordinator writeCoordinator) {
     this.profile = Objects.requireNonNull(profile, "profile");
-    schemaManager = new JdbcSchemaManager(profile);
+    this.schema = Objects.requireNonNull(schema, "schema");
+    this.writeCoordinator = Objects.requireNonNull(writeCoordinator, "writeCoordinator");
   }
 
   @Override
@@ -42,18 +49,22 @@ abstract class StandardJdbcDialect implements JdbcDialect {
     Objects.requireNonNull(connection, "connection");
     Objects.requireNonNull(metadata, "metadata");
     metadata.indexedFields().forEach(profile::valueType);
-    JdbcDatabaseScope scope = JdbcDatabaseScope.capture(connection, profile);
-    schemaManager.initialize(connection, scope, metadata);
+    prepareConnection(connection);
+    JdbcDatabaseScope scope = captureScope(connection);
+    executeWrite(() -> schema.initialize(connection, scope, metadata));
     databaseScope = scope;
   }
 
   @Override
   public final void clear(Connection connection, CollectionMetadata metadata) throws SQLException {
     JdbcDatabaseScope scope = requireScope(connection);
-    try (PreparedStatement statement =
-        connection.prepareStatement("DELETE FROM " + scope.table(metadata.collection()))) {
-      statement.executeUpdate();
-    }
+    executeWrite(
+        () -> {
+          try (PreparedStatement statement =
+              connection.prepareStatement("DELETE FROM " + scope.table(metadata.collection()))) {
+            statement.executeUpdate();
+          }
+        });
   }
 
   @Override
@@ -131,10 +142,13 @@ abstract class StandardJdbcDialect implements JdbcDialect {
             + " WHERE "
             + quoteIdentifier(JdbcMetadata.DOCUMENT_ID)
             + " = ?";
-    try (PreparedStatement statement = connection.prepareStatement(sql)) {
-      statement.setString(1, key.id());
-      statement.executeUpdate();
-    }
+    executeWrite(
+        () -> {
+          try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, key.id());
+            statement.executeUpdate();
+          }
+        });
   }
 
   @Override
@@ -155,8 +169,35 @@ abstract class StandardJdbcDialect implements JdbcDialect {
     if (scope == null) {
       throw new StorageException.Operation(profile.databaseLabel() + " dialect is not initialized");
     }
+    prepareConnection(connection);
     scope.requireSameDatabase(connection);
     return scope;
+  }
+
+  protected JdbcDatabaseScope captureScope(Connection connection) throws SQLException {
+    return StandardJdbcDatabaseScope.capture(connection, profile);
+  }
+
+  protected void prepareConnection(Connection connection) throws SQLException {}
+
+  protected void bindValue(
+      PreparedStatement statement,
+      int parameterIndex,
+      JdbcValueType type,
+      String fieldName,
+      IndexValue value)
+      throws SQLException {
+    type.bind(statement, parameterIndex, fieldName, value);
+  }
+
+  protected IndexValue readValue(
+      ResultSet resultSet, int columnIndex, JdbcValueType type, String fieldName)
+      throws SQLException {
+    return type.read(resultSet, columnIndex, fieldName, profile);
+  }
+
+  protected final void executeWrite(JdbcWriteCoordinator.SqlWrite write) throws SQLException {
+    writeCoordinator.execute(write);
   }
 
   protected final void validateEntry(CollectionMetadata metadata, Map<String, IndexValue> values) {
@@ -216,7 +257,7 @@ abstract class StandardJdbcDialect implements JdbcDialect {
   }
 
   protected final Parameter valueParameter(JdbcValueType type, String fieldName, IndexValue value) {
-    return (statement, index) -> type.bind(statement, index, fieldName, value);
+    return (statement, index) -> bindValue(statement, index, type, fieldName, value);
   }
 
   protected final Parameter stringParameter(String value) {
@@ -267,7 +308,7 @@ abstract class StandardJdbcDialect implements JdbcDialect {
     @Nullable IndexValue sortValue =
         sortField == null
             ? null
-            : profile.valueType(sortField).read(resultSet, 2, sortField.name(), profile);
+            : readValue(resultSet, 2, profile.valueType(sortField), sortField.name());
     return new QueryRow(key, sortValue);
   }
 

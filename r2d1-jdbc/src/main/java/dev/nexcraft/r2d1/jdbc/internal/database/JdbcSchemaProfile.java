@@ -6,24 +6,49 @@ import java.sql.Types;
 import java.util.Objects;
 
 /** Vendor-specific physical metadata required by the shared JDBC schema manager. */
-record JdbcSchemaProfile(
-    String databaseLabel, String tableType, String stringSqlType, int stringMinimumSize) {
+public record JdbcSchemaProfile(
+    String databaseLabel,
+    String tableType,
+    PhysicalType stringType,
+    PhysicalType longType,
+    PhysicalType doubleType,
+    PhysicalType booleanType) {
 
-  static final JdbcSchemaProfile H2 =
-      new JdbcSchemaProfile("H2", "BASE TABLE", "CHARACTER VARYING(1000000000)", 1_000_000_000);
-  static final JdbcSchemaProfile HSQLDB =
-      new JdbcSchemaProfile("HSQLDB", "TABLE", "VARCHAR(1000000000)", 1_000_000_000);
+  public static final JdbcSchemaProfile H2 =
+      new JdbcSchemaProfile(
+          "H2",
+          "BASE TABLE",
+          new PhysicalType("CHARACTER VARYING(1000000000)", Types.VARCHAR, 1_000_000_000),
+          new PhysicalType("BIGINT", Types.BIGINT, 0),
+          new PhysicalType("DOUBLE PRECISION", Types.DOUBLE, 0),
+          new PhysicalType("BOOLEAN", Types.BOOLEAN, 0));
+  public static final JdbcSchemaProfile HSQLDB =
+      new JdbcSchemaProfile(
+          "HSQLDB",
+          "TABLE",
+          new PhysicalType("VARCHAR(1000000000)", Types.VARCHAR, 1_000_000_000),
+          new PhysicalType("BIGINT", Types.BIGINT, 0),
+          new PhysicalType("DOUBLE PRECISION", Types.DOUBLE, 0),
+          new PhysicalType("BOOLEAN", Types.BOOLEAN, 0));
+  public static final JdbcSchemaProfile SQLITE =
+      new JdbcSchemaProfile(
+          "SQLite",
+          "table",
+          new PhysicalType("TEXT", Types.VARCHAR, 0),
+          new PhysicalType("INTEGER", Types.INTEGER, 0),
+          new PhysicalType("REAL", Types.DOUBLE, 0),
+          new PhysicalType("INTEGER", Types.INTEGER, 0));
 
-  JdbcSchemaProfile {
+  public JdbcSchemaProfile {
     Objects.requireNonNull(databaseLabel, "databaseLabel");
     Objects.requireNonNull(tableType, "tableType");
-    Objects.requireNonNull(stringSqlType, "stringSqlType");
-    if (stringMinimumSize <= 0) {
-      throw new IllegalArgumentException("stringMinimumSize must be positive");
-    }
+    Objects.requireNonNull(stringType, "stringType");
+    Objects.requireNonNull(longType, "longType");
+    Objects.requireNonNull(doubleType, "doubleType");
+    Objects.requireNonNull(booleanType, "booleanType");
   }
 
-  JdbcValueType valueType(IndexedField field) {
+  public JdbcValueType valueType(IndexedField field) {
     Objects.requireNonNull(field, "field");
     return switch (field.type()) {
       case STRING -> JdbcValueType.STRING;
@@ -36,28 +61,40 @@ record JdbcSchemaProfile(
     };
   }
 
-  String sqlType(JdbcValueType type) {
-    Objects.requireNonNull(type, "type");
-    return switch (type) {
-      case STRING -> stringSqlType;
-      case LONG -> "BIGINT";
-      case DOUBLE -> "DOUBLE PRECISION";
-      case BOOLEAN -> "BOOLEAN";
-    };
+  public String sqlType(JdbcValueType type) {
+    return physicalType(type).sqlType();
   }
 
   int jdbcType(JdbcValueType type) {
-    Objects.requireNonNull(type, "type");
-    return switch (type) {
-      case STRING -> Types.VARCHAR;
-      case LONG -> Types.BIGINT;
-      case DOUBLE -> Types.DOUBLE;
-      case BOOLEAN -> Types.BOOLEAN;
-    };
+    return physicalType(type).jdbcType();
   }
 
   boolean isCompatibleColumn(JdbcValueType type, int actualJdbcType, int columnSize) {
-    return actualJdbcType == jdbcType(type)
-        && (type != JdbcValueType.STRING || columnSize >= stringMinimumSize);
+    PhysicalType expected = physicalType(type);
+    return actualJdbcType == expected.jdbcType()
+        && (type != JdbcValueType.STRING || columnSize >= expected.minimumSize());
+  }
+
+  private PhysicalType physicalType(JdbcValueType type) {
+    Objects.requireNonNull(type, "type");
+    return switch (type) {
+      case STRING -> stringType;
+      case LONG -> longType;
+      case DOUBLE -> doubleType;
+      case BOOLEAN -> booleanType;
+    };
+  }
+
+  private record PhysicalType(String sqlType, int jdbcType, int minimumSize) {
+
+    private PhysicalType {
+      Objects.requireNonNull(sqlType, "sqlType");
+      if (sqlType.isBlank()) {
+        throw new IllegalArgumentException("sqlType must not be blank");
+      }
+      if (minimumSize < 0) {
+        throw new IllegalArgumentException("minimumSize must not be negative");
+      }
+    }
   }
 }

@@ -41,6 +41,8 @@ abstract class JdbcBackendTest {
 
   protected abstract String stringColumnType();
 
+  protected abstract String longColumnType();
+
   protected void assertDatabaseFiles(Path databasePath) {}
 
   protected String reopenUrl(String url) {
@@ -174,17 +176,23 @@ abstract class JdbcBackendTest {
         dataSource,
         "CREATE TABLE \"nullable_entries\" (\"document_id\" "
             + stringColumnType()
-            + " NOT NULL PRIMARY KEY, \"rank\" BIGINT)");
+            + " NOT NULL PRIMARY KEY, \"rank\" "
+            + longColumnType()
+            + ")");
     execute(
         dataSource,
         "CREATE TABLE \"missing_pk_entries\" (\"document_id\" "
             + stringColumnType()
-            + " NOT NULL, \"rank\" BIGINT NOT NULL)");
+            + " NOT NULL, \"rank\" "
+            + longColumnType()
+            + " NOT NULL)");
     execute(
         dataSource,
         "CREATE TABLE \"wrong_index_entries\" (\"document_id\" "
             + stringColumnType()
-            + " NOT NULL PRIMARY KEY, \"rank\" BIGINT NOT NULL, \"country\" "
+            + " NOT NULL PRIMARY KEY, \"rank\" "
+            + longColumnType()
+            + " NOT NULL, \"country\" "
             + stringColumnType()
             + " NOT NULL)");
     execute(

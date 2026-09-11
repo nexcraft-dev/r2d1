@@ -1,5 +1,9 @@
-package dev.nexcraft.r2d1.jdbc.internal.database;
+package dev.nexcraft.r2d1.jdbc.internal.database.hsqldb;
 
+import dev.nexcraft.r2d1.jdbc.internal.database.JdbcDatabaseScope;
+import dev.nexcraft.r2d1.jdbc.internal.database.JdbcSchemaProfile;
+import dev.nexcraft.r2d1.jdbc.internal.database.JdbcValueType;
+import dev.nexcraft.r2d1.jdbc.internal.database.StandardJdbcDialect;
 import dev.nexcraft.r2d1.jdbc.internal.metadata.JdbcMetadata;
 import dev.nexcraft.r2d1.jdbc.internal.metadata.JdbcMetadata.CollectionMetadata;
 import dev.nexcraft.r2d1.jdbc.internal.metadata.JdbcMetadata.IndexedField;
@@ -13,9 +17,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /** HSQLDB implementation of the internal JDBC index dialect. */
-final class HsqldbDialect extends StandardJdbcDialect {
+public final class HsqldbDialect extends StandardJdbcDialect {
 
-  HsqldbDialect() {
+  public HsqldbDialect() {
     super(JdbcSchemaProfile.HSQLDB);
   }
 
@@ -62,15 +66,23 @@ final class HsqldbDialect extends StandardJdbcDialect {
             columns.stream().map(column -> "incoming." + column).collect(Collectors.joining(", ")))
         .append(")");
 
-    try (PreparedStatement statement = connection.prepareStatement(sql.toString())) {
-      statement.setString(1, entry.documentKey().id());
-      int parameterIndex = 2;
-      for (IndexedField field : metadata.indexedFields()) {
-        JdbcValueType type = profile().valueType(field);
-        type.bind(statement, parameterIndex++, field.name(), entry.values().get(field.name()));
-      }
-      statement.executeUpdate();
-    }
+    executeWrite(
+        () -> {
+          try (PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+            statement.setString(1, entry.documentKey().id());
+            int parameterIndex = 2;
+            for (IndexedField field : metadata.indexedFields()) {
+              JdbcValueType type = profile().valueType(field);
+              bindValue(
+                  statement,
+                  parameterIndex++,
+                  type,
+                  field.name(),
+                  entry.values().get(field.name()));
+            }
+            statement.executeUpdate();
+          }
+        });
   }
 
   @Override
