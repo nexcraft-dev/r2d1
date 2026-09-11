@@ -6,28 +6,34 @@ import java.sql.SQLException;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/** Catalog and schema selected by the H2 connection that initialized one collection. */
-record H2DatabaseScope(@Nullable String catalog, String schema) {
+/** Catalog and schema selected by the connection that initialized one collection. */
+record JdbcDatabaseScope(@Nullable String catalog, String schema, String databaseLabel) {
 
-  H2DatabaseScope {
+  JdbcDatabaseScope {
     if (schema.isBlank()) {
       throw new IllegalArgumentException("schema must not be blank");
     }
+    Objects.requireNonNull(databaseLabel, "databaseLabel");
   }
 
-  static H2DatabaseScope capture(Connection connection) throws SQLException {
+  static JdbcDatabaseScope capture(Connection connection, JdbcSchemaProfile profile)
+      throws SQLException {
     Objects.requireNonNull(connection, "connection");
+    Objects.requireNonNull(profile, "profile");
     String schema = connection.getSchema();
     if (schema == null || schema.isBlank()) {
-      throw new StorageException.Operation("H2 connection did not provide an active schema");
+      throw new StorageException.Operation(
+          profile.databaseLabel() + " connection did not provide an active schema");
     }
-    return new H2DatabaseScope(connection.getCatalog(), schema);
+    return new JdbcDatabaseScope(connection.getCatalog(), schema, profile.databaseLabel());
   }
 
   void requireSameDatabase(Connection connection) throws SQLException {
-    if (!Objects.equals(catalog, connection.getCatalog())) {
+    Objects.requireNonNull(connection, "connection");
+    if (!Objects.equals(catalog, connection.getCatalog())
+        || !schema.equals(connection.getSchema())) {
       throw new StorageException.Operation(
-          "H2 connection catalog does not match the initialized database");
+          databaseLabel + " connection scope does not match the initialized database");
     }
   }
 

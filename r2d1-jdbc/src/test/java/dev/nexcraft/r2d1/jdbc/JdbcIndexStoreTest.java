@@ -38,9 +38,12 @@ class JdbcIndexStoreTest {
   @Test
   void detectsTheBuiltInH2DialectByExactProductName() throws SQLException {
     DatabaseMetaData h2 = proxy(DatabaseMetaData.class, new MetadataHandler("H2"));
+    DatabaseMetaData hsqldb =
+        proxy(DatabaseMetaData.class, new MetadataHandler("HSQL Database Engine"));
     DatabaseMetaData lowerCase = proxy(DatabaseMetaData.class, new MetadataHandler("h2"));
 
     assertThat(JdbcDialects.detect(h2)).isInstanceOf(H2Dialect.class);
+    assertThat(JdbcDialects.detect(hsqldb)).isInstanceOf(HsqldbDialect.class);
     assertThatThrownBy(() -> JdbcDialects.detect(lowerCase))
         .isInstanceOf(StorageException.Operation.class)
         .hasMessage("JDBC database is not supported");

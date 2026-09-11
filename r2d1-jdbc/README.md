@@ -13,8 +13,10 @@ database and provide the JDBC driver themselves.
 | Database | Status | Covered mode |
 | --- | --- | --- |
 | H2 | Built-in | Persistent embedded file database |
+| HSQLDB | Built-in | Persistent embedded file database |
 
-H2 is the only built-in dialect. Unknown databases fail before schema mutation.
+The dialect is selected from the exact JDBC product name. Unknown databases fail before schema
+mutation.
 
 ## Dependencies
 
@@ -22,7 +24,8 @@ H2 is the only built-in dialect. Unknown databases fail before schema mutation.
 `r2d1-core` separately. A concrete `DocumentStore`, such as `r2d1-r2` or an application
 implementation, is still required for complete document persistence.
 
-The H2 driver is not bundled or exposed transitively. Applications must provide it.
+The H2 and HSQLDB drivers are not bundled or exposed transitively. Applications must provide the
+driver for the database selected by their `DataSource`.
 
 ### Gradle
 
@@ -46,6 +49,18 @@ dependencies {
 }
 ```
 
+For HSQLDB, use the same scope rule with the current supported driver version:
+
+```kotlin
+dependencies {
+    implementation("dev.nexcraft:r2d1-jdbc:<version>")
+    runtimeOnly("org.hsqldb:hsqldb:2.7.4")
+}
+```
+
+If application source code imports `org.hsqldb.jdbc.JDBCDataSource`, use
+`implementation("org.hsqldb:hsqldb:2.7.4")` instead.
+
 ### Maven
 
 Use runtime scope when the application does not import H2 classes:
@@ -68,6 +83,19 @@ Use runtime scope when the application does not import H2 classes:
 
 Omit `<scope>runtime</scope>` when application source code directly imports H2 classes. Maven then
 uses its default compile scope.
+
+The equivalent HSQLDB runtime dependency is:
+
+```xml
+<dependency>
+  <groupId>org.hsqldb</groupId>
+  <artifactId>hsqldb</artifactId>
+  <version>2.7.4</version>
+  <scope>runtime</scope>
+</dependency>
+```
+
+Omit `<scope>runtime</scope>` when application source code directly imports HSQLDB classes.
 
 ## Configure H2
 
@@ -101,10 +129,57 @@ Configuration frameworks and connection pools may create another `DataSource` im
 R2D1 requires only that connections returned by the source identify their database product as
 `H2` through JDBC metadata.
 
-## Connect H2 to R2D1
+## Configure HSQLDB
 
-Create one bounded execution resource for blocking JDBC work and pass the H2 `DataSource` to
-`JdbcIndexStore`. Supply `indexStore::initialize` as the collection initializer:
+### Persistent file database
+
+Use a distinct absolute file path for the index database:
+
+```text
+jdbc:hsqldb:file:/absolute/path/to/r2d1-index
+```
+
+HSQLDB reports the product name `HSQL Database Engine`, which the module detects automatically.
+The integration-tested mode is the embedded persistent file mode. Server mode is not required by
+`r2d1-jdbc` and is outside the current support boundary.
+
+When reopening an existing file, `;ifexists=true` can be used to prevent an accidental new
+database from being created:
+
+```text
+jdbc:hsqldb:file:/absolute/path/to/r2d1-index;ifexists=true
+```
+
+### Direct DataSource creation
+
+When HSQLDB is a compile dependency, an application can create its own `JDBCDataSource`:
+
+```java
+import org.hsqldb.jdbc.JDBCDataSource;
+
+JDBCDataSource dataSource = new JDBCDataSource();
+dataSource.setUrl("jdbc:hsqldb:file:/absolute/path/to/r2d1-index");
+dataSource.setUser("SA");
+dataSource.setPassword("");
+```
+
+Configuration frameworks and connection pools may create another `DataSource` implementation. The
+application owns that resource and the HSQLDB driver.
+
+### HSQLDB lifecycle
+
+`JdbcIndexStore` closes each operation connection, but it does not own the `DataSource` or shut
+down the database. Before replacing or closing a lifecycle-bearing HSQLDB DataSource or pool,
+stop admitting new operations, retain and await every in-flight `CompletionStage`, and close
+`JdbcExecution`. The application must then execute `SHUTDOWN` through a short-lived connection and
+only after that close the lifecycle-bearing DataSource or pool. `JdbcExecution.close()` does not
+wait for submitted work. A later DataSource can reopen the same path.
+
+## Connect a JDBC backend to R2D1
+
+Create one bounded execution resource for blocking JDBC work and pass the selected database's
+`DataSource` to `JdbcIndexStore`. The same code works for H2 and HSQLDB. Supply
+`indexStore::initialize` as the collection initializer:
 
 ```java
 import dev.nexcraft.r2d1.DocumentCodec;
@@ -148,7 +223,8 @@ the following sequence:
 1. Inspect the document type and validate its collection and indexed fields.
 2. Open a connection through the supplied `DataSource` on `JdbcExecution`.
 3. Read `DatabaseMetaData.getDatabaseProductName()`.
-4. Select the internal H2 dialect only when the product name is exactly `H2`.
+4. Select the internal H2 dialect for exactly `H2`, or the HSQLDB dialect for exactly
+   `HSQL Database Engine`.
 5. Capture the active catalog and schema, then create or validate the collection schema.
 6. Cache the initialized dialect for later operations on that collection.
 
@@ -187,9 +263,23 @@ H2 maps indexed Java values as follows:
 
 Every indexed value must be present and non-null when a document is written.
 
-## H2 schema behavior
+HSQLDB uses the same logical values and constraints:
 
-Each collection maps to one table in the active H2 schema:
+| Java field type | HSQLDB column type | Notes |
+| --- | --- | --- |
+| `String` | `VARCHAR(1000000000)` | Non-null |
+| `long` or `Long` | `BIGINT` | Non-null |
+| `double` or `Double` | `DOUBLE PRECISION` | Non-null and finite |
+| `boolean` or `Boolean` | `BOOLEAN` | Non-null |
+| `Instant` | Not supported | Initialization fails before HSQLDB schema mutation |
+
+H2 and HSQLDB use the same one-table-per-collection schema, complete replacement semantics, and
+query operators. The dialect keeps the physical type declarations and UPSERT syntax database
+specific.
+
+## Schema behavior
+
+Each collection maps to one table in the active database schema:
 
 - `document_id` is the single `NOT NULL` primary-key column.
 - Every `@Index` field is a required `NOT NULL` column.
@@ -204,14 +294,15 @@ Each collection maps to one table in the active H2 schema:
 
 ## Write, delete, and clear behavior
 
-- Upsert uses H2 `MERGE` keyed by `document_id`. A write replaces the complete indexed projection.
+- Upsert uses the database dialect's `MERGE` keyed by `document_id`. A write replaces the complete
+  indexed projection.
 - Delete is idempotent. Deleting a missing document identifier succeeds.
 - Clear deletes all rows from the collection table and preserves its schema and indexes.
 - User identifiers and values are bound through prepared statements rather than interpolated into
   SQL.
 
-The authoritative `DocumentStore` and the H2 index are separate resources. R2D1 coordinates their
-operations but does not provide a distributed transaction across them.
+The authoritative `DocumentStore` and the JDBC index are separate resources. R2D1 coordinates
+their operations but does not provide a distributed transaction across them.
 
 ## Query behavior
 
@@ -266,7 +357,8 @@ Do not run collection operations after closing their execution resource.
 JDBC failures are exposed through the storage exception hierarchy:
 
 - Authentication and authorization failures map to `StorageException.Access`.
-- Connection failures, H2 timeouts, and transaction rollbacks map to
+- Connection failures, database timeouts, transaction rollbacks, and HSQLDB file-lock failures
+  map to
   `StorageException.Unavailable`.
 - Other SQL and schema failures map to `StorageException.Operation`.
 
@@ -276,5 +368,6 @@ the JDBC URL, SQL text, credentials, or bound values.
 ## Current boundaries
 
 The module does not provide a connection pool, retry policy, virtual-thread mode, framework
-integration, or public dialect SPI. Applications own those choices outside R2D1. H2 persistent
-embedded file mode is the current integration-tested configuration.
+integration, or public dialect SPI. Applications own those choices outside R2D1. H2 and HSQLDB
+persistent embedded file mode are the current integration-tested configurations. SQLite and other
+databases are not supported.
