@@ -36,7 +36,7 @@ DocumentStore     IndexStore        technology-neutral SPI
        │             │
        ▼             ├──────────────┐
 Cloudflare R2         ▼              ▼
-Documents        Cloudflare D1   H2/HSQLDB via JDBC
+Documents        Cloudflare D1   H2/HSQLDB/SQLite via JDBC
                  Indexes         Local indexes
 ```
 
@@ -234,7 +234,7 @@ r2d1-r2
     Cloudflare R2 DocumentStore adapter using AWS SDK v2
 
 r2d1-jdbc
-    Optional JDBC IndexStore adapter with bounded execution and built-in H2 and HSQLDB support
+    Optional JDBC IndexStore adapter with bounded execution and built-in H2, HSQLDB, and SQLite support
 
 r2d1-integration-tests
     Opt-in live tests against dedicated Cloudflare R2 and D1 resources
@@ -287,7 +287,8 @@ infrastructure.
 
 The optional `r2d1-jdbc` module adapts blocking JDBC databases to the asynchronous `IndexStore`
 contract through a bounded execution resource. It supports persistent embedded H2 and HSQLDB file
-databases. The module detects the database from the caller-provided `DataSource`, keeps
+databases and local persistent SQLite files. The module detects the database from the
+caller-provided `DataSource`, keeps
 database-specific behavior behind an internal dialect boundary, and does not bundle a JDBC driver.
 
 See the [JDBC module guide](r2d1-jdbc/README.md) for supported databases, Gradle and Maven
@@ -296,9 +297,9 @@ dependencies, database configuration, lifecycle ownership, schema behavior, and 
 ## Project Status
 
 R2D1 is under active development. The core API, R2 and D1 adapters, persistence orchestration, and
-the H2 and HSQLDB JDBC adapters are available but remain unstable. Explicit index recovery through
-`rebuildIndex()` is available, but automatic reconciliation and background repair are not. Other
-JDBC databases are not yet supported. Module internals may change before the first release.
+the H2, HSQLDB, and SQLite JDBC adapters are available but remain unstable. Explicit index recovery
+through `rebuildIndex()` is available, but automatic reconciliation and background repair are not.
+Other JDBC databases are not yet supported. Module internals may change before the first release.
 
 ## Requirements
 
@@ -306,7 +307,7 @@ JDBC databases are not yet supported. Module internals may change before the fir
 - Adapter-specific infrastructure:
   - Cloudflare account and R2 bucket for `r2d1-r2`
   - Cloudflare account and D1 database for `r2d1-d1`
-  - Application-provided H2 or HSQLDB driver and `DataSource` for the `r2d1-jdbc` backend
+  - Application-provided H2, HSQLDB, or SQLite driver and `DataSource` for the `r2d1-jdbc` backend
 
 ## Development
 

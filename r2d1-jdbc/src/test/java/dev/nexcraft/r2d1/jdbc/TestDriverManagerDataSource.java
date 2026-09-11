@@ -1,11 +1,15 @@
 package dev.nexcraft.r2d1.jdbc;
 
 import java.io.PrintWriter;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 import javax.sql.DataSource;
 import org.jspecify.annotations.Nullable;
@@ -17,6 +21,9 @@ final class TestDriverManagerDataSource implements DataSource {
   private final String username;
   private final String password;
   private volatile @Nullable SQLException connectionFailure;
+  private final AtomicInteger activeConnections = new AtomicInteger();
+  private final AtomicInteger peakConnections = new AtomicInteger();
+  private volatile boolean connectionTracking;
   private @Nullable PrintWriter logWriter;
   private int loginTimeout;
 
@@ -38,13 +45,21 @@ final class TestDriverManagerDataSource implements DataSource {
     connectionFailure = null;
   }
 
+  void trackConnections() {
+    connectionTracking = true;
+  }
+
+  int peakConnectionCount() {
+    return peakConnections.get();
+  }
+
   @Override
   public Connection getConnection() throws SQLException {
     SQLException failure = connectionFailure;
     if (failure != null) {
       throw failure;
     }
-    return DriverManager.getConnection(url, username, password);
+    return track(DriverManager.getConnection(url, username, password));
   }
 
   @Override
@@ -54,7 +69,7 @@ final class TestDriverManagerDataSource implements DataSource {
     if (failure != null) {
       throw failure;
     }
-    return DriverManager.getConnection(url, suppliedUsername, suppliedPassword);
+    return track(DriverManager.getConnection(url, suppliedUsername, suppliedPassword));
   }
 
   @Override
@@ -93,5 +108,29 @@ final class TestDriverManagerDataSource implements DataSource {
   @Override
   public boolean isWrapperFor(Class<?> iface) {
     return iface.isInstance(this);
+  }
+
+  private Connection track(Connection connection) {
+    if (!connectionTracking) {
+      return connection;
+    }
+    int active = activeConnections.incrementAndGet();
+    peakConnections.accumulateAndGet(active, Math::max);
+    AtomicBoolean closed = new AtomicBoolean();
+    return (Connection)
+        Proxy.newProxyInstance(
+            Connection.class.getClassLoader(),
+            new Class<?>[] {Connection.class},
+            (proxy, method, arguments) -> {
+              try {
+                return method.invoke(connection, arguments);
+              } catch (InvocationTargetException failure) {
+                throw failure.getCause();
+              } finally {
+                if ("close".equals(method.getName()) && closed.compareAndSet(false, true)) {
+                  activeConnections.decrementAndGet();
+                }
+              }
+            });
   }
 }

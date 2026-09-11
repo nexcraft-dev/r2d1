@@ -18,7 +18,7 @@ import java.util.Optional;
 import java.util.TreeMap;
 
 /** Reconciles JDBC tables and required single-column indexes without destructive changes. */
-final class JdbcSchemaManager {
+final class JdbcSchemaManager implements JdbcSchema {
 
   private final JdbcSchemaProfile profile;
 
@@ -26,7 +26,8 @@ final class JdbcSchemaManager {
     this.profile = Objects.requireNonNull(profile, "profile");
   }
 
-  void initialize(
+  @Override
+  public void initialize(
       Connection connection, JdbcDatabaseScope scope, CollectionMetadata collectionMetadata)
       throws SQLException {
     Objects.requireNonNull(connection, "connection");
@@ -288,7 +289,7 @@ final class JdbcSchemaManager {
   private static boolean matches(JdbcDatabaseScope scope, String collection, ResultSet resultSet)
       throws SQLException {
     return Objects.equals(scope.catalog(), resultSet.getString("TABLE_CAT"))
-        && scope.schema().equals(resultSet.getString("TABLE_SCHEM"))
+        && Objects.equals(scope.schema(), resultSet.getString("TABLE_SCHEM"))
         && collection.equals(resultSet.getString("TABLE_NAME"));
   }
 

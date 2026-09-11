@@ -30,8 +30,9 @@ import org.jspecify.annotations.Nullable;
  * operation. The execution resource must be closed by the caller that created it.
  *
  * <p>{@link #initialize(Class)} must complete before a collection is used. Database detection runs
- * through {@link DatabaseMetaData} before a dialect can mutate schema. H2 and HSQLDB are supported
- * as persistent embedded index databases. Other databases fail safely before schema initialization.
+ * through {@link DatabaseMetaData} before a dialect can mutate schema. H2, HSQLDB, and SQLite are
+ * supported as persistent embedded index databases. Other databases fail safely before schema
+ * initialization.
  */
 public final class JdbcIndexStore implements IndexStore {
 
@@ -48,7 +49,7 @@ public final class JdbcIndexStore implements IndexStore {
    * @throws NullPointerException if either argument is {@code null}
    */
   public JdbcIndexStore(DataSource dataSource, JdbcExecution execution) {
-    this(dataSource, execution, JdbcDialects::detect);
+    this(dataSource, execution, JdbcDialects.resolver());
   }
 
   JdbcIndexStore(DataSource dataSource, JdbcExecution execution, Resolver dialectResolver) {

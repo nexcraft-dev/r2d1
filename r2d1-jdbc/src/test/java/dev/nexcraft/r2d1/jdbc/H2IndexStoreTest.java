@@ -31,6 +31,11 @@ class H2IndexStoreTest extends JdbcBackendTest {
   }
 
   @Override
+  protected String longColumnType() {
+    return "BIGINT";
+  }
+
+  @Override
   protected void assertDatabaseFiles(Path databasePath) {
     assertThat(Files.exists(databasePath.resolveSibling("persistent.mv.db"))).isTrue();
   }
