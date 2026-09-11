@@ -16,41 +16,48 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 
-/** Reconciles H2 tables and single-column indexes without destructive schema changes. */
-final class H2SchemaManager {
+/** Reconciles JDBC tables and required single-column indexes without destructive changes. */
+final class JdbcSchemaManager {
+
+  private final JdbcSchemaProfile profile;
+
+  JdbcSchemaManager(JdbcSchemaProfile profile) {
+    this.profile = Objects.requireNonNull(profile, "profile");
+  }
 
   void initialize(
-      Connection connection, H2DatabaseScope scope, CollectionMetadata collectionMetadata)
+      Connection connection, JdbcDatabaseScope scope, CollectionMetadata collectionMetadata)
       throws SQLException {
     Objects.requireNonNull(connection, "connection");
     Objects.requireNonNull(scope, "scope");
     Objects.requireNonNull(collectionMetadata, "collectionMetadata");
-    collectionMetadata.indexedFields().forEach(H2ValueType::from);
+    collectionMetadata.indexedFields().forEach(profile::valueType);
 
     Optional<TableInfo> table = inspectTable(connection, scope, collectionMetadata.collection());
     if (table.isEmpty()) {
       createTable(connection, scope, collectionMetadata);
-    } else if (!"BASE TABLE".equals(table.orElseThrow().type())) {
+    } else if (!profile.tableType().equals(table.orElseThrow().type())) {
       throw incompatible(collectionMetadata, "table type");
     }
+    validateExistingIndexes(connection, scope, collectionMetadata);
     reconcileTable(connection, scope, collectionMetadata);
     ensureIndexes(connection, scope, collectionMetadata);
   }
 
-  private static void createTable(
-      Connection connection, H2DatabaseScope scope, CollectionMetadata metadata)
+  private void createTable(
+      Connection connection, JdbcDatabaseScope scope, CollectionMetadata metadata)
       throws SQLException {
     List<String> definitions = new ArrayList<>();
     definitions.add(
         quoteUserIdentifier(JdbcMetadata.DOCUMENT_ID)
             + " "
-            + H2ValueType.STRING.sqlType()
+            + profile.sqlType(JdbcValueType.STRING)
             + " NOT NULL PRIMARY KEY");
     for (IndexedField field : metadata.indexedFields()) {
       definitions.add(
           quoteUserIdentifier(field.name())
               + " "
-              + H2ValueType.from(field).sqlType()
+              + profile.sqlType(profile.valueType(field))
               + " NOT NULL");
     }
     execute(
@@ -62,8 +69,8 @@ final class H2SchemaManager {
             + ")");
   }
 
-  private static void reconcileTable(
-      Connection connection, H2DatabaseScope scope, CollectionMetadata metadata)
+  private void reconcileTable(
+      Connection connection, JdbcDatabaseScope scope, CollectionMetadata metadata)
       throws SQLException {
     Map<String, ColumnInfo> columns = inspectColumns(connection, scope, metadata.collection());
     validateColumns(metadata, columns, false);
@@ -77,7 +84,8 @@ final class H2SchemaManager {
     if (!missing.isEmpty()) {
       if (hasRows(connection, scope, metadata.collection())) {
         throw new StorageException.Operation(
-            "H2 schema requires a rebuild before adding required indexed fields to "
+            profile.databaseLabel()
+                + " schema requires a rebuild before adding required indexed fields to "
                 + metadata.collection());
       }
       for (IndexedField field : missing) {
@@ -88,7 +96,7 @@ final class H2SchemaManager {
                 + " ADD COLUMN "
                 + quoteUserIdentifier(field.name())
                 + " "
-                + H2ValueType.from(field).sqlType()
+                + profile.sqlType(profile.valueType(field))
                 + " NOT NULL");
       }
       columns = inspectColumns(connection, scope, metadata.collection());
@@ -97,8 +105,8 @@ final class H2SchemaManager {
     validatePrimaryKey(connection, scope, metadata);
   }
 
-  private static Optional<TableInfo> inspectTable(
-      Connection connection, H2DatabaseScope scope, String collection) throws SQLException {
+  private Optional<TableInfo> inspectTable(
+      Connection connection, JdbcDatabaseScope scope, String collection) throws SQLException {
     DatabaseMetaData metadata = connection.getMetaData();
     String tablePattern = metadataPattern(metadata, collection);
     TableInfo found = null;
@@ -117,8 +125,8 @@ final class H2SchemaManager {
     return Optional.ofNullable(found);
   }
 
-  private static Map<String, ColumnInfo> inspectColumns(
-      Connection connection, H2DatabaseScope scope, String collection) throws SQLException {
+  private Map<String, ColumnInfo> inspectColumns(
+      Connection connection, JdbcDatabaseScope scope, String collection) throws SQLException {
     DatabaseMetaData metadata = connection.getMetaData();
     String tablePattern = metadataPattern(metadata, collection);
     Map<String, ColumnInfo> columns = new LinkedHashMap<>();
@@ -144,11 +152,12 @@ final class H2SchemaManager {
     return Map.copyOf(columns);
   }
 
-  private static void validateColumns(
+  private void validateColumns(
       CollectionMetadata metadata, Map<String, ColumnInfo> columns, boolean requireAll) {
     ColumnInfo documentId = columns.get(JdbcMetadata.DOCUMENT_ID);
     if (documentId == null
-        || !H2ValueType.STRING.isCompatibleColumn(documentId.jdbcType(), documentId.columnSize())
+        || !profile.isCompatibleColumn(
+            JdbcValueType.STRING, documentId.jdbcType(), documentId.columnSize())
         || !documentId.notNull()) {
       throw incompatible(metadata, JdbcMetadata.DOCUMENT_ID);
     }
@@ -160,15 +169,16 @@ final class H2SchemaManager {
         }
         continue;
       }
-      if (!H2ValueType.from(field).isCompatibleColumn(actual.jdbcType(), actual.columnSize())
+      JdbcValueType expected = profile.valueType(field);
+      if (!profile.isCompatibleColumn(expected, actual.jdbcType(), actual.columnSize())
           || !actual.notNull()) {
         throw incompatible(metadata, field.name());
       }
     }
   }
 
-  private static void validatePrimaryKey(
-      Connection connection, H2DatabaseScope scope, CollectionMetadata collectionMetadata)
+  private void validatePrimaryKey(
+      Connection connection, JdbcDatabaseScope scope, CollectionMetadata collectionMetadata)
       throws SQLException {
     DatabaseMetaData metadata = connection.getMetaData();
     Map<Short, String> columns = new TreeMap<>();
@@ -191,7 +201,7 @@ final class H2SchemaManager {
     }
   }
 
-  private static boolean hasRows(Connection connection, H2DatabaseScope scope, String collection)
+  private static boolean hasRows(Connection connection, JdbcDatabaseScope scope, String collection)
       throws SQLException {
     try (Statement statement = connection.createStatement();
         ResultSet resultSet =
@@ -201,8 +211,8 @@ final class H2SchemaManager {
     }
   }
 
-  private static void ensureIndexes(
-      Connection connection, H2DatabaseScope scope, CollectionMetadata metadata)
+  private void ensureIndexes(
+      Connection connection, JdbcDatabaseScope scope, CollectionMetadata metadata)
       throws SQLException {
     Map<String, List<String>> indexes = inspectIndexes(connection, scope, metadata.collection());
     for (IndexedField field : metadata.indexedFields()) {
@@ -225,8 +235,20 @@ final class H2SchemaManager {
     }
   }
 
-  private static Map<String, List<String>> inspectIndexes(
-      Connection connection, H2DatabaseScope scope, String collection) throws SQLException {
+  private void validateExistingIndexes(
+      Connection connection, JdbcDatabaseScope scope, CollectionMetadata metadata)
+      throws SQLException {
+    Map<String, List<String>> indexes = inspectIndexes(connection, scope, metadata.collection());
+    for (IndexedField field : metadata.indexedFields()) {
+      String indexName = physicalIndexName(metadata.collection(), field.name());
+      if (indexes.containsKey(indexName) && !List.of(field.name()).equals(indexes.get(indexName))) {
+        throw incompatible(metadata, "index for " + field.name());
+      }
+    }
+  }
+
+  private Map<String, List<String>> inspectIndexes(
+      Connection connection, JdbcDatabaseScope scope, String collection) throws SQLException {
     DatabaseMetaData metadata = connection.getMetaData();
     Map<String, TreeMap<Short, String>> ordered = new LinkedHashMap<>();
     try (ResultSet resultSet =
@@ -262,7 +284,7 @@ final class H2SchemaManager {
     }
   }
 
-  private static boolean matches(H2DatabaseScope scope, String collection, ResultSet resultSet)
+  private static boolean matches(JdbcDatabaseScope scope, String collection, ResultSet resultSet)
       throws SQLException {
     return Objects.equals(scope.catalog(), resultSet.getString("TABLE_CAT"))
         && scope.schema().equals(resultSet.getString("TABLE_SCHEM"))
@@ -282,7 +304,7 @@ final class H2SchemaManager {
   }
 
   private static String quoteUserIdentifier(String identifier) {
-    return H2DatabaseScope.quoteDatabaseIdentifier(
+    return JdbcDatabaseScope.quoteDatabaseIdentifier(
         JdbcMetadata.requireIdentifier(identifier, "identifier"));
   }
 
@@ -290,7 +312,7 @@ final class H2SchemaManager {
     return JdbcMetadata.requireIdentifier("idx_" + collection + "_" + field, "physical index name");
   }
 
-  private static String requireText(ResultSet resultSet, String column, String description)
+  private String requireText(ResultSet resultSet, String column, String description)
       throws SQLException {
     String value = resultSet.getString(column);
     if (value == null || value.isBlank()) {
@@ -299,14 +321,18 @@ final class H2SchemaManager {
     return value;
   }
 
-  private static StorageException.Operation schemaInspectionFailure(String detail) {
-    return new StorageException.Operation("H2 schema inspection returned " + detail);
+  private StorageException.Operation schemaInspectionFailure(String detail) {
+    return new StorageException.Operation(
+        profile.databaseLabel() + " schema inspection returned " + detail);
   }
 
-  private static StorageException.Operation incompatible(
-      CollectionMetadata metadata, String detail) {
+  private StorageException.Operation incompatible(CollectionMetadata metadata, String detail) {
     return new StorageException.Operation(
-        "H2 schema is incompatible for collection " + metadata.collection() + " at " + detail);
+        profile.databaseLabel()
+            + " schema is incompatible for collection "
+            + metadata.collection()
+            + " at "
+            + detail);
   }
 
   private record TableInfo(String type) {}

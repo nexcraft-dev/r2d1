@@ -29,6 +29,25 @@ final class JdbcExceptions {
     return new StorageException.Operation(message, failure);
   }
 
+  /**
+   * Translates a connection failure raised before database metadata can identify a dialect.
+   *
+   * <p>Only the verified HSQLDB embedded-file lock signature is classified specially here. All
+   * other failures use the conservative vendor-neutral mapping.
+   */
+  static StorageException translateBeforeDetection(String operation, SQLException failure) {
+    Objects.requireNonNull(operation, "operation");
+    Objects.requireNonNull(failure, "failure");
+    if (isHsqldbFileLock(failure)) {
+      return new StorageException.Unavailable("JDBC " + operation + " failed", failure);
+    }
+    return translate(operation, failure);
+  }
+
+  private static boolean isHsqldbFileLock(SQLException failure) {
+    return failure.getErrorCode() == -451 && "S1000".equals(failure.getSQLState());
+  }
+
   private static boolean hasStateClass(SQLException failure, String expected) {
     String state = failure.getSQLState();
     return state != null && state.startsWith(expected);

@@ -34,6 +34,10 @@ final class TestDriverManagerDataSource implements DataSource {
     connectionFailure = Objects.requireNonNull(failure, "failure");
   }
 
+  void clearConnectionFailure() {
+    connectionFailure = null;
+  }
+
   @Override
   public Connection getConnection() throws SQLException {
     SQLException failure = connectionFailure;

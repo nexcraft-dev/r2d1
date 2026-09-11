@@ -15,6 +15,9 @@ final class JdbcDialects {
     if ("H2".equals(productName)) {
       return new H2Dialect();
     }
+    if ("HSQL Database Engine".equals(productName)) {
+      return new HsqldbDialect();
+    }
     throw new StorageException.Operation("JDBC database is not supported");
   }
 
