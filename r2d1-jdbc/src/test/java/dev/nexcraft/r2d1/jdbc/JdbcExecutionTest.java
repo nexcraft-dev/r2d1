@@ -14,7 +14,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 class JdbcExecutionTest {
@@ -57,6 +59,97 @@ class JdbcExecutionTest {
       assertThat(completedValue(pending)).isEqualTo("pending");
     }
     awaitTermination(worker.get());
+  }
+
+  @Test
+  void runsWorkOnOwnedVirtualThreadsWhenExplicitlyConfigured() {
+    Assumptions.assumeTrue(
+        Runtime.version().feature() >= 25, "virtual-thread mode requires Java 25 or newer");
+    AtomicReference<Thread> worker = new AtomicReference<>();
+
+    try (JdbcExecution execution =
+        JdbcExecution.create(new JdbcExecutionConfig(JdbcExecutionMode.VIRTUAL_THREAD, 1, 1))) {
+      assertThat(
+              completedValue(
+                  execution.execute(
+                      () -> {
+                        worker.set(Thread.currentThread());
+                        return "virtual";
+                      })))
+          .isEqualTo("virtual");
+    }
+
+    assertThat(worker.get().isVirtual()).isTrue();
+    assertThat(worker.get().getName()).startsWith("r2d1-jdbc-virtual-");
+  }
+
+  @Test
+  void rejectsVirtualThreadsOnUnsupportedRuntime() {
+    Assumptions.assumeTrue(
+        Runtime.version().feature() < 25, "this fail-fast assertion runs on Java 21");
+
+    assertThat(
+            org.assertj.core.api.Assertions.catchThrowable(
+                () ->
+                    JdbcExecution.create(
+                        new JdbcExecutionConfig(JdbcExecutionMode.VIRTUAL_THREAD, 1, 0))))
+        .isInstanceOf(UnsupportedOperationException.class)
+        .hasMessageContaining("VIRTUAL_THREAD requires Java 25 or newer");
+  }
+
+  @Test
+  void preservesVirtualThreadConcurrencyAndPendingBounds() {
+    Assumptions.assumeTrue(
+        Runtime.version().feature() >= 25, "virtual-thread mode requires Java 25 or newer");
+    CountDownLatch runningStarted = new CountDownLatch(2);
+    CountDownLatch releaseRunning = new CountDownLatch(1);
+    AtomicInteger active = new AtomicInteger();
+    AtomicInteger peak = new AtomicInteger();
+    AtomicBoolean pendingStarted = new AtomicBoolean();
+
+    try (JdbcExecution execution =
+        JdbcExecution.create(new JdbcExecutionConfig(JdbcExecutionMode.VIRTUAL_THREAD, 2, 2))) {
+      CompletionStage<String> first =
+          execution.execute(() -> blockingOperation(runningStarted, releaseRunning, active, peak));
+      CompletionStage<String> second =
+          execution.execute(() -> blockingOperation(runningStarted, releaseRunning, active, peak));
+      await(runningStarted);
+      CompletionStage<String> third =
+          execution.execute(
+              () -> {
+                pendingStarted.set(true);
+                return "pending-1";
+              });
+      CompletionStage<String> fourth = execution.execute(() -> "pending-2");
+
+      Throwable rejected = completedFailure(execution.execute(() -> "rejected"));
+      assertThat(rejected)
+          .isInstanceOf(StorageException.Unavailable.class)
+          .hasMessage("JDBC execution capacity is exhausted")
+          .hasCauseInstanceOf(RejectedExecutionException.class);
+      assertThat(pendingStarted).isFalse();
+
+      releaseRunning.countDown();
+      assertThat(completedValue(first)).isEqualTo("running");
+      assertThat(completedValue(second)).isEqualTo("running");
+      assertThat(completedValue(third)).isEqualTo("pending-1");
+      assertThat(completedValue(fourth)).isEqualTo("pending-2");
+      assertThat(peak).hasValueLessThanOrEqualTo(2);
+    }
+  }
+
+  @Test
+  void completesOperationFailuresWithoutWrappingTheCause() {
+    RuntimeException failure = new RuntimeException("operation failure");
+    try (JdbcExecution execution = JdbcExecution.create(1, 0)) {
+      assertThat(
+              completedFailure(
+                  execution.execute(
+                      () -> {
+                        throw failure;
+                      })))
+          .isSameAs(failure);
+    }
   }
 
   @Test
@@ -143,6 +236,28 @@ class JdbcExecutionTest {
     assertThatNullPointerException()
         .isThrownBy(() -> JdbcExecution.using(null, 1, 0))
         .withMessage("executor");
+    assertThatNullPointerException()
+        .isThrownBy(() -> new JdbcExecutionConfig(null, 1, 0))
+        .withMessage("mode");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> new JdbcExecutionConfig(JdbcExecutionMode.PLATFORM_THREAD, 0, 0))
+        .withMessage("maxConcurrency must be greater than zero");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> new JdbcExecutionConfig(JdbcExecutionMode.PLATFORM_THREAD, 1, -1))
+        .withMessage("maxPending must not be negative");
+  }
+
+  private static String blockingOperation(
+      CountDownLatch runningStarted,
+      CountDownLatch releaseRunning,
+      AtomicInteger active,
+      AtomicInteger peak) {
+    int current = active.incrementAndGet();
+    peak.accumulateAndGet(current, Math::max);
+    runningStarted.countDown();
+    await(releaseRunning);
+    active.decrementAndGet();
+    return "running";
   }
 
   private static void await(CountDownLatch latch) {

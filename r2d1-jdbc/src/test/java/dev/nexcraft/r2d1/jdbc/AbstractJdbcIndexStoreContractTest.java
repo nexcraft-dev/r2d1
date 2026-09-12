@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import javax.sql.DataSource;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Shared persistent JDBC fixture for the reusable {@link IndexStore} contract. */
@@ -21,11 +22,23 @@ abstract class AbstractJdbcIndexStoreContractTest extends IndexStoreContractTest
 
   protected void shutdown(DataSource dataSource) throws SQLException {}
 
+  /** Creates the execution resource used by the contract fixture. */
+  protected JdbcExecution createExecution() {
+    return JdbcExecution.create(2, 32);
+  }
+
+  /** Creates a Java 25 virtual-thread execution resource for mode-parity fixtures. */
+  protected final JdbcExecution createVirtualExecution() {
+    Assumptions.assumeTrue(
+        Runtime.version().feature() >= 25, "virtual-thread mode requires Java 25 or newer");
+    return JdbcExecution.create(new JdbcExecutionConfig(JdbcExecutionMode.VIRTUAL_THREAD, 2, 32));
+  }
+
   @Override
   protected final Adapter createAdapter() {
     TestDriverManagerDataSource dataSource =
         new TestDriverManagerDataSource(fileUrl(temporaryDirectory.resolve("contract")));
-    JdbcExecution execution = JdbcExecution.create(2, 32);
+    JdbcExecution execution = createExecution();
     JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
     return new Adapter() {
       @Override

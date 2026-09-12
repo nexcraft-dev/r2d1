@@ -60,7 +60,7 @@ class SqliteIndexStoreTest extends JdbcBackendTest {
   void storesBooleansAsIntegersAndRejectsInvalidBooleanResults() throws SQLException {
     TestDriverManagerDataSource dataSource = dataSource("booleans");
     dataSource.trackResources();
-    try (JdbcExecution execution = JdbcExecution.create(2, 8)) {
+    try (JdbcExecution execution = createExecution(2, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(BooleanDocument.class));
       completedValue(
@@ -115,7 +115,7 @@ class SqliteIndexStoreTest extends JdbcBackendTest {
   void supportsZeroIndexUpsertWithoutReplaceSemantics() {
     TestDriverManagerDataSource dataSource = dataSource("zero_index");
     DocumentKey key = new DocumentKey("zero_index_entries", "one");
-    try (JdbcExecution execution = JdbcExecution.create(2, 8)) {
+    try (JdbcExecution execution = createExecution(2, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(ZeroIndexDocument.class));
       completedValue(store.upsert(new IndexEntry(key, Map.of())));
@@ -128,7 +128,7 @@ class SqliteIndexStoreTest extends JdbcBackendTest {
   @Test
   void appliesBusyTimeoutAndTranslatesLockedWritesAsUnavailable() throws SQLException {
     TestDriverManagerDataSource dataSource = dataSource("locked");
-    try (JdbcExecution execution = JdbcExecution.create(2, 8)) {
+    try (JdbcExecution execution = createExecution(2, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(LockDocument.class));
       completedValue(
@@ -171,7 +171,7 @@ class SqliteIndexStoreTest extends JdbcBackendTest {
   @Test
   void allowsReadsWhileAnotherConnectionHasAnActiveWriteTransaction() throws SQLException {
     TestDriverManagerDataSource dataSource = dataSource("reader_writer");
-    try (JdbcExecution execution = JdbcExecution.create(3, 8)) {
+    try (JdbcExecution execution = createExecution(3, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(LockDocument.class));
       completedValue(
@@ -209,7 +209,7 @@ class SqliteIndexStoreTest extends JdbcBackendTest {
   void rejectsInMemoryDatabases() {
     TestDriverManagerDataSource dataSource =
         new TestDriverManagerDataSource("jdbc:sqlite::memory:");
-    try (JdbcExecution execution = JdbcExecution.create(1, 4)) {
+    try (JdbcExecution execution = createExecution(1, 4)) {
       Throwable failure =
           completedFailure(
               new JdbcIndexStore(dataSource, execution).initialize(JournalDocument.class));
@@ -228,7 +228,7 @@ class SqliteIndexStoreTest extends JdbcBackendTest {
   @Test
   void createsExactPhysicalSchemaAndPreservesIndexesAfterClear() throws SQLException {
     TestDriverManagerDataSource dataSource = dataSource("physical_schema");
-    try (JdbcExecution execution = JdbcExecution.create(2, 8)) {
+    try (JdbcExecution execution = createExecution(2, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(PhysicalDocument.class));
 
@@ -270,7 +270,7 @@ class SqliteIndexStoreTest extends JdbcBackendTest {
   void serializesWritesWithoutSerializingReads() {
     TestDriverManagerDataSource dataSource = dataSource("serialized_writes");
     dataSource.trackResources();
-    try (JdbcExecution execution = JdbcExecution.create(3, 8)) {
+    try (JdbcExecution execution = createExecution(3, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(LockDocument.class));
       completedValue(
@@ -312,13 +312,13 @@ class SqliteIndexStoreTest extends JdbcBackendTest {
     String url = fileUrl(temporaryDirectory.resolve("journal_" + mode));
     TestDriverManagerDataSource dataSource = new TestDriverManagerDataSource(url);
     setJournalMode(dataSource, mode);
-    try (JdbcExecution execution = JdbcExecution.create(2, 8)) {
+    try (JdbcExecution execution = createExecution(2, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(JournalDocument.class));
       assertThat(journalMode(dataSource)).isEqualTo(mode);
     }
     TestDriverManagerDataSource reopened = new TestDriverManagerDataSource(url);
-    try (JdbcExecution execution = JdbcExecution.create(2, 8)) {
+    try (JdbcExecution execution = createExecution(2, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(reopened, execution);
       completedValue(store.initialize(JournalDocument.class));
       assertThat(journalMode(reopened)).isEqualTo(mode);
@@ -344,7 +344,7 @@ class SqliteIndexStoreTest extends JdbcBackendTest {
     execute(
         dataSource,
         createIndex + " \"idx_index_entries_rank\" ON \"index_entries\" (\"rank\")" + suffix);
-    try (JdbcExecution execution = JdbcExecution.create(1, 4)) {
+    try (JdbcExecution execution = createExecution(1, 4)) {
       assertIncompatible(
           new JdbcIndexStore(dataSource, execution).initialize(IndexDocument.class),
           "index for rank");

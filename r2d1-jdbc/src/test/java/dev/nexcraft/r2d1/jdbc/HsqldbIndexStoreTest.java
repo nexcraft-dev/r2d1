@@ -79,7 +79,7 @@ class HsqldbIndexStoreTest extends JdbcBackendTest {
     TestDriverManagerDataSource dataSource = new TestDriverManagerDataSource(url);
     DocumentKey key = new DocumentKey("zero_index_entries", "first");
 
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(ZeroIndexDocument.class));
       IndexEntry entry = new IndexEntry(key, Map.of());
@@ -92,7 +92,7 @@ class HsqldbIndexStoreTest extends JdbcBackendTest {
 
     TestDriverManagerDataSource reopenedDataSource =
         new TestDriverManagerDataSource(reopenUrl(url));
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       JdbcIndexStore reopened = new JdbcIndexStore(reopenedDataSource, execution);
       completedValue(reopened.initialize(ZeroIndexDocument.class));
       IndexPage page = completedValue(reopened.query(unsortedQuery("zero_index_entries")));
@@ -113,7 +113,7 @@ class HsqldbIndexStoreTest extends JdbcBackendTest {
     String url = fileUrl(temporaryDirectory.resolve("authentication"));
     TestDriverManagerDataSource authorized =
         new TestDriverManagerDataSource(url, "sa", "correct-password");
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       completedValue(
           new JdbcIndexStore(authorized, execution).initialize(AuthenticationDocument.class));
     }
@@ -121,7 +121,7 @@ class HsqldbIndexStoreTest extends JdbcBackendTest {
 
     TestDriverManagerDataSource unauthorized =
         new TestDriverManagerDataSource(reopenUrl(url), "sa", "wrong-password");
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       Throwable failure =
           completedFailure(
               new JdbcIndexStore(unauthorized, execution).initialize(AuthenticationDocument.class));
@@ -140,7 +140,7 @@ class HsqldbIndexStoreTest extends JdbcBackendTest {
     Path databasePath = temporaryDirectory.resolve("initially_locked");
     String url = fileUrl(databasePath);
     TestDriverManagerDataSource dataSource = new TestDriverManagerDataSource(url);
-    JdbcExecution execution = JdbcExecution.create(1, 8);
+    JdbcExecution execution = createExecution(1, 8);
     LockHolder holder = null;
     try {
       holder = startLockHolder(url);
@@ -168,7 +168,7 @@ class HsqldbIndexStoreTest extends JdbcBackendTest {
     Path databasePath = temporaryDirectory.resolve("locked");
     String url = fileUrl(databasePath);
     TestDriverManagerDataSource dataSource = new TestDriverManagerDataSource(url);
-    JdbcExecution execution = JdbcExecution.create(1, 8);
+    JdbcExecution execution = createExecution(1, 8);
     LockHolder holder = null;
     try {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);

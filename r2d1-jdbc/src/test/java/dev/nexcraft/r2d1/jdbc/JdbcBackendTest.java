@@ -58,6 +58,19 @@ abstract class JdbcBackendTest {
 
   protected void shutdown(DataSource dataSource) throws SQLException {}
 
+  /** Creates the execution resource used by the backend lifecycle fixture. */
+  protected JdbcExecution createExecution(int maxConcurrency, int maxPending) {
+    return JdbcExecution.create(maxConcurrency, maxPending);
+  }
+
+  /** Creates a Java 25 virtual-thread execution resource for backend mode parity tests. */
+  protected final JdbcExecution createVirtualExecution(int maxConcurrency, int maxPending) {
+    org.junit.jupiter.api.Assumptions.assumeTrue(
+        Runtime.version().feature() >= 25, "virtual-thread mode requires Java 25 or newer");
+    return JdbcExecution.create(
+        new JdbcExecutionConfig(JdbcExecutionMode.VIRTUAL_THREAD, maxConcurrency, maxPending));
+  }
+
   @Test
   void persistsRowsAcrossDataSourceAndExecutionReopen() throws SQLException {
     Path databasePath = temporaryDirectory.resolve("persistent");
@@ -65,7 +78,7 @@ abstract class JdbcBackendTest {
     TestDriverManagerDataSource firstDataSource = new TestDriverManagerDataSource(url);
     firstDataSource.trackResources();
 
-    try (JdbcExecution execution = JdbcExecution.create(2, 16)) {
+    try (JdbcExecution execution = createExecution(2, 16)) {
       JdbcIndexStore store = new JdbcIndexStore(firstDataSource, execution);
       completedValue(store.initialize(PersistentDocument.class));
       completedValue(store.upsert(persistentEntry("a", "NZ", 10L, 1.5, true)));
@@ -81,7 +94,7 @@ abstract class JdbcBackendTest {
         new TestDriverManagerDataSource(reopenUrl(url));
     reopenedDataSource.trackResources();
     reopenedDataSource.resetDdlStatementCount();
-    try (JdbcExecution execution = JdbcExecution.create(2, 16)) {
+    try (JdbcExecution execution = createExecution(2, 16)) {
       JdbcIndexStore reopened = new JdbcIndexStore(reopenedDataSource, execution);
       completedValue(reopened.initialize(PersistentDocument.class));
       assertThat(reopenedDataSource.resourceSnapshot().ddlStatements()).isZero();
@@ -114,7 +127,7 @@ abstract class JdbcBackendTest {
         new TestDriverManagerDataSource(reopenUrl(url));
     twiceReopenedDataSource.trackResources();
     twiceReopenedDataSource.resetDdlStatementCount();
-    try (JdbcExecution execution = JdbcExecution.create(2, 16)) {
+    try (JdbcExecution execution = createExecution(2, 16)) {
       JdbcIndexStore twiceReopened = new JdbcIndexStore(twiceReopenedDataSource, execution);
       completedValue(twiceReopened.initialize(PersistentDocument.class));
       assertThat(twiceReopenedDataSource.resourceSnapshot().ddlStatements()).isZero();
@@ -172,7 +185,7 @@ abstract class JdbcBackendTest {
             + stringColumnType()
             + " NOT NULL)");
 
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(ExpandedSchemaDocument.class));
       completedValue(
@@ -199,7 +212,7 @@ abstract class JdbcBackendTest {
     TestDriverManagerDataSource reopened = new TestDriverManagerDataSource(reopenUrl(url));
     reopened.trackResources();
     reopened.resetDdlStatementCount();
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(reopened, execution);
       completedValue(store.initialize(ExpandedSchemaDocument.class));
       assertThat(reopened.resourceSnapshot().ddlStatements()).isZero();
@@ -217,7 +230,7 @@ abstract class JdbcBackendTest {
   void rejectsAddingRequiredColumnsToAPopulatedTableWithoutChangingIt() throws SQLException {
     TestDriverManagerDataSource dataSource = dataSource("populated");
     dataSource.trackResources();
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(BaseMigrationDocument.class));
       completedValue(
@@ -228,7 +241,7 @@ abstract class JdbcBackendTest {
                   Map.of("country", new IndexValue.StringValue("NZ")))));
     }
 
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       assertThat(completedFailure(store.initialize(ExpandedMigrationDocument.class)))
           .isInstanceOf(StorageException.Operation.class)
@@ -292,7 +305,7 @@ abstract class JdbcBackendTest {
         dataSource,
         "CREATE UNIQUE INDEX \"idx_unique_index_entries_rank\" ON \"unique_index_entries\" (\"rank\")");
 
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       assertIncompatible(store.initialize(WrongTypeDocument.class), "rank");
       assertIncompatible(store.initialize(NullableDocument.class), "rank");
@@ -309,7 +322,7 @@ abstract class JdbcBackendTest {
   void rejectsInvalidIdentifiersAndTimestampBeforeSchemaMutation() throws SQLException {
     TestDriverManagerDataSource dataSource = dataSource("unsupported_metadata");
     dataSource.trackResources();
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       assertThatIllegalArgumentException()
           .isThrownBy(() -> store.initialize(InvalidIdentifierDocument.class))
@@ -330,7 +343,7 @@ abstract class JdbcBackendTest {
     TestDriverManagerDataSource dataSource = dataSource("parameters");
     String documentId = "id' OR '1'='1";
     String country = "NZ' OR '1'='1";
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(ParameterDocument.class));
       completedValue(
@@ -365,7 +378,7 @@ abstract class JdbcBackendTest {
   void recoversAfterConnectionAndStatementFailuresWithoutLeakingResources() throws SQLException {
     TestDriverManagerDataSource dataSource = dataSource("failure_cleanup");
     dataSource.trackResources();
-    try (JdbcExecution execution = JdbcExecution.create(2, 8)) {
+    try (JdbcExecution execution = createExecution(2, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(ParameterDocument.class));
 
@@ -409,7 +422,7 @@ abstract class JdbcBackendTest {
             + " NOT NULL PRIMARY KEY, \"rank\" "
             + longColumnType()
             + " NOT NULL CHECK (\"rank\" >= 0))");
-    try (JdbcExecution execution = JdbcExecution.create(2, 8)) {
+    try (JdbcExecution execution = createExecution(2, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(ConstraintDocument.class));
       Throwable failure =
@@ -442,7 +455,7 @@ abstract class JdbcBackendTest {
     TestDriverManagerDataSource dataSource = dataSource("concurrent_parity");
     dataSource.trackResources();
     ExecutorService callers = Executors.newFixedThreadPool(8);
-    try (JdbcExecution execution = JdbcExecution.create(4, 64)) {
+    try (JdbcExecution execution = createExecution(4, 64)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(ConcurrentDocument.class));
       CountDownLatch start = new CountDownLatch(1);
@@ -510,7 +523,7 @@ abstract class JdbcBackendTest {
   void repeatsOneHundredOperationsWithoutLeakingResourcesOrState() throws SQLException {
     TestDriverManagerDataSource dataSource = dataSource("repetition");
     dataSource.trackResources();
-    try (JdbcExecution execution = JdbcExecution.create(4, 64)) {
+    try (JdbcExecution execution = createExecution(4, 64)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(ConcurrentDocument.class));
       for (int index = 0; index < 40; index++) {
