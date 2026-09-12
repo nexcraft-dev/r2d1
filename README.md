@@ -45,6 +45,13 @@ The public collection API is synchronous. Storage I/O is composed asynchronously
 `CompletionStage` without leaking AWS or Cloudflare transport types and does not define an
 executor, callback thread, cancellation guarantee, or timeout policy.
 
+R2D1 does not have a global thread-mode switch. The Core SPI does not own an executor. D1 uses
+Java's asynchronous HTTP client and R2 uses the AWS SDK's asynchronous Netty client, so neither
+adapter creates an R2D1-managed worker pool. The optional JDBC adapter is the current exception:
+its `JdbcExecution` resource owns a bounded blocking-work executor and can explicitly use platform
+or virtual threads. A caller-owned executor can also be supplied to JDBC when an application
+framework manages the thread model.
+
 Persistence operations follow these paths:
 
 - `put`: serialize the document, write R2, then upsert the D1 index row.

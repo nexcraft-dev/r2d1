@@ -39,7 +39,13 @@ overflow is reported as an exceptionally completed `CompletionStage`, just as in
 
 `JdbcExecution.create(config)` owns its executor and must be closed by its creator. The existing
 `JdbcExecution.using(executor, maxConcurrency, maxPending)` API remains caller-owned and is not a
-virtual-thread mode selector; R2D1 never shuts down the supplied executor.
+mode selector: an application may supply either a platform- or virtual-thread-backed executor, and
+R2D1 never shuts it down. This is the integration point for an application-managed executor; the
+JDBC module does not detect Spring Boot or any other framework's thread mode.
+
+This mode is local to the JDBC execution resource. It does not change the Core SPI, D1's
+asynchronous HTTP transport, or R2's asynchronous Netty transport. Those modules do not create an
+R2D1-managed worker pool that can be switched by this setting.
 
 R2D1 supports the execution mode on the supported Java runtime, but does not certify that every
 JDBC driver implementation is free of virtual-thread pinning or carrier-thread bottlenecks. For

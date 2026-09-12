@@ -23,9 +23,10 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The default factory-created form owns a fixed set of platform threads. An explicit {@link
  * JdbcExecutionConfig} can select the supported virtual-thread mode. The caller-provided form never
- * owns or closes its executor, which must dispatch work away from asynchronous event-loop and SDK
- * completion threads. All forms enforce the configured running and pending-work limits before
- * submitting work to the underlying executor.
+ * owns or closes its executor; the caller chooses whether that executor uses platform or virtual
+ * threads, and it must dispatch work away from asynchronous event-loop and SDK completion threads.
+ * All forms enforce the configured running and pending-work limits before submitting work to the
+ * underlying executor.
  *
  * <p>Closing this resource rejects new work, fails work that is still pending, and allows work that
  * has already been submitted to finish. Only an executor created by an R2D1-managed {@code create}
@@ -117,8 +118,9 @@ public final class JdbcExecution implements AutoCloseable {
   /**
    * Creates a bounded execution resource over a caller-owned executor.
    *
-   * <p>The supplied executor must run blocking JDBC work on suitable dedicated platform threads.
-   * Closing the returned resource never shuts down the supplied executor.
+   * <p>The supplied executor must run blocking JDBC work on suitable dedicated threads. It may be
+   * platform- or virtual-thread-backed; R2D1 does not select, inspect, or shut down that thread
+   * model. Closing the returned resource never shuts down the supplied executor.
    *
    * @param executor caller-owned executor for blocking JDBC work
    * @param maxConcurrency positive maximum number of concurrently running JDBC operations
