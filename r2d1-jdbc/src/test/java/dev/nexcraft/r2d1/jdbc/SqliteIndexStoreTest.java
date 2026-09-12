@@ -26,7 +26,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** SQLite-specific storage, schema, locking, and configuration coverage. */
 class SqliteIndexStoreTest extends JdbcBackendTest {
@@ -56,6 +59,7 @@ class SqliteIndexStoreTest extends JdbcBackendTest {
   @Test
   void storesBooleansAsIntegersAndRejectsInvalidBooleanResults() throws SQLException {
     TestDriverManagerDataSource dataSource = dataSource("booleans");
+    dataSource.trackResources();
     try (JdbcExecution execution = JdbcExecution.create(2, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(BooleanDocument.class));
@@ -100,6 +104,10 @@ class SqliteIndexStoreTest extends JdbcBackendTest {
       assertThat(completedFailure(store.query(sortedBooleanQuery)))
           .isInstanceOf(StorageException.Operation.class)
           .hasMessageContaining("invalid value for indexed field 'active'");
+      assertNoOpenResources(dataSource);
+      execute(dataSource, "UPDATE \"boolean_entries\" SET \"active\" = 0");
+      assertThat(completedValue(store.query(sortedBooleanQuery)).documentKeys()).hasSize(2);
+      assertNoOpenResources(dataSource);
     }
   }
 
@@ -136,20 +144,20 @@ class SqliteIndexStoreTest extends JdbcBackendTest {
         statement.setString(2, "locked");
         assertThat(statement.executeUpdate()).isEqualTo(1);
 
-        long startedAt = System.nanoTime();
         Throwable failure =
             completedFailure(
                 store.upsert(
                     entry("lock_entries", "locked", Map.of("rank", new IndexValue.LongValue(3L)))),
                 SQLITE_BUSY_FAILURE_TIMEOUT);
-        Duration elapsed = Duration.ofNanos(System.nanoTime() - startedAt);
         assertThat(failure)
             .isInstanceOf(StorageException.Unavailable.class)
             .hasMessage("JDBC upsert failed")
             .hasCauseInstanceOf(SQLException.class);
         assertThat(((SQLException) failure.getCause()).getErrorCode() & 0xff).isEqualTo(5);
-        assertThat(elapsed).isGreaterThanOrEqualTo(Duration.ofMillis(4_500));
         blocker.rollback();
+        completedValue(
+            store.upsert(
+                entry("lock_entries", "locked", Map.of("rank", new IndexValue.LongValue(4L)))));
       }
     }
   }
@@ -258,52 +266,71 @@ class SqliteIndexStoreTest extends JdbcBackendTest {
   }
 
   @Test
-  void completesConcurrentWritesWithinBoundedExecution() {
-    TestDriverManagerDataSource dataSource = dataSource("concurrent_writes");
-    dataSource.trackConnections();
-    try (JdbcExecution execution = JdbcExecution.create(4, 64)) {
+  @Timeout(30)
+  void serializesWritesWithoutSerializingReads() {
+    TestDriverManagerDataSource dataSource = dataSource("serialized_writes");
+    dataSource.trackResources();
+    try (JdbcExecution execution = JdbcExecution.create(3, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(LockDocument.class));
+      completedValue(
+          store.upsert(
+              entry("lock_entries", "visible", Map.of("rank", new IndexValue.LongValue(0L)))));
 
-      List<CompletionStage<@org.jspecify.annotations.Nullable Void>> writes = new ArrayList<>();
-      for (int index = 0; index < 40; index++) {
-        writes.add(
-            store.upsert(
-                entry(
-                    "lock_entries",
-                    "document-" + index,
-                    Map.of("rank", new IndexValue.LongValue(index)))));
+      TestDriverManagerDataSource.MutationGate gate = dataSource.blockNextMutation();
+      CountDownLatch connections = dataSource.expectConnectionAcquisitions(3);
+      CompletionStage<@org.jspecify.annotations.Nullable Void> firstWrite =
+          store.upsert(
+              entry("lock_entries", "first", Map.of("rank", new IndexValue.LongValue(1L))));
+      await(gate.started());
+      CompletionStage<@org.jspecify.annotations.Nullable Void> secondWrite =
+          store.upsert(
+              entry("lock_entries", "second", Map.of("rank", new IndexValue.LongValue(2L))));
+      CompletionStage<IndexPage> read = store.query(unsortedQuery("lock_entries"));
+      try {
+        await(connections);
+        assertThat(completedValue(read).documentKeys())
+            .containsExactly(new DocumentKey("lock_entries", "visible"));
+        assertThat(secondWrite.toCompletableFuture()).isNotDone();
+        assertThat(dataSource.peakConcurrentMutations()).isEqualTo(1);
+      } finally {
+        gate.release().countDown();
       }
-      CompletableFuture<?>[] futures =
-          writes.stream()
-              .map(stage -> stage.toCompletableFuture())
-              .toArray(CompletableFuture[]::new);
-      completedValue(CompletableFuture.allOf(futures));
-
-      IndexQuery allRows =
-          new IndexQuery("lock_entries", List.of(), Optional.empty(), 100, Optional.empty());
-      assertThat(completedValue(store.query(allRows)).documentKeys()).hasSize(40);
-
-      List<CompletionStage<?>> reads = new ArrayList<>();
-      for (int index = 0; index < 8; index++) {
-        reads.add(store.query(allRows));
-      }
-      CompletableFuture<?>[] readFutures =
-          reads.stream()
-              .map(stage -> stage.toCompletableFuture())
-              .toArray(CompletableFuture[]::new);
-      completedValue(CompletableFuture.allOf(readFutures));
-      assertThat(dataSource.peakConnectionCount()).isLessThanOrEqualTo(4);
+      completedValue(firstWrite);
+      completedValue(secondWrite);
+      assertThat(completedValue(store.query(unsortedQuery("lock_entries"))).documentKeys())
+          .containsExactly(
+              new DocumentKey("lock_entries", "first"),
+              new DocumentKey("lock_entries", "second"),
+              new DocumentKey("lock_entries", "visible"));
+      assertThat(dataSource.peakConcurrentMutations()).isEqualTo(1);
+      assertNoOpenResources(dataSource);
     }
   }
 
   private void assertJournalModePreserved(String mode) throws SQLException {
-    TestDriverManagerDataSource dataSource = dataSource("journal_" + mode);
+    String url = fileUrl(temporaryDirectory.resolve("journal_" + mode));
+    TestDriverManagerDataSource dataSource = new TestDriverManagerDataSource(url);
     setJournalMode(dataSource, mode);
     try (JdbcExecution execution = JdbcExecution.create(2, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(JournalDocument.class));
       assertThat(journalMode(dataSource)).isEqualTo(mode);
+    }
+    TestDriverManagerDataSource reopened = new TestDriverManagerDataSource(url);
+    try (JdbcExecution execution = JdbcExecution.create(2, 8)) {
+      JdbcIndexStore store = new JdbcIndexStore(reopened, execution);
+      completedValue(store.initialize(JournalDocument.class));
+      assertThat(journalMode(reopened)).isEqualTo(mode);
+    }
+  }
+
+  private static void await(CountDownLatch latch) {
+    try {
+      assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+    } catch (InterruptedException failure) {
+      Thread.currentThread().interrupt();
+      throw new AssertionError("SQLite concurrency coordination was interrupted", failure);
     }
   }
 

@@ -66,6 +66,7 @@ public abstract class IndexStoreContractTest {
   @Test
   protected final void initializesTheSameSchemaIdempotently() {
     await(adapter().initialize(ContractDocument.class));
+    await(adapter().initialize(ContractDocument.class));
 
     assertThat(await(store().query(unsortedQuery())).documentKeys()).isEmpty();
   }
@@ -124,20 +125,32 @@ public abstract class IndexStoreContractTest {
 
   @Test
   protected final void supportsDoubleComparisonOperators() {
-    insertComparisonEntries();
+    await(store().upsert(entry("a", "alpha", 10L, -2.5, false)));
+    await(store().upsert(entry("b", "beta", 20L, 0.0, true)));
+    await(store().upsert(entry("c", "gamma", 30L, 1.25, true)));
+    await(store().upsert(entry("d", "delta", 40L, 1.25, false)));
+    await(store().upsert(entry("e", "epsilon", 50L, 3.5, true)));
 
-    assertQuery("score", ComparisonOperator.EQUAL, new IndexValue.DoubleValue(2.0), "b");
-    assertQuery("score", ComparisonOperator.NOT_EQUAL, new IndexValue.DoubleValue(2.0), "a", "c");
-    assertQuery("score", ComparisonOperator.GREATER_THAN, new IndexValue.DoubleValue(2.0), "c");
+    assertQuery("score", ComparisonOperator.EQUAL, new IndexValue.DoubleValue(1.25), "c", "d");
+    assertQuery(
+        "score", ComparisonOperator.NOT_EQUAL, new IndexValue.DoubleValue(1.25), "a", "b", "e");
+    assertQuery("score", ComparisonOperator.GREATER_THAN, new IndexValue.DoubleValue(1.25), "e");
     assertQuery(
         "score",
         ComparisonOperator.GREATER_THAN_OR_EQUAL,
-        new IndexValue.DoubleValue(2.0),
-        "b",
-        "c");
-    assertQuery("score", ComparisonOperator.LESS_THAN, new IndexValue.DoubleValue(2.0), "a");
+        new IndexValue.DoubleValue(1.25),
+        "c",
+        "d",
+        "e");
+    assertQuery("score", ComparisonOperator.LESS_THAN, new IndexValue.DoubleValue(1.25), "a", "b");
     assertQuery(
-        "score", ComparisonOperator.LESS_THAN_OR_EQUAL, new IndexValue.DoubleValue(2.0), "a", "b");
+        "score",
+        ComparisonOperator.LESS_THAN_OR_EQUAL,
+        new IndexValue.DoubleValue(1.25),
+        "a",
+        "b",
+        "c",
+        "d");
   }
 
   @Test
@@ -146,6 +159,9 @@ public abstract class IndexStoreContractTest {
 
     assertQuery("active", ComparisonOperator.EQUAL, new IndexValue.BooleanValue(true), "b", "c");
     assertQuery("active", ComparisonOperator.NOT_EQUAL, new IndexValue.BooleanValue(true), "a");
+    assertQuery("active", ComparisonOperator.EQUAL, new IndexValue.BooleanValue(false), "a");
+    assertQuery(
+        "active", ComparisonOperator.NOT_EQUAL, new IndexValue.BooleanValue(false), "b", "c");
   }
 
   @Test
@@ -193,86 +209,13 @@ public abstract class IndexStoreContractTest {
   }
 
   @Test
-  protected final void continuesQueriesWithAKeysetCursor() {
-    await(store().upsert(entry("c", "NZ", 20L, 3.0, true)));
-    await(store().upsert(entry("a", "NZ", 10L, 1.0, true)));
-    await(store().upsert(entry("b", "NZ", 10L, 2.0, true)));
-    await(store().upsert(entry("e", "NZ", 30L, 5.0, true)));
-    await(store().upsert(entry("d", "NZ", 20L, 4.0, true)));
+  protected final void paginatesEverySortableTypeWithoutDuplicatesOmissionsOrOrderChanges() {
+    insertCursorEntries();
 
-    IndexPage first = await(store().query(sortedQuery(SortDirection.ASC, 2)));
-    assertThat(first.documentKeys()).containsExactly(key("a"), key("b"));
-    IndexCursor firstCursor = first.nextCursor().orElseThrow();
-
-    IndexPage second =
-        await(
-            store()
-                .query(
-                    new IndexQuery(
-                        COLLECTION,
-                        List.of(),
-                        Optional.of(new IndexQuery.Sort("rank", SortDirection.ASC)),
-                        2,
-                        Optional.of(firstCursor))));
-    assertThat(second.documentKeys()).containsExactly(key("c"), key("d"));
-    IndexCursor secondCursor = second.nextCursor().orElseThrow();
-
-    IndexPage third =
-        await(
-            store()
-                .query(
-                    new IndexQuery(
-                        COLLECTION,
-                        List.of(),
-                        Optional.of(new IndexQuery.Sort("rank", SortDirection.ASC)),
-                        2,
-                        Optional.of(secondCursor))));
-    assertThat(third.documentKeys()).containsExactly(key("e"));
-    assertThat(third.nextCursor()).isEmpty();
-
-    List<DocumentKey> allKeys = new ArrayList<>();
-    allKeys.addAll(first.documentKeys());
-    allKeys.addAll(second.documentKeys());
-    allKeys.addAll(third.documentKeys());
-    assertThat(allKeys)
-        .containsExactly(key("a"), key("b"), key("c"), key("d"), key("e"))
-        .doesNotHaveDuplicates();
-  }
-
-  @Test
-  protected final void continuesDescendingQueriesWithAKeysetCursor() {
-    await(store().upsert(entry("c", "NZ", 20L, 3.0, true)));
-    await(store().upsert(entry("a", "NZ", 10L, 1.0, true)));
-    await(store().upsert(entry("b", "NZ", 10L, 2.0, true)));
-    await(store().upsert(entry("e", "NZ", 30L, 5.0, true)));
-    await(store().upsert(entry("d", "NZ", 20L, 4.0, true)));
-
-    IndexPage first = await(store().query(sortedQuery(SortDirection.DESC, 2)));
-    IndexPage second =
-        await(
-            store()
-                .query(
-                    new IndexQuery(
-                        COLLECTION,
-                        List.of(),
-                        Optional.of(new IndexQuery.Sort("rank", SortDirection.DESC)),
-                        2,
-                        first.nextCursor())));
-    IndexPage third =
-        await(
-            store()
-                .query(
-                    new IndexQuery(
-                        COLLECTION,
-                        List.of(),
-                        Optional.of(new IndexQuery.Sort("rank", SortDirection.DESC)),
-                        2,
-                        second.nextCursor())));
-
-    assertThat(first.documentKeys()).containsExactly(key("e"), key("d"));
-    assertThat(second.documentKeys()).containsExactly(key("c"), key("b"));
-    assertThat(third.documentKeys()).containsExactly(key("a"));
-    assertThat(third.nextCursor()).isEmpty();
+    assertCursorMatrix("country", List.of("a", "k", "c", "m", "b", "z"));
+    assertCursorMatrix("rank", List.of("a", "b", "c", "k", "m", "z"));
+    assertCursorMatrix("score", List.of("a", "c", "m", "b", "k", "z"));
+    assertCursorMatrix("active", List.of("a", "b", "c", "k", "m", "z"));
   }
 
   @Test
@@ -294,6 +237,22 @@ public abstract class IndexStoreContractTest {
     assertThat(first.documentKeys()).containsExactly(key("a"), key("b"));
     assertThat(second.documentKeys()).containsExactly(key("c"));
     assertThat(second.nextCursor()).isEmpty();
+  }
+
+  @Test
+  protected final void handlesEmptySingleAndExactSizePages() {
+    IndexPage empty = await(store().query(unsortedQuery()));
+    assertThat(empty.documentKeys()).isEmpty();
+    assertThat(empty.nextCursor()).isEmpty();
+
+    await(store().upsert(entry("only", "alpha", 0L, 0.0, false)));
+    IndexPage single =
+        await(
+            store()
+                .query(
+                    new IndexQuery(COLLECTION, List.of(), Optional.empty(), 1, Optional.empty())));
+    assertThat(single.documentKeys()).containsExactly(key("only"));
+    assertThat(single.nextCursor()).isEmpty();
   }
 
   @Test
@@ -348,6 +307,58 @@ public abstract class IndexStoreContractTest {
     await(store().upsert(entry("a", "alpha", 10L, 1.0, false)));
     await(store().upsert(entry("b", "beta", 20L, 2.0, true)));
     await(store().upsert(entry("c", "gamma", 30L, 3.0, true)));
+  }
+
+  private void insertCursorEntries() {
+    await(store().upsert(entry("m", "beta", 20L, 0.5, true)));
+    await(store().upsert(entry("a", "alpha", -10L, -2.5, false)));
+    await(store().upsert(entry("z", "gamma", 20L, 3.75, true)));
+    await(store().upsert(entry("c", "beta", 0L, 0.0, false)));
+    await(store().upsert(entry("k", "alpha", 20L, 3.75, true)));
+    await(store().upsert(entry("b", "gamma", -10L, 1.25, false)));
+  }
+
+  private void assertCursorMatrix(String field, List<String> ascendingIds) {
+    List<String> descendingIds = new ArrayList<>(ascendingIds);
+    java.util.Collections.reverse(descendingIds);
+    for (SortDirection direction : SortDirection.values()) {
+      List<String> expected = direction == SortDirection.ASC ? ascendingIds : descendingIds;
+      for (int pageSize : List.of(1, 2, expected.size())) {
+        assertCursorTraversal(field, direction, pageSize, expected);
+      }
+    }
+  }
+
+  private void assertCursorTraversal(
+      String field, SortDirection direction, int pageSize, List<String> expectedIds) {
+    List<DocumentKey> actual = new ArrayList<>();
+    Optional<IndexCursor> cursor = Optional.empty();
+    int pageCount = 0;
+    do {
+      IndexPage page =
+          await(
+              store()
+                  .query(
+                      new IndexQuery(
+                          COLLECTION,
+                          List.of(),
+                          Optional.of(new IndexQuery.Sort(field, direction)),
+                          pageSize,
+                          cursor)));
+      actual.addAll(page.documentKeys());
+      cursor = page.nextCursor();
+      pageCount++;
+      assertThat(pageCount)
+          .as("cursor termination for %s %s at page size %s", field, direction, pageSize)
+          .isLessThanOrEqualTo(expectedIds.size());
+    } while (cursor.isPresent());
+
+    DocumentKey[] expected =
+        expectedIds.stream().map(IndexStoreContractTest::key).toArray(DocumentKey[]::new);
+    assertThat(actual)
+        .as("full cursor traversal for %s %s at page size %s", field, direction, pageSize)
+        .containsExactly(expected)
+        .doesNotHaveDuplicates();
   }
 
   private void assertQuery(

@@ -8,6 +8,7 @@ import dev.nexcraft.r2d1.SortDirection;
 import dev.nexcraft.r2d1.annotation.Document;
 import dev.nexcraft.r2d1.annotation.Index;
 import dev.nexcraft.r2d1.spi.DocumentKey;
+import dev.nexcraft.r2d1.spi.IndexCursor;
 import dev.nexcraft.r2d1.spi.IndexEntry;
 import dev.nexcraft.r2d1.spi.IndexPage;
 import dev.nexcraft.r2d1.spi.IndexQuery;
@@ -26,10 +27,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Shared schema, persistence, and parameter coverage for built-in JDBC backends. */
@@ -56,29 +63,28 @@ abstract class JdbcBackendTest {
     Path databasePath = temporaryDirectory.resolve("persistent");
     String url = fileUrl(databasePath);
     TestDriverManagerDataSource firstDataSource = new TestDriverManagerDataSource(url);
+    firstDataSource.trackResources();
 
     try (JdbcExecution execution = JdbcExecution.create(2, 16)) {
       JdbcIndexStore store = new JdbcIndexStore(firstDataSource, execution);
       completedValue(store.initialize(PersistentDocument.class));
-      completedValue(
-          store.upsert(
-              entry(
-                  "persistent_entries",
-                  "first",
-                  Map.of(
-                      "active", new IndexValue.BooleanValue(true),
-                      "country", new IndexValue.StringValue("NZ"),
-                      "rank", new IndexValue.LongValue(10L),
-                      "score", new IndexValue.DoubleValue(2.5)))));
+      completedValue(store.upsert(persistentEntry("a", "NZ", 10L, 1.5, true)));
+      completedValue(store.upsert(persistentEntry("b", "NZ", 20L, 2.5, false)));
+      completedValue(store.upsert(persistentEntry("c", "AU", 30L, 3.5, true)));
+      assertNoOpenResources(firstDataSource);
     }
     shutdown(firstDataSource);
+    assertNoOpenResources(firstDataSource);
     assertDatabaseFiles(databasePath);
 
     TestDriverManagerDataSource reopenedDataSource =
         new TestDriverManagerDataSource(reopenUrl(url));
+    reopenedDataSource.trackResources();
+    reopenedDataSource.resetDdlStatementCount();
     try (JdbcExecution execution = JdbcExecution.create(2, 16)) {
       JdbcIndexStore reopened = new JdbcIndexStore(reopenedDataSource, execution);
       completedValue(reopened.initialize(PersistentDocument.class));
+      assertThat(reopenedDataSource.resourceSnapshot().ddlStatements()).isZero();
       IndexPage page =
           completedValue(
               reopened.query(
@@ -93,14 +99,69 @@ abstract class JdbcBackendTest {
                       10,
                       Optional.empty())));
       assertThat(page.documentKeys())
-          .containsExactly(new DocumentKey("persistent_entries", "first"));
+          .containsExactly(
+              new DocumentKey("persistent_entries", "a"),
+              new DocumentKey("persistent_entries", "b"));
+      assertRequiredIndexes(
+          reopenedDataSource, "persistent_entries", "active", "country", "rank", "score");
+      completedValue(reopened.upsert(persistentEntry("b", "AU", 5L, -1.25, true)));
+      assertNoOpenResources(reopenedDataSource);
     }
     shutdown(reopenedDataSource);
+    assertNoOpenResources(reopenedDataSource);
+
+    TestDriverManagerDataSource twiceReopenedDataSource =
+        new TestDriverManagerDataSource(reopenUrl(url));
+    twiceReopenedDataSource.trackResources();
+    twiceReopenedDataSource.resetDdlStatementCount();
+    try (JdbcExecution execution = JdbcExecution.create(2, 16)) {
+      JdbcIndexStore twiceReopened = new JdbcIndexStore(twiceReopenedDataSource, execution);
+      completedValue(twiceReopened.initialize(PersistentDocument.class));
+      assertThat(twiceReopenedDataSource.resourceSnapshot().ddlStatements()).isZero();
+      assertThat(
+              completedValue(
+                      twiceReopened.query(
+                          new IndexQuery(
+                              "persistent_entries",
+                              List.of(),
+                              Optional.of(new IndexQuery.Sort("rank", SortDirection.ASC)),
+                              10,
+                              Optional.empty())))
+                  .documentKeys())
+          .containsExactly(
+              new DocumentKey("persistent_entries", "b"),
+              new DocumentKey("persistent_entries", "a"),
+              new DocumentKey("persistent_entries", "c"));
+      assertThat(
+              completedValue(
+                      twiceReopened.query(
+                          new IndexQuery(
+                              "persistent_entries",
+                              List.of(
+                                  new IndexQuery.Filter(
+                                      "country",
+                                      ComparisonOperator.EQUAL,
+                                      new IndexValue.StringValue("AU"))),
+                              Optional.empty(),
+                              10,
+                              Optional.empty())))
+                  .documentKeys())
+          .containsExactly(
+              new DocumentKey("persistent_entries", "b"),
+              new DocumentKey("persistent_entries", "c"));
+      assertRequiredIndexes(
+          twiceReopenedDataSource, "persistent_entries", "active", "country", "rank", "score");
+      assertNoOpenResources(twiceReopenedDataSource);
+    }
+    shutdown(twiceReopenedDataSource);
+    assertNoOpenResources(twiceReopenedDataSource);
   }
 
   @Test
-  void addsRequiredColumnsAndIndexesToAnEmptyTable() throws SQLException {
-    TestDriverManagerDataSource dataSource = dataSource("additive");
+  void addsRequiredColumnsAndPreservesIndexesAfterClearAndReopen() throws SQLException {
+    String url = fileUrl(temporaryDirectory.resolve("additive"));
+    TestDriverManagerDataSource dataSource = new TestDriverManagerDataSource(url);
+    dataSource.trackResources();
     execute(
         dataSource,
         "CREATE TABLE \"schema_entries\" ("
@@ -131,12 +192,31 @@ abstract class JdbcBackendTest {
         .containsEntry("idx_schema_entries_country", List.of("country"))
         .containsEntry("idx_schema_entries_rank", List.of("rank"));
     assertThat(rowCount(dataSource, "schema_entries")).isZero();
+    assertNoOpenResources(dataSource);
     shutdown(dataSource);
+    assertNoOpenResources(dataSource);
+
+    TestDriverManagerDataSource reopened = new TestDriverManagerDataSource(reopenUrl(url));
+    reopened.trackResources();
+    reopened.resetDdlStatementCount();
+    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+      JdbcIndexStore store = new JdbcIndexStore(reopened, execution);
+      completedValue(store.initialize(ExpandedSchemaDocument.class));
+      assertThat(reopened.resourceSnapshot().ddlStatements()).isZero();
+      assertThat(indexColumns(reopened, "schema_entries"))
+          .containsEntry("idx_schema_entries_country", List.of("country"))
+          .containsEntry("idx_schema_entries_rank", List.of("rank"));
+      assertThat(rowCount(reopened, "schema_entries")).isZero();
+      assertNoOpenResources(reopened);
+    }
+    shutdown(reopened);
+    assertNoOpenResources(reopened);
   }
 
   @Test
   void rejectsAddingRequiredColumnsToAPopulatedTableWithoutChangingIt() throws SQLException {
     TestDriverManagerDataSource dataSource = dataSource("populated");
+    dataSource.trackResources();
     try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(BaseMigrationDocument.class));
@@ -159,12 +239,15 @@ abstract class JdbcBackendTest {
         .contains("document_id", "country")
         .doesNotContain("rank");
     assertThat(rowCount(dataSource, "migration_entries")).isEqualTo(1L);
+    assertNoOpenResources(dataSource);
     shutdown(dataSource);
+    assertNoOpenResources(dataSource);
   }
 
   @Test
   void rejectsIncompatibleColumnsPrimaryKeysAndIndexes() throws SQLException {
     TestDriverManagerDataSource dataSource = dataSource("incompatible");
+    dataSource.trackResources();
     execute(
         dataSource,
         "CREATE TABLE \"wrong_type_entries\" (\"document_id\" "
@@ -198,6 +281,16 @@ abstract class JdbcBackendTest {
     execute(
         dataSource,
         "CREATE INDEX \"idx_wrong_index_entries_rank\" ON \"wrong_index_entries\" (\"country\")");
+    execute(
+        dataSource,
+        "CREATE TABLE \"unique_index_entries\" (\"document_id\" "
+            + stringColumnType()
+            + " NOT NULL PRIMARY KEY, \"rank\" "
+            + longColumnType()
+            + " NOT NULL)");
+    execute(
+        dataSource,
+        "CREATE UNIQUE INDEX \"idx_unique_index_entries_rank\" ON \"unique_index_entries\" (\"rank\")");
 
     try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
@@ -205,13 +298,17 @@ abstract class JdbcBackendTest {
       assertIncompatible(store.initialize(NullableDocument.class), "rank");
       assertIncompatible(store.initialize(MissingPrimaryKeyDocument.class), "document_id");
       assertIncompatible(store.initialize(WrongIndexDocument.class), "index for rank");
+      assertIncompatible(store.initialize(UniqueIndexDocument.class), "index for rank");
     }
+    assertNoOpenResources(dataSource);
     shutdown(dataSource);
+    assertNoOpenResources(dataSource);
   }
 
   @Test
   void rejectsInvalidIdentifiersAndTimestampBeforeSchemaMutation() throws SQLException {
     TestDriverManagerDataSource dataSource = dataSource("unsupported_metadata");
+    dataSource.trackResources();
     try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       assertThatIllegalArgumentException()
@@ -223,7 +320,9 @@ abstract class JdbcBackendTest {
     }
     assertThat(tableExists(dataSource, "invalid-name")).isFalse();
     assertThat(tableExists(dataSource, "timestamp_entries")).isFalse();
+    assertNoOpenResources(dataSource);
     shutdown(dataSource);
+    assertNoOpenResources(dataSource);
   }
 
   @Test
@@ -260,6 +359,218 @@ abstract class JdbcBackendTest {
           .isEmpty();
     }
     shutdown(dataSource);
+  }
+
+  @Test
+  void recoversAfterConnectionAndStatementFailuresWithoutLeakingResources() throws SQLException {
+    TestDriverManagerDataSource dataSource = dataSource("failure_cleanup");
+    dataSource.trackResources();
+    try (JdbcExecution execution = JdbcExecution.create(2, 8)) {
+      JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
+      completedValue(store.initialize(ParameterDocument.class));
+
+      SQLException connectionFailure = new SQLException("jdbc:secret-connection", "08006");
+      dataSource.failConnections(connectionFailure);
+      CompletionStage<IndexPage> failedConnection = store.query(unsortedQuery("parameter_entries"));
+      assertThat(failedConnection).isNotNull();
+      assertThat(completedFailure(failedConnection))
+          .isInstanceOf(StorageException.Unavailable.class)
+          .hasMessage("JDBC query failed")
+          .hasCause(connectionFailure);
+      dataSource.clearConnectionFailure();
+      assertThat(completedValue(store.query(unsortedQuery("parameter_entries"))).documentKeys())
+          .isEmpty();
+      assertNoOpenResources(dataSource);
+
+      SQLException statementFailure = new SQLException("SELECT secret FROM hidden", "42000");
+      dataSource.failNextStatementExecution(statementFailure);
+      CompletionStage<IndexPage> failedStatement = store.query(unsortedQuery("parameter_entries"));
+      assertThat(failedStatement).isNotNull();
+      assertThat(completedFailure(failedStatement))
+          .isInstanceOf(StorageException.Operation.class)
+          .hasMessage("JDBC query failed")
+          .hasCause(statementFailure);
+      assertThat(completedValue(store.query(unsortedQuery("parameter_entries"))).documentKeys())
+          .isEmpty();
+      assertNoOpenResources(dataSource);
+    }
+    shutdown(dataSource);
+    assertNoOpenResources(dataSource);
+  }
+
+  @Test
+  void closesResourcesAfterConstraintFailuresAndAllowsSubsequentWrites() throws SQLException {
+    TestDriverManagerDataSource dataSource = dataSource("constraint_cleanup");
+    dataSource.trackResources();
+    execute(
+        dataSource,
+        "CREATE TABLE \"constraint_entries\" (\"document_id\" "
+            + stringColumnType()
+            + " NOT NULL PRIMARY KEY, \"rank\" "
+            + longColumnType()
+            + " NOT NULL CHECK (\"rank\" >= 0))");
+    try (JdbcExecution execution = JdbcExecution.create(2, 8)) {
+      JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
+      completedValue(store.initialize(ConstraintDocument.class));
+      Throwable failure =
+          completedFailure(
+              store.upsert(
+                  entry(
+                      "constraint_entries",
+                      "invalid",
+                      Map.of("rank", new IndexValue.LongValue(-1L)))));
+      assertThat(failure)
+          .isInstanceOf(StorageException.Operation.class)
+          .hasMessage("JDBC upsert failed")
+          .hasCauseInstanceOf(SQLException.class);
+      assertNoOpenResources(dataSource);
+
+      completedValue(
+          store.upsert(
+              entry("constraint_entries", "valid", Map.of("rank", new IndexValue.LongValue(1L)))));
+      assertThat(completedValue(store.query(unsortedQuery("constraint_entries"))).documentKeys())
+          .containsExactly(new DocumentKey("constraint_entries", "valid"));
+      assertNoOpenResources(dataSource);
+    }
+    shutdown(dataSource);
+    assertNoOpenResources(dataSource);
+  }
+
+  @Test
+  @Timeout(60)
+  void preservesCorrectnessAcrossControlledConcurrentReadsAndWrites() throws SQLException {
+    TestDriverManagerDataSource dataSource = dataSource("concurrent_parity");
+    dataSource.trackResources();
+    ExecutorService callers = Executors.newFixedThreadPool(8);
+    try (JdbcExecution execution = JdbcExecution.create(4, 64)) {
+      JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
+      completedValue(store.initialize(ConcurrentDocument.class));
+      CountDownLatch start = new CountDownLatch(1);
+      List<CompletableFuture<CompletionStage<?>>> submissions = new ArrayList<>();
+      for (int operation = 0; operation < 40; operation++) {
+        int current = operation;
+        submissions.add(
+            CompletableFuture.supplyAsync(
+                () -> {
+                  await(start);
+                  if (current < 32) {
+                    return store.upsert(
+                        entry(
+                            "concurrent_entries",
+                            "document-" + String.format("%02d", current),
+                            Map.of("rank", new IndexValue.LongValue(current % 7L))));
+                  }
+                  return store.query(
+                      new IndexQuery(
+                          "concurrent_entries",
+                          List.of(),
+                          Optional.of(new IndexQuery.Sort("rank", SortDirection.ASC)),
+                          100,
+                          Optional.empty()));
+                },
+                callers));
+      }
+      start.countDown();
+      List<CompletionStage<?>> operations =
+          submissions.stream().map(JdbcBackendTest::completedValue).toList();
+      CompletableFuture<?>[] futures =
+          operations.stream()
+              .map(CompletionStage::toCompletableFuture)
+              .toArray(CompletableFuture[]::new);
+      completedValue(CompletableFuture.allOf(futures));
+      operations.subList(32, 40).stream()
+          .map(JdbcBackendTest::completedValue)
+          .map(IndexPage.class::cast)
+          .forEach(
+              page ->
+                  assertThat(page.documentKeys())
+                      .doesNotHaveDuplicates()
+                      .allMatch(key -> key.collection().equals("concurrent_entries")));
+
+      IndexPage finalPage =
+          completedValue(
+              store.query(
+                  new IndexQuery(
+                      "concurrent_entries",
+                      List.of(),
+                      Optional.of(new IndexQuery.Sort("rank", SortDirection.ASC)),
+                      100,
+                      Optional.empty())));
+      assertThat(finalPage.documentKeys()).hasSize(32).doesNotHaveDuplicates();
+      assertNoOpenResources(dataSource);
+    } finally {
+      callers.shutdownNow();
+    }
+    shutdown(dataSource);
+    assertNoOpenResources(dataSource);
+  }
+
+  @Test
+  @Timeout(60)
+  void repeatsOneHundredOperationsWithoutLeakingResourcesOrState() throws SQLException {
+    TestDriverManagerDataSource dataSource = dataSource("repetition");
+    dataSource.trackResources();
+    try (JdbcExecution execution = JdbcExecution.create(4, 64)) {
+      JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
+      completedValue(store.initialize(ConcurrentDocument.class));
+      for (int index = 0; index < 40; index++) {
+        completedValue(
+            store.upsert(
+                entry(
+                    "concurrent_entries",
+                    "document-" + String.format("%02d", index),
+                    Map.of("rank", new IndexValue.LongValue(index % 7L)))));
+      }
+      for (int traversal = 0; traversal < 5; traversal++) {
+        List<DocumentKey> traversed = new ArrayList<>();
+        Optional<IndexCursor> cursor = Optional.empty();
+        for (int page = 0; page < 6; page++) {
+          IndexPage result =
+              completedValue(
+                  store.query(
+                      new IndexQuery(
+                          "concurrent_entries",
+                          List.of(),
+                          Optional.of(new IndexQuery.Sort("rank", SortDirection.ASC)),
+                          7,
+                          cursor)));
+          traversed.addAll(result.documentKeys());
+          cursor = result.nextCursor();
+        }
+        assertThat(cursor).isEmpty();
+        assertThat(traversed).hasSize(40).doesNotHaveDuplicates();
+      }
+      for (int index = 0; index < 30; index++) {
+        completedValue(
+            store.delete(
+                new DocumentKey("concurrent_entries", "document-" + String.format("%02d", index))));
+      }
+      assertThat(
+              completedValue(
+                      store.query(
+                          new IndexQuery(
+                              "concurrent_entries",
+                              List.of(),
+                              Optional.empty(),
+                              100,
+                              Optional.empty())))
+                  .documentKeys())
+          .containsExactly(
+              new DocumentKey("concurrent_entries", "document-30"),
+              new DocumentKey("concurrent_entries", "document-31"),
+              new DocumentKey("concurrent_entries", "document-32"),
+              new DocumentKey("concurrent_entries", "document-33"),
+              new DocumentKey("concurrent_entries", "document-34"),
+              new DocumentKey("concurrent_entries", "document-35"),
+              new DocumentKey("concurrent_entries", "document-36"),
+              new DocumentKey("concurrent_entries", "document-37"),
+              new DocumentKey("concurrent_entries", "document-38"),
+              new DocumentKey("concurrent_entries", "document-39"));
+      assertNoOpenResources(dataSource);
+      assertThat(dataSource.resourceSnapshot().peakConnections()).isLessThanOrEqualTo(4);
+    }
+    shutdown(dataSource);
+    assertNoOpenResources(dataSource);
   }
 
   protected final TestDriverManagerDataSource dataSource(String databaseName) {
@@ -343,6 +654,45 @@ abstract class JdbcBackendTest {
     return false;
   }
 
+  protected static void assertNoOpenResources(TestDriverManagerDataSource dataSource) {
+    TestDriverManagerDataSource.ResourceSnapshot snapshot = dataSource.resourceSnapshot();
+    assertThat(snapshot.activeConnections()).as("active JDBC connections").isZero();
+    assertThat(snapshot.activeStatements()).as("active JDBC statements").isZero();
+    assertThat(snapshot.activeResultSets()).as("active JDBC result sets").isZero();
+    assertThat(snapshot.activeMetadataResultSets()).as("active JDBC metadata result sets").isZero();
+  }
+
+  private static void assertRequiredIndexes(
+      DataSource dataSource, String collection, String... fields) throws SQLException {
+    Map<String, List<String>> indexes = indexColumns(dataSource, collection);
+    for (String field : fields) {
+      assertThat(indexes).containsEntry("idx_" + collection + "_" + field, List.of(field));
+    }
+  }
+
+  private static IndexEntry persistentEntry(
+      String documentId, String country, long rank, double score, boolean active) {
+    return entry(
+        "persistent_entries",
+        documentId,
+        Map.of(
+            "active", new IndexValue.BooleanValue(active),
+            "country", new IndexValue.StringValue(country),
+            "rank", new IndexValue.LongValue(rank),
+            "score", new IndexValue.DoubleValue(score)));
+  }
+
+  private static void await(CountDownLatch latch) {
+    try {
+      if (!latch.await(10, TimeUnit.SECONDS)) {
+        throw new AssertionError("concurrent JDBC operations did not start in time");
+      }
+    } catch (InterruptedException failure) {
+      Thread.currentThread().interrupt();
+      throw new AssertionError("concurrent JDBC operation was interrupted", failure);
+    }
+  }
+
   protected static void assertIncompatible(CompletionStage<?> stage, String detail) {
     assertThat(completedFailure(stage))
         .isInstanceOf(StorageException.Operation.class)
@@ -414,6 +764,21 @@ abstract class JdbcBackendTest {
 
   @Document("wrong_index_entries")
   private static final class WrongIndexDocument {
+    @Index private long rank;
+  }
+
+  @Document("unique_index_entries")
+  private static final class UniqueIndexDocument {
+    @Index private long rank;
+  }
+
+  @Document("constraint_entries")
+  private static final class ConstraintDocument {
+    @Index private long rank;
+  }
+
+  @Document("concurrent_entries")
+  private static final class ConcurrentDocument {
     @Index private long rank;
   }
 

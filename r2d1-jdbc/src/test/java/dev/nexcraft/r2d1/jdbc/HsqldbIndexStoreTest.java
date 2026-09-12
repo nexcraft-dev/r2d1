@@ -9,9 +9,12 @@ import dev.nexcraft.r2d1.spi.IndexEntry;
 import dev.nexcraft.r2d1.spi.IndexPage;
 import dev.nexcraft.r2d1.spi.IndexValue;
 import dev.nexcraft.r2d1.spi.StorageException;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -19,6 +22,12 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 
@@ -252,32 +261,32 @@ class HsqldbIndexStoreTest extends JdbcBackendTest {
     }
 
     private void awaitReady() throws IOException, InterruptedException {
-      StringBuilder line = new StringBuilder();
-      long deadline = System.nanoTime() + HOLDER_READY_TIMEOUT.toNanos();
-      while (System.nanoTime() < deadline) {
-        int available = output.available();
-        while (available-- > 0) {
-          int value = output.read();
-          if (value < 0) {
-            throw new IOException("HSQLDB lock holder output closed before readiness");
-          }
-          if (value == '\n') {
-            if ("READY".equals(line.toString().strip())) {
-              return;
-            }
-            throw new IOException("HSQLDB lock holder returned unexpected readiness: " + line);
-          }
-          line.append((char) value);
-          if (line.length() > 128) {
-            throw new IOException("HSQLDB lock holder readiness output was too long");
-          }
+      ExecutorService readerExecutor = Executors.newSingleThreadExecutor();
+      Future<String> readiness =
+          readerExecutor.submit(
+              () ->
+                  new BufferedReader(new InputStreamReader(output, StandardCharsets.UTF_8))
+                      .readLine());
+      try {
+        String line = readiness.get(HOLDER_READY_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        if (line == null) {
+          throw new IOException("HSQLDB lock holder output closed before readiness");
         }
-        if (!process.isAlive()) {
-          throw new IOException("HSQLDB lock holder exited before readiness");
+        if (!"READY".equals(line.strip())) {
+          throw new IOException("HSQLDB lock holder returned unexpected readiness: " + line);
         }
-        Thread.sleep(10L);
+      } catch (ExecutionException failure) {
+        Throwable cause = failure.getCause();
+        if (cause instanceof IOException ioFailure) {
+          throw ioFailure;
+        }
+        throw new IOException("HSQLDB lock holder readiness failed", cause);
+      } catch (TimeoutException failure) {
+        readiness.cancel(true);
+        throw new IOException("HSQLDB lock holder readiness timed out", failure);
+      } finally {
+        readerExecutor.shutdownNow();
       }
-      throw new IOException("HSQLDB lock holder readiness timed out");
     }
 
     private void release() throws IOException, InterruptedException {
