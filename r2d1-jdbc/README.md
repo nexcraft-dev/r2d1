@@ -8,6 +8,51 @@ The module keeps database-specific SQL and schema behavior behind an internal di
 Applications use the same `JdbcIndexStore(DataSource, JdbcExecution)` API for every supported
 database and provide the JDBC driver themselves.
 
+## JDBC execution modes
+
+`PLATFORM_THREAD` is the default execution mode. Existing code using
+`JdbcExecution.create(maxConcurrency, maxPending)` keeps the bounded platform-thread behavior
+across upgrades.
+
+Virtual threads are available only through explicit configuration on Java 25 or newer:
+
+```java
+import dev.nexcraft.r2d1.jdbc.JdbcExecution;
+import dev.nexcraft.r2d1.jdbc.JdbcExecutionConfig;
+import dev.nexcraft.r2d1.jdbc.JdbcExecutionMode;
+
+JdbcExecutionConfig config =
+    new JdbcExecutionConfig(JdbcExecutionMode.VIRTUAL_THREAD, 100, 500);
+
+try (JdbcExecution execution = JdbcExecution.create(config)) {
+  // Pass execution to JdbcIndexStore and use the store while it remains open.
+}
+```
+
+`VIRTUAL_THREAD` is an opt-in mode and never falls back to platform threads. Selecting it on a
+runtime older than Java 25 fails during execution-resource creation. R2D1 does not select a mode
+from the Java runtime or JDBC driver, and there is no `AUTO` mode.
+
+Virtual threads do not remove database concurrency limits. `maxConcurrency` continues to bound
+active JDBC operations and `maxPending` continues to bound admitted work waiting to run. Capacity
+overflow is reported as an exceptionally completed `CompletionStage`, just as in platform mode.
+
+`JdbcExecution.create(config)` owns its executor and must be closed by its creator. The existing
+`JdbcExecution.using(executor, maxConcurrency, maxPending)` API remains caller-owned and is not a
+virtual-thread mode selector; R2D1 never shuts down the supplied executor.
+
+R2D1 supports the execution mode on the supported Java runtime, but does not certify that every
+JDBC driver implementation is free of virtual-thread pinning or carrier-thread bottlenecks. For
+manual investigation, run a Java 25 workload with a Flight Recorder profile, for example:
+
+```text
+java -XX:StartFlightRecording=filename=r2d1-jdbc.jfr,duration=30s,settings=profile ...
+jfr view r2d1-jdbc.jfr
+```
+
+Inspect virtual-thread pinning, carrier starvation, and long synchronization waits in the recorded
+events. This is diagnostic guidance only and adds no production dependency or automatic fallback.
+
 The implementation is organized under `dev.nexcraft.r2d1.jdbc.internal`. Metadata conversion and
 database mechanics are implementation details; the internal `JdbcDatabase` bridge is not a
 supported extension SPI, and applications should continue to use `JdbcIndexStore`.
@@ -457,7 +502,7 @@ the JDBC URL, SQL text, credentials, or bound values.
 
 ## Current boundaries
 
-The module does not provide a connection pool, retry policy, virtual-thread mode, framework
-integration, or public dialect SPI. Applications own those choices outside R2D1. H2 and HSQLDB
+The module does not provide a connection pool, retry policy, framework integration, or public
+dialect SPI. Applications own those choices outside R2D1. H2 and HSQLDB
 persistent embedded file mode and SQLite local persistent file mode are the current
 integration-tested configurations. Other databases are not supported.

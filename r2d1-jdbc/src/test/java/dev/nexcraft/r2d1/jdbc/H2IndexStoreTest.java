@@ -49,7 +49,7 @@ class H2IndexStoreTest extends JdbcBackendTest {
     TestDriverManagerDataSource dataSource =
         new TestDriverManagerDataSource(
             fileUrl(temporaryDirectory.resolve("locked")) + ";LOCK_TIMEOUT=50");
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(dataSource, execution);
       completedValue(store.initialize(LockDocument.class));
       completedValue(
@@ -84,14 +84,14 @@ class H2IndexStoreTest extends JdbcBackendTest {
     String url = fileUrl(temporaryDirectory.resolve("authentication"));
     TestDriverManagerDataSource authorized =
         new TestDriverManagerDataSource(url, "sa", "correct-password");
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       completedValue(
           new JdbcIndexStore(authorized, execution).initialize(AuthenticationDocument.class));
     }
 
     TestDriverManagerDataSource unauthorized =
         new TestDriverManagerDataSource(url, "sa", "wrong-password");
-    try (JdbcExecution execution = JdbcExecution.create(1, 8)) {
+    try (JdbcExecution execution = createExecution(1, 8)) {
       Throwable failure =
           completedFailure(
               new JdbcIndexStore(unauthorized, execution).initialize(AuthenticationDocument.class));
