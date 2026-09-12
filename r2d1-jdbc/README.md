@@ -368,6 +368,7 @@ Each collection maps to one table in the active database schema:
 - `document_id` is the single `NOT NULL` primary-key column.
 - Every `@Index` field is a required `NOT NULL` column.
 - Every indexed field has a single-column index named `idx_<collection>_<field>`.
+- Required indexes must be non-unique and unfiltered; incompatible definitions fail initialization.
 - Repeated initialization validates and reuses a compatible schema.
 - A missing table, required columns on an empty table, and missing required indexes are created.
 - A populated table that is missing a required column fails without changing its columns.
@@ -401,6 +402,9 @@ their operations but does not provide a distributed transaction across them.
 - Pagination uses keyset cursors and reads one additional row to determine whether another page
   exists.
 - Query values and limits are prepared-statement parameters.
+
+Cross-database ordering coverage uses deterministic ASCII strings. Locale-sensitive,
+case-insensitive, and database-specific collation behavior is outside the R2D1 query contract.
 
 Continuation cursors contain the last document key and optional sort value, not a query fingerprint.
 Pass a returned cursor to `after(...)` while retaining the same filters and sort:

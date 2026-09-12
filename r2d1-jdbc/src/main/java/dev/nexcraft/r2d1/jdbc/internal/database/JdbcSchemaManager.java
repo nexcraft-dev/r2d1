@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
+import org.jspecify.annotations.Nullable;
 
 /** Reconciles JDBC tables and required single-column indexes without destructive changes. */
 final class JdbcSchemaManager implements JdbcSchema {
@@ -216,7 +217,7 @@ final class JdbcSchemaManager implements JdbcSchema {
   private void ensureIndexes(
       Connection connection, JdbcDatabaseScope scope, CollectionMetadata metadata)
       throws SQLException {
-    Map<String, List<String>> indexes = inspectIndexes(connection, scope, metadata.collection());
+    Map<String, IndexInfo> indexes = inspectIndexes(connection, scope, metadata.collection());
     for (IndexedField field : metadata.indexedFields()) {
       String indexName = physicalIndexName(metadata.collection(), field.name());
       if (!indexes.containsKey(indexName)) {
@@ -231,7 +232,7 @@ final class JdbcSchemaManager implements JdbcSchema {
                 + ")");
         indexes = inspectIndexes(connection, scope, metadata.collection());
       }
-      if (!List.of(field.name()).equals(indexes.get(indexName))) {
+      if (!compatibleIndex(indexes.get(indexName), field.name())) {
         throw incompatible(metadata, "index for " + field.name());
       }
     }
@@ -240,19 +241,22 @@ final class JdbcSchemaManager implements JdbcSchema {
   private void validateExistingIndexes(
       Connection connection, JdbcDatabaseScope scope, CollectionMetadata metadata)
       throws SQLException {
-    Map<String, List<String>> indexes = inspectIndexes(connection, scope, metadata.collection());
+    Map<String, IndexInfo> indexes = inspectIndexes(connection, scope, metadata.collection());
     for (IndexedField field : metadata.indexedFields()) {
       String indexName = physicalIndexName(metadata.collection(), field.name());
-      if (indexes.containsKey(indexName) && !List.of(field.name()).equals(indexes.get(indexName))) {
+      if (indexes.containsKey(indexName)
+          && !compatibleIndex(indexes.get(indexName), field.name())) {
         throw incompatible(metadata, "index for " + field.name());
       }
     }
   }
 
-  private Map<String, List<String>> inspectIndexes(
+  private Map<String, IndexInfo> inspectIndexes(
       Connection connection, JdbcDatabaseScope scope, String collection) throws SQLException {
     DatabaseMetaData metadata = connection.getMetaData();
     Map<String, TreeMap<Short, String>> ordered = new LinkedHashMap<>();
+    Map<String, Boolean> nonUnique = new LinkedHashMap<>();
+    Map<String, Boolean> filtered = new LinkedHashMap<>();
     try (ResultSet resultSet =
         metadata.getIndexInfo(scope.catalog(), scope.schema(), collection, false, false)) {
       while (resultSet.next()) {
@@ -265,6 +269,14 @@ final class JdbcSchemaManager implements JdbcSchema {
         if (indexName == null || columnName == null) {
           continue;
         }
+        boolean currentNonUnique = resultSet.getBoolean("NON_UNIQUE");
+        boolean currentFiltered = resultSet.getString("FILTER_CONDITION") != null;
+        Boolean previousNonUnique = nonUnique.putIfAbsent(indexName, currentNonUnique);
+        Boolean previousFiltered = filtered.putIfAbsent(indexName, currentFiltered);
+        if ((previousNonUnique != null && previousNonUnique != currentNonUnique)
+            || (previousFiltered != null && previousFiltered != currentFiltered)) {
+          throw schemaInspectionFailure("inconsistent index definition");
+        }
         short position = resultSet.getShort("ORDINAL_POSITION");
         String previous =
             ordered
@@ -275,9 +287,23 @@ final class JdbcSchemaManager implements JdbcSchema {
         }
       }
     }
-    Map<String, List<String>> indexes = new LinkedHashMap<>();
-    ordered.forEach((name, columns) -> indexes.put(name, List.copyOf(columns.values())));
+    Map<String, IndexInfo> indexes = new LinkedHashMap<>();
+    ordered.forEach(
+        (name, columns) ->
+            indexes.put(
+                name,
+                new IndexInfo(
+                    List.copyOf(columns.values()),
+                    Boolean.TRUE.equals(nonUnique.get(name)),
+                    Boolean.TRUE.equals(filtered.get(name)))));
     return Map.copyOf(indexes);
+  }
+
+  static boolean compatibleIndex(@Nullable IndexInfo index, String field) {
+    return index != null
+        && index.nonUnique()
+        && !index.filtered()
+        && List.of(field).equals(index.columns());
   }
 
   private static void execute(Connection connection, String sql) throws SQLException {
@@ -340,4 +366,11 @@ final class JdbcSchemaManager implements JdbcSchema {
   private record TableInfo(String type) {}
 
   private record ColumnInfo(int jdbcType, int columnSize, boolean notNull) {}
+
+  record IndexInfo(List<String> columns, boolean nonUnique, boolean filtered) {
+
+    IndexInfo {
+      columns = List.copyOf(columns);
+    }
+  }
 }

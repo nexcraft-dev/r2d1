@@ -26,6 +26,9 @@ val spotlessSerializationService =
         maxParallelUsages.set(1)
     }
 
+val javaToolchainVersion =
+    providers.gradleProperty("r2d1.javaToolchainVersion").map(String::toInt).orElse(21)
+
 allprojects {
     group = "dev.nexcraft"
     version = "0.1.0-SNAPSHOT"
@@ -38,7 +41,7 @@ subprojects {
 
     extensions.configure<JavaPluginExtension> {
         toolchain {
-            languageVersion = JavaLanguageVersion.of(21)
+            languageVersion.set(javaToolchainVersion.map(JavaLanguageVersion::of))
         }
     }
 
