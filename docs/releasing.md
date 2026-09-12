@@ -26,25 +26,40 @@ eight-character short key ID.
 The workflow passes the values to Gradle as in-memory project properties. Secret values must never
 be committed, copied into `gradle.properties`, or printed in workflow logs.
 
-## Version and tag
+## Version and tag policy
 
 Development builds use the default `0.1.0-SNAPSHOT` version. A release supplies the version through
-the `r2d1.version` Gradle property. The release tag and supplied version must match exactly:
+the `r2d1.version` Gradle property.
+
+A push to `main` creates and publishes the next release automatically. If no release tag exists, the
+workflow starts at `v1.0.0`. Later `main` changes increment the minor version and reset the patch
+version:
 
 ```text
-v1.0.0 -> 1.0.0
+no release tag -> v1.0.0
+v1.0.0 -> v1.1.0
+v1.1.0 -> v1.2.0
 ```
 
-Snapshot versions and malformed tags are rejected before publication.
+Major versions are selected manually. Push the chosen major tag, such as `v2.0.0`, on the intended
+`main` commit. The tag-triggered workflow publishes that exact version, and later `main` changes
+continue with `v2.1.0`, `v2.2.0`, and so on.
+
+On a retried run, the workflow reuses a valid release tag that already points at the same commit
+instead of incrementing the version again. Snapshot versions and malformed manual tags are rejected
+before publication.
 
 ## Release flow
 
-The `maven-central-release.yml` workflow runs only for a semantic-version Git tag. It checks out the
-tag, runs the complete verification build, validates the release properties, publishes to Maven Local
-to verify the generated artifacts, and then invokes `publishToMavenCentral`. The Vanniktech publisher
-waits for Central validation and automatically releases a validated deployment.
+The `maven-central-release.yml` workflow runs for pushes to `main` and manually pushed semantic-version
+tags. It resolves the release version, runs the complete verification build, validates the release
+properties, and publishes to Maven Local to verify the generated artifacts and signatures. For an
+automatic minor release, it then creates the resolved tag on the verified commit. Finally, it invokes
+`publishToMavenCentral`; the Vanniktech publisher waits for Central validation and automatically
+releases a validated deployment.
 
-The workflow does not run for ordinary branch pushes or pull requests.
+The workflow does not run for feature branch pushes or pull requests. Release runs are serialized so
+concurrent `main` changes cannot claim the same version.
 
 Before the first release, review the generated POMs and artifacts locally:
 
@@ -60,20 +75,24 @@ before it starts the Maven Central upload.
 
 ## Starting v1.0.0
 
-After merging the release configuration and confirming all required secrets:
+After confirming all required secrets, merge the release configuration into `main`. That `main` push
+creates `v1.0.0` and starts the production publication automatically. No manual tag command is needed
+for the initial release or later minor releases.
+
+For a future major release, tag the selected `main` commit explicitly:
 
 ```shell
-git tag v1.0.0
-git push origin v1.0.0
+git tag -a v2.0.0 -m "Release v2.0.0"
+git push origin v2.0.0
 ```
 
-That tag push is the production action. It starts the GitHub Actions workflow and can upload and
-automatically publish the deployment to Maven Central. Do not repeat the tag or upload a second
-deployment for the same coordinates; Maven Central releases are immutable.
+The tag push starts the same production workflow for the explicit major version. Do not repeat a tag
+or upload a second deployment for coordinates that Maven Central has already published; published
+releases are immutable.
 
 ## Failed releases
 
-If Central validation fails, inspect the deployment validation details in the Central Portal and fix
-the repository configuration locally. Do not reuse the failed deployment or overwrite the same
-version. Create a new corrected deployment only after choosing an unreleased version according to the
-project's release policy.
+If a run fails, first check whether Central published any coordinates. A rerun for the same commit
+reuses its existing tag. If Central already published the version, do not retry or overwrite it;
+published releases are immutable. Otherwise, inspect the deployment validation details in the Central
+Portal and rerun only after correcting the failure.
