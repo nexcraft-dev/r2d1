@@ -294,6 +294,9 @@ database-specific behavior behind an internal dialect boundary, and does not bun
 See the [JDBC module guide](r2d1-jdbc/README.md) for supported databases, Gradle and Maven
 dependencies, database configuration, lifecycle ownership, schema behavior, and query semantics.
 
+See the [release guide](docs/releasing.md) for Maven Central coordinates, release tags, required
+GitHub secrets, and the automated Central Portal publishing workflow.
+
 ## Project Status
 
 R2D1 is under active development. The core API, R2 and D1 adapters, persistence orchestration, and

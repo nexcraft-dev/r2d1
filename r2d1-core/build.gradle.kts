@@ -1,5 +1,6 @@
 plugins {
     `java-test-fixtures`
+    id("com.vanniktech.maven.publish")
 }
 
 description = "Framework-independent public API and abstractions"
