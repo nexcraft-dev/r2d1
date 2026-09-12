@@ -1,0 +1,65 @@
+name: Maven Central Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+      ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+      ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
+      ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v6
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tags must match v<major>.<minor>.<patch>"
+            exit 1
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Run verification build
+        run: ./gradlew -Pr2d1.version="$VERSION" clean check
+
+      - name: Validate publishing configuration
+        run: ./gradlew -Pr2d1.version="$VERSION" validateMavenCentralConfiguration
+
+      - name: Publish locally and validate release artifacts
+        run: |
+          ./gradlew -Pr2d1.version="$VERSION" publishToMavenLocal
+          for module in r2d1-core r2d1-d1 r2d1-r2 r2d1-jdbc; do
+            repository="$HOME/.m2/repository/dev/nexcraft/$module/$VERSION"
+            test -f "$repository/$module-$VERSION.jar"
+            test -f "$repository/$module-$VERSION-sources.jar"
+            test -f "$repository/$module-$VERSION-javadoc.jar"
+            test -f "$repository/$module-$VERSION.pom"
+            test -f "$repository/$module-$VERSION.jar.asc"
+            test -f "$repository/$module-$VERSION-sources.jar.asc"
+            test -f "$repository/$module-$VERSION-javadoc.jar.asc"
+            test -f "$repository/$module-$VERSION.pom.asc"
+          done
+
+      - name: Publish and automatically release on Maven Central
+        run: ./gradlew -Pr2d1.version="$VERSION" publishToMavenCentral
