@@ -1,3 +1,7 @@
+plugins {
+    id("com.vanniktech.maven.publish")
+}
+
 description = "JDBC IndexStore with built-in H2, HSQLDB, and SQLite support"
 
 dependencies {

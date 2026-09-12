@@ -1,3 +1,7 @@
+plugins {
+    id("com.vanniktech.maven.publish")
+}
+
 description = "Cloudflare R2 integration"
 
 dependencies {
