@@ -13,6 +13,7 @@ import dev.nexcraft.r2d1.spi.IndexPage;
 import dev.nexcraft.r2d1.spi.IndexQuery;
 import dev.nexcraft.r2d1.spi.IndexStore;
 import dev.nexcraft.r2d1.spi.StorageException;
+import java.net.http.HttpClient;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -52,6 +53,22 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
    */
   public D1IndexStore(D1Config config) {
     this(D1Transport.rest(Objects.requireNonNull(config, "config")), true);
+  }
+
+  /**
+   * Creates a D1 index store over a caller-owned Java HTTP client.
+   *
+   * <p>The store owns its D1 transport wrapper but never closes the supplied client.
+   *
+   * @param config Cloudflare D1 REST API connection settings
+   * @param client caller-owned Java HTTP client
+   * @throws NullPointerException if either argument is {@code null}
+   */
+  public D1IndexStore(D1Config config, HttpClient client) {
+    this(
+        D1Transport.rest(
+            Objects.requireNonNull(config, "config"), Objects.requireNonNull(client, "client")),
+        true);
   }
 
   D1IndexStore(D1Transport transport) {

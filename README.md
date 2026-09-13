@@ -243,6 +243,9 @@ r2d1-r2
 r2d1-jdbc
     Optional JDBC IndexStore adapter with bounded execution and built-in H2, HSQLDB, and SQLite support
 
+r2d1-micronaut
+    Micronaut 5 configuration and dependency injection integration
+
 r2d1-integration-tests
     Opt-in live tests against dedicated Cloudflare R2 and D1 resources
 ```
@@ -252,7 +255,9 @@ Integration tests are grouped by purpose: Cloudflare resource scenarios use
 `dev.nexcraft.r2d1.integration.persistence`, and reusable fixtures live under
 `dev.nexcraft.r2d1.integration.support`.
 
-Framework-specific integrations will remain separate from the core library.
+Framework-specific integrations remain separate from the core library. The optional Micronaut 5
+module publishes `dev.nexcraft:r2d1-micronaut` and creates the top-level `R2D1` facade from
+application beans and selected adapters without changing the Core API or SPI.
 
 Implementation details are grouped below the supported public packages. Core persistence
 orchestration uses `dev.nexcraft.r2d1.internal.persistence`; the D1 adapter separates metadata,
@@ -263,14 +268,7 @@ from the supported API and may change between releases.
 Public Java packages use JSpecify `@NullMarked` semantics. Nullable API positions, such as a final
 page's absent `nextCursor`, are declared explicitly with `@Nullable`.
 
-Future modules may include:
-
-```text
-r2d1-spring
-r2d1-spring-boot-starter
-```
-
-The core API will not depend on Spring.
+The core API does not depend on Micronaut or Spring.
 
 ## D1 Schema Initialization
 
@@ -303,6 +301,9 @@ The JDBC index remains a rebuildable projection rather than an authoritative doc
 See the [JDBC module guide](r2d1-jdbc/README.md) for supported databases, Gradle and Maven
 dependencies, database configuration, lifecycle ownership, schema behavior, and query semantics.
 
+See the [Micronaut 5 module guide](r2d1-micronaut/README.md) for dependencies, the complete
+configuration contract, override rules, lifecycle ownership, and native-image requirements.
+
 See the [release guide](docs/releasing.md) for Maven Central coordinates, release tags, required
 GitHub secrets, and the automated Central Portal publishing workflow.
 
@@ -316,6 +317,7 @@ Other JDBC databases are not yet supported. Module internals may change before t
 ## Requirements
 
 - Java 21+
+- Java 25+ for `r2d1-micronaut`; all other published modules remain Java 21 compatible
 - Adapter-specific infrastructure:
   - Cloudflare account and R2 bucket for `r2d1-r2`
   - Cloudflare account and D1 database for `r2d1-d1`

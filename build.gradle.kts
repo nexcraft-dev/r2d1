@@ -14,6 +14,7 @@ import org.gradle.testing.jacoco.tasks.JacocoReport
 plugins {
     base
     id("com.diffplug.spotless") version "8.10.2" apply false
+    id("io.micronaut.library") version "5.0.2" apply false
     id("com.vanniktech.maven.publish") version "0.37.0" apply false
 }
 
@@ -41,6 +42,7 @@ val publicationNames =
         "r2d1-d1" to "R2D1 Cloudflare D1 Integration",
         "r2d1-r2" to "R2D1 Cloudflare R2 Integration",
         "r2d1-jdbc" to "R2D1 JDBC IndexStore",
+        "r2d1-micronaut" to "R2D1 Micronaut 5 Integration",
     )
 
 allprojects {
