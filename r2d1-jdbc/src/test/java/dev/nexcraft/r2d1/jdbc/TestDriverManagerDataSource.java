@@ -29,6 +29,7 @@ final class TestDriverManagerDataSource implements DataSource {
   private final String password;
   private volatile @Nullable SQLException connectionFailure;
   private final AtomicInteger activeConnections = new AtomicInteger();
+  private final AtomicInteger connectionAttempts = new AtomicInteger();
   private final AtomicInteger peakConnections = new AtomicInteger();
   private final AtomicInteger activeStatements = new AtomicInteger();
   private final AtomicInteger peakStatements = new AtomicInteger();
@@ -40,6 +41,8 @@ final class TestDriverManagerDataSource implements DataSource {
   private final AtomicInteger activeMutations = new AtomicInteger();
   private final AtomicInteger peakMutations = new AtomicInteger();
   private final AtomicReference<@Nullable SQLException> statementFailure = new AtomicReference<>();
+  private final AtomicReference<@Nullable SQLException> statementFailureAfterExecution =
+      new AtomicReference<>();
   private final AtomicReference<@Nullable CountDownLatch> expectedConnections =
       new AtomicReference<>();
   private final AtomicReference<@Nullable MutationGate> mutationGate = new AtomicReference<>();
@@ -63,6 +66,14 @@ final class TestDriverManagerDataSource implements DataSource {
 
   void clearConnectionFailure() {
     connectionFailure = null;
+  }
+
+  int connectionAttempts() {
+    return connectionAttempts.get();
+  }
+
+  void resetConnectionAttempts() {
+    connectionAttempts.set(0);
   }
 
   void trackResources() {
@@ -90,6 +101,10 @@ final class TestDriverManagerDataSource implements DataSource {
     statementFailure.set(Objects.requireNonNull(failure, "failure"));
   }
 
+  void failAfterNextStatementExecution(SQLException failure) {
+    statementFailureAfterExecution.set(Objects.requireNonNull(failure, "failure"));
+  }
+
   CountDownLatch expectConnectionAcquisitions(int count) {
     CountDownLatch expectation = new CountDownLatch(count);
     expectedConnections.set(expectation);
@@ -109,6 +124,7 @@ final class TestDriverManagerDataSource implements DataSource {
 
   @Override
   public Connection getConnection() throws SQLException {
+    connectionAttempts.incrementAndGet();
     SQLException failure = connectionFailure;
     if (failure != null) {
       throw failure;
@@ -119,6 +135,7 @@ final class TestDriverManagerDataSource implements DataSource {
   @Override
   public Connection getConnection(String suppliedUsername, String suppliedPassword)
       throws SQLException {
+    connectionAttempts.incrementAndGet();
     SQLException failure = connectionFailure;
     if (failure != null) {
       throw failure;
@@ -220,6 +237,7 @@ final class TestDriverManagerDataSource implements DataSource {
             new Class<?>[] {type},
             (proxy, method, arguments) -> {
               try {
+                boolean ddl = false;
                 if (method.getName().startsWith("execute")) {
                   SQLException failure = statementFailure.getAndSet(null);
                   if (failure != null) {
@@ -231,7 +249,8 @@ final class TestDriverManagerDataSource implements DataSource {
                       && arguments[0] instanceof String text) {
                     sql = text;
                   }
-                  if (isDdl(sql)) {
+                  ddl = isDdl(sql);
+                  if (ddl) {
                     ddlStatements.incrementAndGet();
                   }
                   if (isMutation(sql)) {
@@ -257,6 +276,12 @@ final class TestDriverManagerDataSource implements DataSource {
                   }
                 }
                 Object result = method.invoke(statement, arguments);
+                if (ddl) {
+                  SQLException failure = statementFailureAfterExecution.getAndSet(null);
+                  if (failure != null) {
+                    throw failure;
+                  }
+                }
                 return result instanceof ResultSet resultSet
                     ? trackResultSet(resultSet, false)
                     : result;

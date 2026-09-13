@@ -293,10 +293,12 @@ infrastructure.
 ## JDBC Module
 
 The optional `r2d1-jdbc` module adapts blocking JDBC databases to the asynchronous `IndexStore`
-contract through a bounded execution resource. It supports persistent embedded H2 and HSQLDB file
-databases and local persistent SQLite files. The module detects the database from the
-caller-provided `DataSource`, keeps
+contract through a bounded execution resource. It supports persistent embedded and remote/server
+H2 and HSQLDB databases plus local embedded SQLite files. The caller-provided `DataSource` defines
+the endpoint and owns credentials, TLS, pooling, and server lifecycle; JDBC execution mode is
+independent of deployment topology. The module detects the database from JDBC metadata, keeps
 database-specific behavior behind an internal dialect boundary, and does not bundle a JDBC driver.
+The JDBC index remains a rebuildable projection rather than an authoritative document store.
 
 See the [JDBC module guide](r2d1-jdbc/README.md) for supported databases, Gradle and Maven
 dependencies, database configuration, lifecycle ownership, schema behavior, and query semantics.

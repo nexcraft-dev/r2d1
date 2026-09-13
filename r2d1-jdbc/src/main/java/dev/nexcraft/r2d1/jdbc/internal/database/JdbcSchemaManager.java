@@ -63,13 +63,29 @@ final class JdbcSchemaManager implements JdbcSchema {
               + profile.sqlType(profile.valueType(field))
               + " NOT NULL");
     }
-    execute(
-        connection,
-        "CREATE TABLE IF NOT EXISTS "
-            + scope.table(metadata.collection())
-            + " ("
-            + String.join(", ", definitions)
-            + ")");
+    try {
+      execute(
+          connection,
+          "CREATE TABLE IF NOT EXISTS "
+              + scope.table(metadata.collection())
+              + " ("
+              + String.join(", ", definitions)
+              + ")");
+    } catch (SQLException failure) {
+      Optional<TableInfo> table;
+      try {
+        table = inspectTable(connection, scope, metadata.collection());
+      } catch (SQLException inspectionFailure) {
+        failure.addSuppressed(inspectionFailure);
+        throw failure;
+      }
+      if (table.isEmpty()) {
+        throw failure;
+      }
+      if (!profile.tableType().equals(table.orElseThrow().type())) {
+        throw incompatible(metadata, "table type");
+      }
+    }
   }
 
   private void reconcileTable(
@@ -92,15 +108,32 @@ final class JdbcSchemaManager implements JdbcSchema {
                 + metadata.collection());
       }
       for (IndexedField field : missing) {
-        execute(
-            connection,
-            "ALTER TABLE "
-                + scope.table(metadata.collection())
-                + " ADD COLUMN "
-                + quoteUserIdentifier(field.name())
-                + " "
-                + profile.sqlType(profile.valueType(field))
-                + " NOT NULL");
+        try {
+          execute(
+              connection,
+              "ALTER TABLE "
+                  + scope.table(metadata.collection())
+                  + " ADD COLUMN "
+                  + quoteUserIdentifier(field.name())
+                  + " "
+                  + profile.sqlType(profile.valueType(field))
+                  + " NOT NULL");
+        } catch (SQLException failure) {
+          Map<String, ColumnInfo> currentColumns;
+          try {
+            currentColumns = inspectColumns(connection, scope, metadata.collection());
+          } catch (SQLException inspectionFailure) {
+            failure.addSuppressed(inspectionFailure);
+            throw failure;
+          }
+          ColumnInfo actual = currentColumns.get(field.name());
+          if (actual == null) {
+            throw failure;
+          }
+          if (!compatibleColumn(field, actual)) {
+            throw incompatible(metadata, field.name());
+          }
+        }
       }
       columns = inspectColumns(connection, scope, metadata.collection());
     }
@@ -172,12 +205,16 @@ final class JdbcSchemaManager implements JdbcSchema {
         }
         continue;
       }
-      JdbcValueType expected = profile.valueType(field);
-      if (!profile.isCompatibleColumn(expected, actual.jdbcType(), actual.columnSize())
-          || !actual.notNull()) {
+      if (!compatibleColumn(field, actual)) {
         throw incompatible(metadata, field.name());
       }
     }
+  }
+
+  private boolean compatibleColumn(IndexedField field, ColumnInfo actual) {
+    return profile.isCompatibleColumn(
+            profile.valueType(field), actual.jdbcType(), actual.columnSize())
+        && actual.notNull();
   }
 
   private void validatePrimaryKey(
@@ -221,15 +258,32 @@ final class JdbcSchemaManager implements JdbcSchema {
     for (IndexedField field : metadata.indexedFields()) {
       String indexName = physicalIndexName(metadata.collection(), field.name());
       if (!indexes.containsKey(indexName)) {
-        execute(
-            connection,
-            "CREATE INDEX IF NOT EXISTS "
-                + scope.index(indexName)
-                + " ON "
-                + scope.table(metadata.collection())
-                + " ("
-                + quoteUserIdentifier(field.name())
-                + ")");
+        try {
+          execute(
+              connection,
+              "CREATE INDEX IF NOT EXISTS "
+                  + scope.index(indexName)
+                  + " ON "
+                  + scope.table(metadata.collection())
+                  + " ("
+                  + quoteUserIdentifier(field.name())
+                  + ")");
+        } catch (SQLException failure) {
+          try {
+            indexes = inspectIndexes(connection, scope, metadata.collection());
+          } catch (SQLException inspectionFailure) {
+            failure.addSuppressed(inspectionFailure);
+            throw failure;
+          }
+          IndexInfo actual = indexes.get(indexName);
+          if (actual == null) {
+            throw failure;
+          }
+          if (!compatibleIndex(actual, field.name())) {
+            throw incompatible(metadata, "index for " + field.name());
+          }
+          continue;
+        }
         indexes = inspectIndexes(connection, scope, metadata.collection());
       }
       if (!compatibleIndex(indexes.get(indexName), field.name())) {

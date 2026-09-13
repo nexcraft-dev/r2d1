@@ -28,6 +28,11 @@ import org.jspecify.annotations.Nullable;
  * All forms enforce the configured running and pending-work limits before submitting work to the
  * underlying executor.
  *
+ * <p>The selected thread model is independent of JDBC deployment topology. It does not determine
+ * whether a caller-owned {@code DataSource} uses an embedded database, a remote server, or a
+ * connection pool, and it does not change the number of physical connections available from that
+ * source.
+ *
  * <p>Closing this resource rejects new work, fails work that is still pending, and allows work that
  * has already been submitted to finish. Only an executor created by an R2D1-managed {@code create}
  * method is shut down.

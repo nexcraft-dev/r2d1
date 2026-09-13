@@ -67,12 +67,41 @@ supported extension SPI, and applications should continue to use `JdbcIndexStore
 
 | Database | Status | Covered mode |
 | --- | --- | --- |
-| H2 | Built-in | Persistent embedded file database |
-| HSQLDB | Built-in | Persistent embedded file database |
-| SQLite | Built-in | Local persistent file database |
+| H2 | Built-in | Persistent embedded file and TCP server databases |
+| HSQLDB | Built-in | Persistent embedded file and HSQL server databases |
+| SQLite | Built-in | Local persistent embedded file database only |
 
 The dialect is selected from the exact JDBC product name. Unknown databases fail before schema
 mutation.
+
+## Deployment topology
+
+`JdbcIndexStore` does not parse JDBC URLs or select a deployment mode. The caller-provided
+`DataSource` defines whether H2 or HSQLDB connects to an embedded database or to a shared server
+endpoint. Multiple application instances may use independent `DataSource`, `JdbcExecution`, and
+`JdbcIndexStore` objects against the same endpoint; each operation obtains and closes a fresh
+connection from its own `DataSource`.
+
+The application owns endpoint discovery, credentials, TLS, connection pooling, server startup and
+shutdown, and any production failover policy. R2D1 neither starts a production database server nor
+owns those resources. `PLATFORM_THREAD` and `VIRTUAL_THREAD` affect only local admission and thread
+execution; they do not change the endpoint, connection count, transaction scope, or deployment
+topology.
+
+Remote integration coverage uses the pinned H2 TCP and HSQLDB HSQL drivers with loopback,
+file-backed servers. It verifies shared visibility, concurrent operations, restart recovery, and
+file persistence. It is not a certification of clustering, failover, network partitions, external
+proxies, or every production server configuration.
+
+## Custom JDBC dialects
+
+`JdbcDialect` and the internal `JdbcDatabase` bridge are not supported extension APIs in this
+release. `JdbcIndexStore` exposes only its public `DataSource` and `JdbcExecution` constructor and
+selects built-in dialects from exact JDBC product names. Applications cannot register a custom
+dialect or use `ServiceLoader`; unknown database products fail before schema mutation.
+
+The built-in support list is limited to H2, HSQLDB, and SQLite. This module does not claim
+compatibility with every JDBC database.
 
 ## Dependencies
 
@@ -191,7 +220,15 @@ jdbc:h2:file:/absolute/path/to/r2d1-index
 No close-delay option is required. H2 closes a persistent embedded database after its last
 connection closes. A later connection to the same path reopens its tables, indexes, and rows.
 
-External H2 server mode is not part of the current integration-test scope.
+H2 TCP server connections use the same built-in dialect when metadata reports the exact product
+name `H2`:
+
+```text
+jdbc:h2:tcp://database.example:9092/absolute/path/to/r2d1-index
+```
+
+The application owns the H2 server and its network, authentication, TLS, and shutdown policy.
+R2D1 does not start or stop it.
 
 ### Direct DataSource creation
 
@@ -220,15 +257,21 @@ Use a distinct absolute file path for the index database:
 jdbc:hsqldb:file:/absolute/path/to/r2d1-index
 ```
 
-HSQLDB reports the product name `HSQL Database Engine`, which the module detects automatically.
-The integration-tested mode is the embedded persistent file mode. Server mode is not required by
-`r2d1-jdbc` and is outside the current support boundary.
+HSQLDB reports the product name `HSQL Database Engine`, which the module detects automatically in
+both embedded and HSQL server connections.
 
 When reopening an existing file, `;ifexists=true` can be used to prevent an accidental new
 database from being created:
 
 ```text
 jdbc:hsqldb:file:/absolute/path/to/r2d1-index;ifexists=true
+```
+
+For an application-managed HSQL server, configure the `DataSource` with its shared endpoint and
+database alias:
+
+```text
+jdbc:hsqldb:hsql://database.example:9001/r2d1-index
 ```
 
 ### Direct DataSource creation
@@ -245,16 +288,21 @@ dataSource.setPassword("");
 ```
 
 Configuration frameworks and connection pools may create another `DataSource` implementation. The
-application owns that resource and the HSQLDB driver.
+application owns that resource, the HSQLDB driver, credentials, transport security, and server
+lifecycle.
 
 ### HSQLDB lifecycle
 
 `JdbcIndexStore` closes each operation connection, but it does not own the `DataSource` or shut
-down the database. Before replacing or closing a lifecycle-bearing HSQLDB DataSource or pool,
-stop admitting new operations, retain and await every in-flight `CompletionStage`, and close
-`JdbcExecution`. The application must then execute `SHUTDOWN` through a short-lived connection and
-only after that close the lifecycle-bearing DataSource or pool. `JdbcExecution.close()` does not
-wait for submitted work. A later DataSource can reopen the same path.
+down the database. Before replacing or closing a lifecycle-bearing HSQLDB DataSource or pool, stop
+admitting new operations, retain and await every in-flight `CompletionStage`, and close
+`JdbcExecution`. `JdbcExecution.close()` does not wait for submitted work.
+
+For an embedded file database, the application must execute `SHUTDOWN` through a short-lived
+connection before closing the lifecycle-bearing DataSource or pool; a later DataSource can reopen
+the same path. For an HSQL server connection, closing the client DataSource or pool does not stop
+the server. The application must manage server shutdown separately through its deployment
+infrastructure.
 
 ## Configure SQLite
 
@@ -422,6 +470,10 @@ Each collection maps to one table in the active database schema:
 - Required indexes must be non-unique and unfiltered; incompatible definitions fail initialization.
 - Repeated initialization validates and reuses a compatible schema.
 - A missing table, required columns on an empty table, and missing required indexes are created.
+- If H2 or HSQLDB reports a table, additive-column, or index DDL failure, initialization reads the
+  current metadata once and accepts the result only when the requested table type, column type and
+  nullability, primary key, or exact single-column index is already compatible. Missing or
+  incompatible state preserves the failure.
 - A populated table that is missing a required column fails without changing its columns.
 - SQLite adds a required column only to an empty table and uses a type-appropriate non-null default
   because SQLite requires one for `ALTER TABLE ... ADD COLUMN ... NOT NULL`.
@@ -429,6 +481,8 @@ Each collection maps to one table in the active database schema:
 - Extra columns and indexes are preserved.
 - Initialization never drops or renames objects, converts column types, or creates defaults for
   existing rows.
+- Initialization does not retry DDL, sleep, back off, or acquire a distributed schema lock. A
+  failed initialization remains cached by that `JdbcIndexStore` instance.
 
 ## Write, delete, and clear behavior
 
@@ -442,6 +496,12 @@ Each collection maps to one table in the active database schema:
 
 The authoritative `DocumentStore` and the JDBC index are separate resources. R2D1 coordinates
 their operations but does not provide a distributed transaction across them.
+
+The JDBC table remains a rebuildable projection, not the authoritative document store. Run
+`R2D1Collection.rebuildIndex()` as a maintenance operation while application writes are paused to
+replace its rows from the configured `DocumentStore`. A rebuild performed through one shared H2 or
+HSQLDB endpoint is visible to other instances, but R2D1 does not coordinate concurrent rebuilds or
+make a rebuild atomic across the document and index stores.
 
 ## Query behavior
 
@@ -487,6 +547,8 @@ if (first.nextCursor() != null) {
 - It obtains and closes one connection for each initialization or index operation.
 - The application closes `JdbcExecution` when no further JDBC operations can occur.
 - The application closes a lifecycle-bearing `DataSource` or connection pool that it creates.
+- The application configures and rotates credentials and TLS material, sizes its connection pool,
+  and starts, stops, or fails over any remote H2 or HSQLDB server.
 - `JdbcExecution.create(maxConcurrency, maxPending)` owns bounded platform threads and shuts them
   down when closed.
 - `JdbcExecution.using(executor, maxConcurrency, maxPending)` bounds admission but never shuts down
@@ -508,7 +570,8 @@ the JDBC URL, SQL text, credentials, or bound values.
 
 ## Current boundaries
 
-The module does not provide a connection pool, retry policy, framework integration, or public
-dialect SPI. Applications own those choices outside R2D1. H2 and HSQLDB
-persistent embedded file mode and SQLite local persistent file mode are the current
-integration-tested configurations. Other databases are not supported.
+The module does not provide a connection pool, retry policy, framework integration, server
+bootstrap API, deployment-mode API, URL parser, distributed lock, concurrent rebuild coordination,
+or public dialect SPI. Applications own those choices outside R2D1. Persistent embedded and remote
+server modes are integration-tested for H2 and HSQLDB; SQLite support is local embedded-only. Other
+databases are not supported.
