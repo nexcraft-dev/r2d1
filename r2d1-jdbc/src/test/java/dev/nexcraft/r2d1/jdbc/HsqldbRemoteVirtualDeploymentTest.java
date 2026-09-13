@@ -4,10 +4,10 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledForJreRange;
 import org.junit.jupiter.api.condition.JRE;
 
-/** Runs the reusable HSQLDB contract with the explicit virtual-thread execution mode. */
+/** Verifies remote HSQLDB deployment behavior with Java 25 virtual-thread execution. */
 @Tag("java-25")
 @EnabledForJreRange(min = JRE.JAVA_25)
-class HsqldbVirtualIndexStoreContractTest extends HsqldbIndexStoreContractTest {
+class HsqldbRemoteVirtualDeploymentTest extends HsqldbRemoteDeploymentTest {
 
   @Override
   protected JdbcExecution createExecution() {

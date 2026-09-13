@@ -88,6 +88,13 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
+        if (javaToolchainVersion.get() >= 25) {
+            // Test dependencies load native libraries and use legacy Unsafe on Java 25.
+            jvmArgs(
+                "--enable-native-access=ALL-UNNAMED",
+                "--sun-misc-unsafe-memory-access=allow",
+            )
+        }
     }
 
     tasks.named<Test>("test") {

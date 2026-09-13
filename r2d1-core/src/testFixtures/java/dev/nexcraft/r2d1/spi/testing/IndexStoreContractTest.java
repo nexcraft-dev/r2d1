@@ -437,6 +437,7 @@ public abstract class IndexStoreContractTest {
   }
 
   /** Adapter-specific lifecycle and failure-injection hooks used by the reusable contract. */
+  @SuppressWarnings("try")
   public interface Adapter extends AutoCloseable {
 
     /** Returns the concrete store under test. */

@@ -16,8 +16,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledForJreRange;
+import org.junit.jupiter.api.condition.JRE;
 
 class JdbcExecutionTest {
 
@@ -62,9 +64,9 @@ class JdbcExecutionTest {
   }
 
   @Test
+  @Tag("java-25")
+  @EnabledForJreRange(min = JRE.JAVA_25)
   void runsWorkOnOwnedVirtualThreadsWhenExplicitlyConfigured() {
-    Assumptions.assumeTrue(
-        Runtime.version().feature() >= 25, "virtual-thread mode requires Java 25 or newer");
     AtomicReference<Thread> worker = new AtomicReference<>();
 
     try (JdbcExecution execution =
@@ -84,10 +86,9 @@ class JdbcExecutionTest {
   }
 
   @Test
+  @Tag("java-before-25")
+  @EnabledForJreRange(max = JRE.JAVA_24)
   void rejectsVirtualThreadsOnUnsupportedRuntime() {
-    Assumptions.assumeTrue(
-        Runtime.version().feature() < 25, "this fail-fast assertion runs on Java 21");
-
     assertThat(
             org.assertj.core.api.Assertions.catchThrowable(
                 () ->
@@ -98,9 +99,9 @@ class JdbcExecutionTest {
   }
 
   @Test
+  @Tag("java-25")
+  @EnabledForJreRange(min = JRE.JAVA_25)
   void preservesVirtualThreadConcurrencyAndPendingBounds() {
-    Assumptions.assumeTrue(
-        Runtime.version().feature() >= 25, "virtual-thread mode requires Java 25 or newer");
     CountDownLatch runningStarted = new CountDownLatch(2);
     CountDownLatch releaseRunning = new CountDownLatch(1);
     AtomicInteger active = new AtomicInteger();

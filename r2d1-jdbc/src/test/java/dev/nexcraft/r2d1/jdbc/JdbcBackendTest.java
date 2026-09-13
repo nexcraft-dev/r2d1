@@ -65,8 +65,6 @@ abstract class JdbcBackendTest {
 
   /** Creates a Java 25 virtual-thread execution resource for backend mode parity tests. */
   protected final JdbcExecution createVirtualExecution(int maxConcurrency, int maxPending) {
-    org.junit.jupiter.api.Assumptions.assumeTrue(
-        Runtime.version().feature() >= 25, "virtual-thread mode requires Java 25 or newer");
     return JdbcExecution.create(
         new JdbcExecutionConfig(JdbcExecutionMode.VIRTUAL_THREAD, maxConcurrency, maxPending));
   }

@@ -27,12 +27,15 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>This store owns neither its {@link DataSource} nor its {@link JdbcExecution}. Every JDBC call
  * is submitted to the supplied bounded execution resource, and every connection is closed after one
- * operation. The execution resource must be closed by the caller that created it.
+ * operation. The caller owns endpoint configuration, credentials, TLS, pooling, database-server
+ * lifecycle, and execution-resource closure. Execution mode does not select or alter deployment
+ * topology.
  *
  * <p>{@link #initialize(Class)} must complete before a collection is used. Database detection runs
- * through {@link DatabaseMetaData} before a dialect can mutate schema. H2, HSQLDB, and SQLite are
- * supported as persistent embedded index databases. Other databases fail safely before schema
- * initialization.
+ * through {@link DatabaseMetaData} before a dialect can mutate schema. H2 and HSQLDB are supported
+ * through embedded and remote/server connections; SQLite is supported as a local embedded file
+ * database. Other databases fail safely before schema initialization. All JDBC storage remains a
+ * derived, rebuildable index projection rather than authoritative document storage.
  */
 public final class JdbcIndexStore implements IndexStore {
 
