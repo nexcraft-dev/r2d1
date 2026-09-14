@@ -8,7 +8,7 @@ on:
       - ".github/workflows/micronaut-native.yml"
       - "build.gradle.kts"
       - "settings.gradle.kts"
-      - "r2d1-core/**"
+      - "r2d1/**"
       - "r2d1-jdbc/**"
       - "r2d1-micronaut/**"
   pull_request:
@@ -16,7 +16,7 @@ on:
       - ".github/workflows/micronaut-native.yml"
       - "build.gradle.kts"
       - "settings.gradle.kts"
-      - "r2d1-core/**"
+      - "r2d1/**"
       - "r2d1-jdbc/**"
       - "r2d1-micronaut/**"
 

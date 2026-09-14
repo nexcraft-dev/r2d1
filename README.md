@@ -19,6 +19,43 @@ The storage model has two parts:
 
 R2D1 exposes a limited query model. It is not a SQL database or ORM.
 
+## Dependencies
+
+The public Maven Central surface contains exactly three artifacts. The base `r2d1` artifact
+contains the Core API and the Cloudflare R2 and D1 implementations. JDBC and Micronaut are
+additional integrations:
+
+```kotlin
+dependencies {
+    implementation("dev.nexcraft:r2d1:<version>")
+    implementation("dev.nexcraft:r2d1-jdbc:<version>")
+    implementation("dev.nexcraft:r2d1-micronaut:<version>")
+}
+```
+
+The equivalent Maven coordinates are:
+
+```xml
+<dependency>
+  <groupId>dev.nexcraft</groupId>
+  <artifactId>r2d1</artifactId>
+  <version>${r2d1.version}</version>
+</dependency>
+<dependency>
+  <groupId>dev.nexcraft</groupId>
+  <artifactId>r2d1-jdbc</artifactId>
+  <version>${r2d1.version}</version>
+</dependency>
+<dependency>
+  <groupId>dev.nexcraft</groupId>
+  <artifactId>r2d1-micronaut</artifactId>
+  <version>${r2d1.version}</version>
+</dependency>
+```
+
+Declare only the integrations used by an application. JDBC drivers remain application-provided
+and are not bundled by `r2d1-jdbc`.
+
 ## Architecture
 
 ```text
@@ -131,11 +168,11 @@ is valid only when the queried and sorted fields have been configured appropriat
 
 R2D1 does not download R2 objects for filtering in application memory.
 
-## Core Java API
+## R2D1 Java API
 
-The core module defines the framework-independent contracts shown below. Applications configure the
-R2 and D1 adapters and supply a `DocumentCodec`, keeping domain serialization independent of any
-specific JSON library.
+The `r2d1` artifact defines the framework-independent contracts and includes the Cloudflare R2 and
+D1 adapters shown below. Applications supply a `DocumentCodec`, keeping domain serialization
+independent of any specific JSON library.
 
 ```java
 R2DocumentStore documentStore = configuredR2DocumentStore;
@@ -231,14 +268,8 @@ add background reconciliation, automatic retries, distributed locks, queues, or 
 R2D1 is organized as a modular project.
 
 ```text
-r2d1-core
-    Core API and abstractions
-
-r2d1-d1
-    Cloudflare D1 integration
-
-r2d1-r2
-    Cloudflare R2 DocumentStore adapter using AWS SDK v2
+r2d1
+    Core API, Cloudflare R2 DocumentStore, and Cloudflare D1 IndexStore
 
 r2d1-jdbc
     Optional JDBC IndexStore adapter with bounded execution and built-in H2, HSQLDB, and SQLite support
@@ -255,12 +286,12 @@ Integration tests are grouped by purpose: Cloudflare resource scenarios use
 `dev.nexcraft.r2d1.integration.persistence`, and reusable fixtures live under
 `dev.nexcraft.r2d1.integration.support`.
 
-Framework-specific integrations remain separate from the core library. The optional Micronaut 5
+Framework-specific integrations remain separate from the base library. The optional Micronaut 5
 module publishes `dev.nexcraft:r2d1-micronaut` and creates the top-level `R2D1` facade from
-application beans and selected adapters without changing the Core API or SPI.
+application beans and selected adapters without changing the public API or SPI.
 
-Implementation details are grouped below the supported public packages. Core persistence
-orchestration uses `dev.nexcraft.r2d1.internal.persistence`; the D1 adapter separates metadata,
+Implementation details are grouped below the supported public packages. Base persistence
+orchestration uses `dev.nexcraft.r2d1.internal.persistence`; the built-in D1 adapter separates metadata,
 SQL, transport, and schema code under `dev.nexcraft.r2d1.d1.internal`; and JDBC keeps metadata and
 database mechanics under `dev.nexcraft.r2d1.jdbc.internal`. These internal packages are excluded
 from the supported API and may change between releases.
@@ -268,12 +299,12 @@ from the supported API and may change between releases.
 Public Java packages use JSpecify `@NullMarked` semantics. Nullable API positions, such as a final
 page's absent `nextCursor`, are declared explicitly with `@Nullable`.
 
-The core API does not depend on Micronaut or Spring.
+The base API does not depend on Micronaut or Spring.
 
 ## D1 Schema Initialization
 
-The D1 module uses the Cloudflare D1 REST API through Java's reusable asynchronous `HttpClient` and
-uses Avaje JSON-B generated adapters for the REST protocol. A document type's schema must be
+The `r2d1` artifact uses the Cloudflare D1 REST API through Java's reusable asynchronous `HttpClient`
+and Avaje JSON-B generated adapters for the REST protocol. A document type's schema must be
 initialized before its index operations are used:
 
 ```java
@@ -317,10 +348,10 @@ Other JDBC databases are not yet supported. Module internals may change before t
 ## Requirements
 
 - Java 21+
-- Java 25+ for `r2d1-micronaut`; all other published modules remain Java 21 compatible
+- Java 25+ for `r2d1-micronaut`; `r2d1` and `r2d1-jdbc` remain Java 21 compatible
 - Adapter-specific infrastructure:
-  - Cloudflare account and R2 bucket for `r2d1-r2`
-  - Cloudflare account and D1 database for `r2d1-d1`
+  - Cloudflare account and R2 bucket for the built-in R2 adapter
+  - Cloudflare account and D1 database for the built-in D1 adapter
   - Application-provided H2, HSQLDB, or SQLite driver and `DataSource` for the `r2d1-jdbc` backend
 
 ## Development

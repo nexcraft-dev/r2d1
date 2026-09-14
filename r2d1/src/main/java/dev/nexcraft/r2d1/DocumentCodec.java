@@ -5,7 +5,7 @@ import dev.nexcraft.r2d1.spi.StoredDocument;
 /**
  * Converts domain documents to and from the bytes owned by the authoritative document store.
  *
- * <p>The core module supplies no default serialization format. Implementations may use an
+ * <p>The {@code r2d1} artifact supplies no default serialization format. Implementations may use an
  * application-selected codec, but implementation-specific types do not become part of this
  * contract. Codec failures propagate through the synchronous collection operation that invoked
  * them.

@@ -97,7 +97,7 @@ jobs:
       - name: Publish locally and validate release artifacts
         run: |
           ./gradlew -Pr2d1.version="$VERSION" publishToMavenLocal
-          for module in r2d1-core r2d1-d1 r2d1-r2 r2d1-jdbc r2d1-micronaut; do
+          for module in r2d1 r2d1-jdbc r2d1-micronaut; do
             repository="$HOME/.m2/repository/dev/nexcraft/$module/$VERSION"
             test -f "$repository/$module-$VERSION.jar"
             test -f "$repository/$module-$VERSION-sources.jar"

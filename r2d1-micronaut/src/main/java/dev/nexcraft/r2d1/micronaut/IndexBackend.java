@@ -5,6 +5,6 @@ public enum IndexBackend {
   /** Use the optional R2D1 JDBC adapter. */
   JDBC,
 
-  /** Use the optional Cloudflare D1 adapter. */
+  /** Use the built-in Cloudflare D1 adapter. */
   D1
 }

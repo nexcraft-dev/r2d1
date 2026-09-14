@@ -28,6 +28,7 @@ public class PersistenceException extends RuntimeException {
   /** Failure after the authoritative operation succeeded but the derived index operation failed. */
   public static final class PartialFailure extends PersistenceException {
 
+    /** Affected document identity. */
     private final DocumentKey documentKey;
 
     /**
@@ -55,6 +56,7 @@ public class PersistenceException extends RuntimeException {
   /** Failure caused by disagreement between a derived index and authoritative document storage. */
   public static final class InconsistentState extends PersistenceException {
 
+    /** Inconsistent document identity. */
     private final DocumentKey documentKey;
 
     /**

@@ -105,9 +105,9 @@ compatibility with every JDBC database.
 
 ## Dependencies
 
-`r2d1-jdbc` exposes `r2d1-core` transitively. Applications do not normally need to declare
-`r2d1-core` separately. A concrete `DocumentStore`, such as `r2d1-r2` or an application
-implementation, is still required for complete document persistence.
+`r2d1-jdbc` exposes `r2d1` transitively. Applications do not normally need to declare `r2d1`
+separately. The transitive base artifact includes the Core API and the Cloudflare R2 and D1
+implementations, while JDBC supplies the optional index backend.
 
 The H2, HSQLDB, and SQLite drivers are not bundled or exposed transitively. Applications must
 provide the driver for the database selected by their `DataSource`.

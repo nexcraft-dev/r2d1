@@ -20,10 +20,10 @@ tasks.withType<Test>().configureEach {
 }
 
 dependencies {
-    api(project(":r2d1-core"))
+    api(project(":r2d1"))
     api("org.jspecify:jspecify:1.0.0")
 
-    testImplementation(testFixtures(project(":r2d1-core")))
+    testImplementation(testFixtures(project(":r2d1")))
     testImplementation("com.h2database:h2:2.5.250")
     testImplementation("org.hsqldb:hsqldb:2.7.4")
     testRuntimeOnly("org.xerial:sqlite-jdbc:3.53.4.0")
