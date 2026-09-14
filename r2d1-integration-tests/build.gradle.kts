@@ -14,9 +14,7 @@ configurations[integrationTest.runtimeOnlyConfigurationName].extendsFrom(
 )
 
 dependencies {
-    add(integrationTest.implementationConfigurationName, project(":r2d1-core"))
-    add(integrationTest.implementationConfigurationName, project(":r2d1-d1"))
-    add(integrationTest.implementationConfigurationName, project(":r2d1-r2"))
+    add(integrationTest.implementationConfigurationName, project(":r2d1"))
 }
 
 val requiredEnvironmentVariables = listOf(

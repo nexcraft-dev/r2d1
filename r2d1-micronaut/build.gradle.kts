@@ -39,23 +39,19 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 dependencies {
-    api(project(":r2d1-core"))
+    api(project(":r2d1"))
     api("org.jspecify:jspecify:1.0.0")
     api("io.micronaut:micronaut-context")
 
     compileOnly(project(":r2d1-jdbc"))
-    compileOnly(project(":r2d1-d1"))
-    compileOnly(project(":r2d1-r2"))
 
     testImplementation(project(":r2d1-jdbc"))
-    testImplementation(project(":r2d1-d1"))
-    testImplementation(project(":r2d1-r2"))
     testImplementation("com.h2database:h2:2.5.250")
 
     add(optionalAdapterTest.implementationConfigurationName, platform("org.junit:junit-bom:5.14.4"))
     add(optionalAdapterTest.implementationConfigurationName, "org.junit.jupiter:junit-jupiter")
     add(optionalAdapterTest.implementationConfigurationName, "org.assertj:assertj-core:3.27.7")
-    add(optionalAdapterTest.implementationConfigurationName, project(":r2d1-core"))
+    add(optionalAdapterTest.implementationConfigurationName, project(":r2d1"))
     add(
         optionalAdapterTest.implementationConfigurationName,
         platform("io.micronaut.platform:micronaut-platform:5.1.5"),
@@ -69,7 +65,7 @@ dependencies {
     add(nativeH2Test.implementationConfigurationName, platform("org.junit:junit-bom:5.14.4"))
     add(nativeH2Test.implementationConfigurationName, "org.junit.jupiter:junit-jupiter")
     add(nativeH2Test.implementationConfigurationName, "org.assertj:assertj-core:3.27.7")
-    add(nativeH2Test.implementationConfigurationName, project(":r2d1-core"))
+    add(nativeH2Test.implementationConfigurationName, project(":r2d1"))
     add(nativeH2Test.implementationConfigurationName, project(":r2d1-jdbc"))
     add(nativeH2Test.implementationConfigurationName, "com.h2database:h2:2.5.250")
     add(
@@ -82,7 +78,7 @@ dependencies {
 
 val optionalAdapterTestTask =
     tasks.register<Test>("optionalAdapterTest") {
-        description = "Tests safe startup diagnostics without optional R2D1 adapters."
+        description = "Tests safe startup diagnostics when the optional JDBC adapter is absent."
         group = "verification"
         testClassesDirs = optionalAdapterTest.output.classesDirs
         classpath = optionalAdapterTest.runtimeClasspath

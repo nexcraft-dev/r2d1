@@ -52,8 +52,8 @@ final class R2D1CoreFactory {
     if (!provider.isPresent()) {
       String message =
           environment.containsProperties("r2d1.r2")
-              ? "R2 configuration is present but no DocumentStore was created; add r2d1-r2 or define a DocumentStore bean"
-              : "No DocumentStore bean exists; add r2d1-r2 configuration or define a DocumentStore bean";
+              ? "R2 configuration is present but no DocumentStore was created; verify r2d1.r2 configuration or define a DocumentStore bean"
+              : "No DocumentStore bean exists; configure r2d1.r2 or define a DocumentStore bean";
       throw new ConfigurationException(message);
     }
     return requiredUnique(provider, "DocumentStore");

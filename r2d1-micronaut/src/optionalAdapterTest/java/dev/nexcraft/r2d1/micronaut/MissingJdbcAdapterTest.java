@@ -10,7 +10,7 @@ import java.lang.reflect.Proxy;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-class MissingOptionalAdapterTest {
+class MissingJdbcAdapterTest {
 
   @Test
   void generatedDefinitionsLoadAndExplainAMissingJdbcAdapter() {
@@ -21,18 +21,6 @@ class MissingOptionalAdapterTest {
                     .beanDefinitions(bean(DocumentStore.class), bean(DocumentCodec.class))
                     .start())
         .hasMessageContaining("index backend 'jdbc'")
-        .hasMessageContaining("add the matching R2D1 adapter");
-  }
-
-  @Test
-  void generatedDefinitionsLoadAndExplainAMissingD1Adapter() {
-    assertThatThrownBy(
-            () ->
-                ApplicationContext.builder()
-                    .properties(Map.of("r2d1.enabled", true, "r2d1.index.type", "d1"))
-                    .beanDefinitions(bean(DocumentStore.class), bean(DocumentCodec.class))
-                    .start())
-        .hasMessageContaining("index backend 'd1'")
         .hasMessageContaining("add the matching R2D1 adapter");
   }
 

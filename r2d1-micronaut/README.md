@@ -2,26 +2,24 @@
 
 `r2d1-micronaut` integrates the framework-neutral R2D1 API with Micronaut 5. It conditionally
 creates the top-level `R2D1` bean, selects application-owned resources, and manages only resources
-that the integration creates itself. It does not add Micronaut APIs to `r2d1-core`.
+that the integration creates itself. It does not add Micronaut APIs to `r2d1`.
 
 ## Requirements and dependencies
 
-Micronaut 5 and this module require Java 25. The Core, D1, R2, and JDBC artifacts remain compiled
+Micronaut 5 and this module require Java 25. The `r2d1` and `r2d1-jdbc` artifacts remain compiled
 for Java 21. The module uses Micronaut Platform 5.1.5 and is built with the Micronaut library Gradle
 plugin 5.0.2.
 
-Add the integration and only the adapters used by the application:
+Add the integration. It transitively provides `r2d1`, including the Cloudflare R2 and D1 adapters:
 
 ```kotlin
 dependencies {
     implementation("dev.nexcraft:r2d1-micronaut:<version>")
-    implementation("dev.nexcraft:r2d1-r2:<version>")
-    implementation("dev.nexcraft:r2d1-d1:<version>")
 }
 ```
 
-For a JDBC index, replace `r2d1-d1` with `r2d1-jdbc` and add the application-selected JDBC driver.
-The Micronaut integration does not transitively add JDBC, D1, R2, a connection pool, or a database
+For a JDBC index, add `r2d1-jdbc` and the application-selected JDBC driver. The Micronaut
+integration does not transitively add the optional JDBC adapter, a connection pool, or a database
 driver.
 
 ## Configuration
@@ -126,8 +124,8 @@ resolvable `@Primary` bean.
 
 ## GraalVM native image
 
-The supported native smoke path is Micronaut `ApplicationContext` with the H2 JDBC backend. Core and
-JDBC inspect document fields through reflection, so each document type used in a native image must
+The supported native smoke path is Micronaut `ApplicationContext` with the H2 JDBC backend. The base
+and JDBC artifacts inspect document fields through reflection, so each document type used in a native image must
 be explicitly registered, for example:
 
 ```java

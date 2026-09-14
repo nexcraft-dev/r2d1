@@ -264,9 +264,15 @@ class HsqldbIndexStoreTest extends JdbcBackendTest {
       ExecutorService readerExecutor = Executors.newSingleThreadExecutor();
       Future<String> readiness =
           readerExecutor.submit(
-              () ->
-                  new BufferedReader(new InputStreamReader(output, StandardCharsets.UTF_8))
-                      .readLine());
+              () -> {
+                BufferedReader reader =
+                    new BufferedReader(new InputStreamReader(output, StandardCharsets.UTF_8));
+                String line;
+                do {
+                  line = reader.readLine();
+                } while (line != null && !"READY".equals(line.strip()));
+                return line;
+              });
       try {
         String line = readiness.get(HOLDER_READY_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         if (line == null) {
