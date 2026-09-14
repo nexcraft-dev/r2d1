@@ -69,7 +69,17 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
         true);
   }
 
-  R2DocumentStore(S3AsyncClient client, String bucketName) {
+  /**
+   * Creates an R2 document store that borrows an existing asynchronous S3 client.
+   *
+   * <p>Closing this store does not close the supplied client.
+   *
+   * @param client caller-owned S3-compatible asynchronous client
+   * @param bucketName R2 bucket that stores documents
+   * @throws NullPointerException if either argument is {@code null}
+   * @throws IllegalArgumentException if {@code bucketName} is blank
+   */
+  public R2DocumentStore(S3AsyncClient client, String bucketName) {
     this(client, bucketName, false);
   }
 
