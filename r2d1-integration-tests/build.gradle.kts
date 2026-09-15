@@ -15,6 +15,9 @@ configurations[integrationTest.runtimeOnlyConfigurationName].extendsFrom(
 
 dependencies {
     add(integrationTest.implementationConfigurationName, project(":r2d1"))
+    add(integrationTest.implementationConfigurationName, project(":r2d1-filesystem"))
+    add(integrationTest.implementationConfigurationName, project(":r2d1-jdbc"))
+    add(integrationTest.implementationConfigurationName, "com.h2database:h2:2.5.250")
 }
 
 val requiredEnvironmentVariables = listOf(

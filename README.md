@@ -9,25 +9,27 @@
   filtering, sorting, and pagination.
 </p>
 
-R2D1 is a framework-independent Java library that combines **Cloudflare R2** and **Cloudflare D1**
-for document storage and indexed queries.
+R2D1 is a framework-independent Java library that combines an authoritative `DocumentStore` with a
+rebuildable `IndexStore` for document storage and indexed queries. Cloudflare R2/D1 and local
+filesystem/JDBC combinations use the same persistence orchestration.
 
 The storage model has two parts:
 
-- **R2 is the authoritative document store.**
-- **D1 is a rebuildable index projection used to find documents.**
+- **The configured `DocumentStore` is authoritative for document content and logical existence.**
+- **The configured `IndexStore` is a rebuildable projection used to find documents.**
 
 R2D1 exposes a limited query model. It is not a SQL database or ORM.
 
 ## Dependencies
 
-The public Maven Central surface contains exactly three artifacts. The base `r2d1` artifact
-contains the Core API and the Cloudflare R2 and D1 implementations. JDBC and Micronaut are
+The public Maven Central surface contains exactly four artifacts. The base `r2d1` artifact contains
+the Core API and the Cloudflare R2 and D1 implementations. Filesystem, JDBC, and Micronaut are
 additional integrations:
 
 ```kotlin
 dependencies {
     implementation("dev.nexcraft:r2d1:<version>")
+    implementation("dev.nexcraft:r2d1-filesystem:<version>")
     implementation("dev.nexcraft:r2d1-jdbc:<version>")
     implementation("dev.nexcraft:r2d1-micronaut:<version>")
 }
@@ -36,6 +38,11 @@ dependencies {
 The equivalent Maven coordinates are:
 
 ```xml
+<dependency>
+  <groupId>dev.nexcraft</groupId>
+  <artifactId>r2d1-filesystem</artifactId>
+  <version>${r2d1.version}</version>
+</dependency>
 <dependency>
   <groupId>dev.nexcraft</groupId>
   <artifactId>r2d1</artifactId>
@@ -75,6 +82,8 @@ DocumentStore     IndexStore        technology-neutral SPI
 Cloudflare R2         ▼              ▼
 Documents        Cloudflare D1   H2/HSQLDB/SQLite via JDBC
                  Indexes         Local indexes
+       │
+       └── FilesystemDocumentStore
 ```
 
 The public collection API is synchronous. Storage I/O is composed asynchronously, and
@@ -84,20 +93,19 @@ executor, callback thread, cancellation guarantee, or timeout policy.
 
 R2D1 does not have a global thread-mode switch. The Core SPI does not own an executor. D1 uses
 Java's asynchronous HTTP client and R2 uses the AWS SDK's asynchronous Netty client, so neither
-adapter creates an R2D1-managed worker pool. The optional JDBC adapter is the current exception:
-its `JdbcExecution` resource owns a bounded blocking-work executor and can explicitly use platform
-or virtual threads. A caller-owned executor can also be supplied to JDBC when an application
-framework manages the thread model.
+adapter creates an R2D1-managed worker pool. The optional JDBC and filesystem adapters perform
+blocking work through caller-owned execution resources; JDBC uses its bounded `JdbcExecution`, and
+`FileSystemDocumentStore` accepts a caller-owned executor.
 
 Persistence operations follow these paths:
 
-- `put`: serialize the document, write R2, then upsert the D1 index row.
-- `get`: read the authoritative document from R2 only.
-- `query`: query D1, then fetch the matching R2 documents concurrently while preserving D1 order.
-- `delete`: delete the R2 document, then delete the D1 index row.
+- `put`: serialize the document, write the authoritative `DocumentStore`, then upsert the index row.
+- `get`: read the authoritative `DocumentStore` only.
+- `query`: query the `IndexStore`, then fetch matching documents concurrently while preserving index order.
+- `delete`: delete the authoritative document, then delete the derived index row.
 
-R2 and D1 do not share an atomic transaction. A successful R2 mutation followed by a failed D1
-mutation is reported as a partial failure and may require an explicit index rebuild.
+The two stores do not share an atomic transaction. A successful authoritative mutation followed by
+a failed index mutation is reported as a partial failure and may require an explicit index rebuild.
 
 ## Design Goals
 
@@ -126,14 +134,15 @@ Queries can use only fields that have been explicitly indexed.
 
 ## Storage and Query Model
 
-### R2 owns the document
+### The DocumentStore owns the document
 
-The complete document is stored in Cloudflare R2.
+The complete document is stored in the configured `DocumentStore`. In the Cloudflare deployment
+this is R2; the filesystem adapter stores one canonical file per document.
 
 D1 should contain only the metadata and indexed fields necessary to locate and query documents.
 
 ```text
-R2
+DocumentStore
 └── users/01JXYZ...
     └── Complete document
 
@@ -145,10 +154,10 @@ D1
     └── createdAt
 ```
 
-### D1 is a rebuildable index
+### The IndexStore is rebuildable
 
-D1 is an index over the documents stored in R2, not an authoritative document store. The index can
-be rebuilt from the R2 documents when necessary.
+The index is a projection over documents stored in the authoritative `DocumentStore`, not an
+authoritative document store. It can be rebuilt from authoritative documents when necessary.
 
 ### Query constraints
 
@@ -175,7 +184,7 @@ D1 adapters shown below. Applications supply a `DocumentCodec`, keeping domain s
 independent of any specific JSON library.
 
 ```java
-R2DocumentStore documentStore = configuredR2DocumentStore;
+DocumentStore documentStore = configuredDocumentStore;
 D1IndexStore indexStore = configuredD1IndexStore;
 DocumentCodec documentCodec = applicationDocumentCodec;
 
@@ -206,8 +215,8 @@ users.delete("user-123");
 users.rebuildIndex();
 ```
 
-`R2DocumentStore` and `D1IndexStore` implement `AutoCloseable`. The application owns their lifecycle;
-`PersistenceCollectionFactory` does not close them.
+`R2DocumentStore` and `D1IndexStore` implement `AutoCloseable`. The application owns adapter and
+executor lifecycles; `PersistenceCollectionFactory` does not close them.
 
 Document metadata may be declared using annotations:
 
@@ -243,25 +252,33 @@ before executing a query.
 
 ## Consistency Recovery
 
-R2 is the authoritative document store. D1 is a disposable materialized index that may become
-temporarily inconsistent when an R2 write or delete succeeds and the following D1 operation fails.
-R2D1 exposes an explicit collection-level recovery operation for this case:
+The configured `DocumentStore` is authoritative for content and logical existence. The
+`IndexStore` is a disposable materialized projection that may become temporarily inconsistent when
+the authoritative operation succeeds and the following index operation fails. R2D1 exposes an
+explicit collection-level recovery operation for this case:
 
 ```java
 R2D1Collection<User> users = db.collection(User.class);
 users.rebuildIndex();
 ```
 
-The rebuild lists R2 document keys in bounded pages, loads each authoritative document, derives its
-index entry through the normal metadata path, clears only the collection's D1 rows, and writes the
-replacement rows. D1 tables, columns, and SQLite indexes are preserved. Missing D1 rows are restored
-and stale D1 rows are removed, including when the authoritative collection is empty.
+The rebuild lists authoritative document keys in bounded pages, loads each document, derives its
+index entry through the normal metadata path, clears only the collection's index rows, and writes
+the replacement rows. Index tables, columns, and indexes are preserved. Missing index rows are
+restored and stale rows are removed, including when the authoritative collection is empty.
 
 Rebuilds are synchronous at the public API and asynchronously composed internally. They are
-idempotent for an unchanged R2 collection but are not atomic across R2 and D1. A failure after the D1
-rows are cleared can leave the index incomplete; resolve the failure and run `rebuildIndex()` again.
-Run this maintenance operation while application writes to the collection are paused. R2D1 does not
-add background reconciliation, automatic retries, distributed locks, queues, or Workers.
+idempotent for an unchanged authoritative collection but are not atomic across the two stores. A
+failure after index rows are cleared can leave the projection incomplete; resolve the failure and
+run `rebuildIndex()` again. Run this maintenance operation while application writes are paused.
+
+The global mutation contract is the same for R2 + D1, R2 + JDBC, Filesystem + D1, and Filesystem +
+JDBC. PUT and DELETE are authoritative-store first. If index cleanup fails after an authoritative
+DELETE, `DELETE` reports `PersistenceException.PartialFailure`; GET still reports the document as
+absent, while a stale index row causes query hydration to fail explicitly with
+`PersistenceException.InconsistentState`. R2D1 does not silently skip the row or change page and
+cursor semantics. A rebuild scans the authoritative store, so a physically deleted document is not
+resurrected.
 
 ## Modules
 
@@ -270,6 +287,9 @@ R2D1 is organized as a modular project.
 ```text
 r2d1
     Core API, Cloudflare R2 DocumentStore, and Cloudflare D1 IndexStore
+
+r2d1-filesystem
+    Filesystem DocumentStore with atomic canonical-file replacement
 
 r2d1-jdbc
     Optional JDBC IndexStore adapter with bounded execution and built-in H2, HSQLDB, and SQLite support
@@ -300,6 +320,30 @@ Public Java packages use JSpecify `@NullMarked` semantics. Nullable API position
 page's absent `nextCursor`, are declared explicitly with `@Nullable`.
 
 The base API does not depend on Micronaut or Spring.
+
+## Filesystem Module
+
+The optional `r2d1-filesystem` artifact provides `FileSystemDocumentStore`:
+
+```java
+ExecutorService filesystemExecutor = Executors.newFixedThreadPool(4);
+FileSystemDocumentStore documents =
+    new FileSystemDocumentStore(Path.of("/var/lib/my-app/r2d1"), filesystemExecutor);
+```
+
+The application owns and closes `filesystemExecutor`. Each collection is one encoded directory;
+each document is one encoded `<id>.json` canonical file. PUT writes a unique temporary file in the
+same directory and publishes it with `ATOMIC_MOVE` plus replacement. If the provider cannot provide
+that atomic publication, the operation fails and the previous canonical file remains in place; no
+unsafe delete-then-move fallback is attempted. Temporary and orphan files are ignored by GET and
+listing, and a process crash may leave an orphan temporary file. Atomic visibility is not an fsync
+or power-loss durability guarantee.
+
+The filesystem adapter does not provide version history, lost-update prevention, CAS, locks, retries,
+or replication. Concurrent complete PUTs have last-publication-wins behavior according to the
+underlying filesystem's atomic-move ordering. It follows the same authoritative DocumentStore and
+rebuildable IndexStore contract as R2, so it can be combined with D1 or JDBC without a
+filesystem-specific consistency rule.
 
 ## D1 Schema Initialization
 
@@ -340,7 +384,7 @@ GitHub secrets, and the automated Central Portal publishing workflow.
 
 ## Project Status
 
-R2D1 is under active development. The core API, R2 and D1 adapters, persistence orchestration, and
+R2D1 is under active development. The core API, R2, D1, filesystem, persistence orchestration, and
 the H2, HSQLDB, and SQLite JDBC adapters are available but remain unstable. Explicit index recovery
 through `rebuildIndex()` is available, but automatic reconciliation and background repair are not.
 Other JDBC databases are not yet supported. Module internals may change before the first release.
@@ -352,6 +396,7 @@ Other JDBC databases are not yet supported. Module internals may change before t
 - Adapter-specific infrastructure:
   - Cloudflare account and R2 bucket for the built-in R2 adapter
   - Cloudflare account and D1 database for the built-in D1 adapter
+  - A writable filesystem root and caller-owned blocking-I/O executor for the filesystem adapter
   - Application-provided H2, HSQLDB, or SQLite driver and `DataSource` for the `r2d1-jdbc` backend
 
 ## Development

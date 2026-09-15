@@ -7,8 +7,10 @@ import org.jspecify.annotations.Nullable;
  * Asynchronous authoritative persistence for serialized documents.
  *
  * <p>Implementations derive any physical location from {@link DocumentKey}; no implementation
- * reference is stored in the derived index. Operations on this store and {@link IndexStore} are not
- * one atomic transaction, so callers must tolerate temporary cross-store inconsistency.
+ * reference is stored in the derived index. This store is authoritative for document content and
+ * logical existence. Operations on this store and {@link IndexStore} are not one atomic
+ * transaction, so callers must tolerate temporary cross-store inconsistency without treating an
+ * index row as proof that a document exists.
  *
  * <p>Every operation returns a non-null {@link CompletionStage}. Storage failures are reported by
  * exceptional completion with {@link StorageException}; they are not returned in a result wrapper.

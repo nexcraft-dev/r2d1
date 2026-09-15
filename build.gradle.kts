@@ -42,6 +42,7 @@ val r2d1Version =
 val publicPublicationProjects =
     linkedMapOf(
         ":r2d1" to "r2d1",
+        ":r2d1-filesystem" to "r2d1-filesystem",
         ":r2d1-jdbc" to "r2d1-jdbc",
         ":r2d1-micronaut" to "r2d1-micronaut",
     )
@@ -49,6 +50,7 @@ val publicPublicationProjects =
 val publicationNames =
     mapOf(
         "r2d1" to "R2D1",
+        "r2d1-filesystem" to "R2D1 Filesystem DocumentStore",
         "r2d1-jdbc" to "R2D1 JDBC IndexStore",
         "r2d1-micronaut" to "R2D1 Micronaut 5 Integration",
     )
@@ -307,7 +309,7 @@ val prepareVerificationRepository =
 val publishPublicationsToVerificationRepository =
     tasks.register("publishPublicationsToVerificationRepository") {
         group = "verification"
-        description = "Publishes the three public artifacts to a temporary file Maven repository."
+        description = "Publishes the four public artifacts to a temporary file Maven repository."
         dependsOn(prepareVerificationRepository)
         dependsOn(
             publicPublicationProjects.keys.map { projectPath ->
@@ -346,6 +348,10 @@ val verifyPublishedConsumer =
                             "dev/nexcraft/r2d1/R2D1.class",
                             "dev/nexcraft/r2d1/r2/R2DocumentStore.class",
                             "dev/nexcraft/r2d1/d1/D1IndexStore.class",
+                        ),
+                    "r2d1-filesystem" to
+                        listOf(
+                            "dev/nexcraft/r2d1/filesystem/FileSystemDocumentStore.class",
                         ),
                     "r2d1-jdbc" to
                         listOf(
@@ -479,7 +485,7 @@ val verifyPublishedConsumer =
                     }
 
                     rootProject.name = "r2d1-published-consumer"
-                    include("core", "jdbc", "micronaut", "combined")
+                    include("core", "filesystem", "jdbc", "micronaut", "combined")
                     """.trimIndent()
                 )
 
@@ -529,6 +535,24 @@ val verifyPublishedConsumer =
                               }
                             }
                             """.trimIndent(),
+                        "filesystem" to
+                            """
+                            package consumer;
+
+                            import dev.nexcraft.r2d1.filesystem.FileSystemDocumentStore;
+
+                            public final class Main {
+                              public static void main(String[] args) {
+                                require(FileSystemDocumentStore.class);
+                              }
+
+                              private static void require(Class<?> type) {
+                                if (type.getName().isBlank()) {
+                                  throw new AssertionError(type.getName());
+                                }
+                              }
+                            }
+                            """.trimIndent(),
                         "micronaut" to
                             """
                             package consumer;
@@ -563,6 +587,7 @@ val verifyPublishedConsumer =
 
                             import dev.nexcraft.r2d1.R2D1;
                             import dev.nexcraft.r2d1.d1.D1IndexStore;
+                            import dev.nexcraft.r2d1.filesystem.FileSystemDocumentStore;
                             import dev.nexcraft.r2d1.jdbc.JdbcIndexStore;
                             import dev.nexcraft.r2d1.micronaut.R2D1Configuration;
                             import dev.nexcraft.r2d1.r2.R2DocumentStore;
@@ -572,6 +597,7 @@ val verifyPublishedConsumer =
                                 require(R2D1.class);
                                 require(R2DocumentStore.class);
                                 require(D1IndexStore.class);
+                                require(FileSystemDocumentStore.class);
                                 require(JdbcIndexStore.class);
                                 require(R2D1Configuration.class);
                               }
@@ -587,11 +613,13 @@ val verifyPublishedConsumer =
                 val dependencyCoordinates =
                     mapOf(
                         "core" to listOf("dev.nexcraft:r2d1:$version"),
+                        "filesystem" to listOf("dev.nexcraft:r2d1-filesystem:$version"),
                         "jdbc" to listOf("dev.nexcraft:r2d1-jdbc:$version"),
                         "micronaut" to listOf("dev.nexcraft:r2d1-micronaut:$version"),
                         "combined" to
                             listOf(
                                 "dev.nexcraft:r2d1:$version",
+                                "dev.nexcraft:r2d1-filesystem:$version",
                                 "dev.nexcraft:r2d1-jdbc:$version",
                                 "dev.nexcraft:r2d1-micronaut:$version",
                             ),
