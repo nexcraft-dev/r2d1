@@ -13,6 +13,8 @@ R2D1 is a framework-independent Java library that combines an authoritative `Doc
 rebuildable `IndexStore` for document storage and indexed queries. Cloudflare R2/D1 and local
 filesystem/JDBC combinations use the same persistence orchestration.
 
+Official website: [r2d1.nexcraft.dev](https://r2d1.nexcraft.dev)
+
 The storage model has two parts:
 
 - **The configured `DocumentStore` is authoritative for document content and logical existence.**

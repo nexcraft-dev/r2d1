@@ -1,0 +1,37 @@
+---
+import { localePath, stripLocale, type Locale } from "../i18n/config";
+import { ui } from "../i18n/ui";
+
+interface Props {
+  currentPath: string;
+  locale?: Locale;
+}
+
+const { currentPath, locale = "en" } = Astro.props;
+const texts = ui[locale];
+const basePath = stripLocale(currentPath);
+const active = (href: string) =>
+  href === "/docs/" ? basePath === href : basePath.startsWith(href);
+---
+
+<nav class="docs-nav" aria-label={texts.docsNav.title}>
+  <p class="docs-nav-title">{texts.docsNav.title}</p>
+  {texts.docsNav.groups.map((group) => (
+    <div class="docs-nav-group">
+      <p class="docs-nav-label">{group.label}</p>
+      <ul>
+        {group.links.map((link) => (
+          <li>
+            <a
+              class:list={{ "docs-nav-link": true, "is-active": active(link.href) }}
+              href={localePath(link.href, locale)}
+              aria-current={active(link.href) ? "page" : undefined}
+            >
+              {link.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ))}
+</nav>

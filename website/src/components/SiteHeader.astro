@@ -1,0 +1,63 @@
+---
+import { localeHreflangs, localeNames, localePath, locales, stripLocale, type Locale } from "../i18n/config";
+import { ui } from "../i18n/ui";
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = "en" } = Astro.props;
+const texts = ui[locale];
+const basePath = stripLocale(Astro.url.pathname);
+const isActive = (href: string) =>
+  href === "/" ? basePath === href : basePath.startsWith(href);
+---
+
+<a class="skip-link" href="#main-content">{texts.skip}</a>
+<header class="site-header">
+  <div class="top-banner">
+    <div>
+      <strong>{texts.bannerTitle}</strong>
+      <span>{texts.bannerSubtitle}</span>
+    </div>
+    <div class="top-banner-actions">
+      <nav class="language-switcher" aria-label={texts.languageLabel}>
+        {locales.map((availableLocale) => (
+          <a
+            class:list={{ "language-link": true, "is-active": availableLocale === locale }}
+            href={localePath(basePath, availableLocale)}
+            hreflang={localeHreflangs[availableLocale]}
+            aria-current={availableLocale === locale ? "page" : undefined}
+          >
+            {localeNames[availableLocale]}
+          </a>
+        ))}
+      </nav>
+    </div>
+  </div>
+
+  <div class="site-nav-wrap">
+    <a class="brand" href={localePath("/", locale)} aria-label={`${texts.home} R2D1`}>
+      <img class="brand-mark" src="/r2d1-logo.png" alt="" width="52" height="52" />
+      <span>R2D1</span>
+    </a>
+    <nav class="site-nav" aria-label={texts.docs}>
+      <a
+        class:list={{ "nav-link": true, "is-active": isActive("/") }}
+        href={localePath("/", locale)}
+        aria-current={isActive("/") ? "page" : undefined}
+      >
+        {texts.home}
+      </a>
+      <a
+        class:list={{ "nav-link": true, "is-active": isActive("/docs") }}
+        href={localePath("/docs/", locale)}
+        aria-current={isActive("/docs") ? "page" : undefined}
+      >
+        {texts.docs}
+      </a>
+      <a class="nav-link" href="https://github.com/nexcraft-dev/r2d1" rel="noreferrer">{texts.github}</a>
+    </nav>
+    <a class="sticker sticker-start" href={localePath("/docs/getting-started/", locale)}>{texts.getStarted}</a>
+  </div>
+</header>

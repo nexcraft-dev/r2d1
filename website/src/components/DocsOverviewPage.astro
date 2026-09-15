@@ -1,0 +1,282 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import { localePath, type Locale } from "../i18n/config";
+
+interface ModuleCard {
+  label: string;
+  name: string;
+  coordinate: string;
+  description: string;
+  link: string;
+  href: string;
+}
+
+interface OverviewCopy {
+  seoTitle: string;
+  seoDescription: string;
+  eyebrow: string;
+  title: string;
+  intro: string;
+  documentLabel: string;
+  documentTitle: string;
+  documentDescription: string;
+  documentLinks: Array<{ label: string; href: string }>;
+  indexLabel: string;
+  indexTitle: string;
+  indexDescription: string;
+  indexLinks: Array<{ label: string; href: string }>;
+  apiEyebrow: string;
+  apiTitle: string;
+  apiCards: Array<{ title: string; description: string; link: string; href: string }>;
+  modulesEyebrow: string;
+  modulesTitle: string;
+  modules: ModuleCard[];
+  boundaryEyebrow: string;
+  boundaryTitle: string;
+  boundaryDescription: string;
+}
+
+const copy: Record<Locale, OverviewCopy> = {
+  en: {
+    seoTitle: "R2D1 Docs | Overview",
+    seoDescription: "Choose R2D1 document and index backends, configure the selected modules, and use the common Java API.",
+    eyebrow: "R2D1 / DOCS",
+    title: "Choose the backends. Then use one API.",
+    intro: "Start with the two backend roles. A DocumentStore owns complete documents; an IndexStore owns the fields used for indexed lookup. After both are configured, the collection API is shared across every pairing.",
+    documentLabel: "DOCUMENT STORES",
+    documentTitle: "Complete documents",
+    documentDescription: "Choose where authoritative serialized documents live.",
+    documentLinks: [
+      { label: "R2 DocumentStore →", href: "/docs/document-stores/r2/" },
+      { label: "Filesystem DocumentStore →", href: "/docs/document-stores/filesystem/" }
+    ],
+    indexLabel: "INDEX STORES",
+    indexTitle: "Indexed lookup",
+    indexDescription: "Choose where document identifiers and indexed fields are projected.",
+    indexLinks: [
+      { label: "D1 IndexStore →", href: "/docs/index-stores/d1/" },
+      { label: "JDBC IndexStore →", href: "/docs/index-stores/jdbc/" }
+    ],
+    apiEyebrow: "COMMON API",
+    apiTitle: "The usage stays the same.",
+    apiCards: [
+      { title: "Getting Started", description: "Set up both backend roles, define a document, and run the first indexed query.", link: "Start the common path →", href: "/docs/getting-started/" },
+      { title: "Core Concepts", description: "Understand collections, metadata, authoritative documents, indexes, and cursors.", link: "Read Core Concepts →", href: "/docs/concepts/" },
+      { title: "Querying", description: "Filter indexed fields, apply one sort, and continue with opaque cursor pagination.", link: "Read Querying →", href: "/docs/querying/" },
+      { title: "Consistency and Recovery", description: "Handle partial failures and rebuild the derived index from authoritative documents.", link: "Read Consistency →", href: "/docs/consistency/" }
+    ],
+    modulesEyebrow: "PUBLIC MODULES",
+    modulesTitle: "The four published artifacts.",
+    modules: [
+      { label: "CORE + CLOUDFLARE", name: "R2D1", coordinate: "dev.nexcraft:r2d1", description: "Common API plus R2 and D1 adapters.", link: "Configuration →", href: "/docs/configuration/" },
+      { label: "INDEX STORE", name: "R2D1-JDBC", coordinate: "dev.nexcraft:r2d1-jdbc", description: "H2, HSQLDB, and local SQLite index support.", link: "JDBC setup →", href: "/docs/index-stores/jdbc/" },
+      { label: "DOCUMENT STORE", name: "R2D1-FILESYSTEM", coordinate: "dev.nexcraft:r2d1-filesystem", description: "Canonical local document files.", link: "Filesystem setup →", href: "/docs/document-stores/filesystem/" },
+      { label: "FRAMEWORK INTEGRATION", name: "R2D1-MICRONAUT", coordinate: "dev.nexcraft:r2d1-micronaut", description: "Micronaut 5 bean and resource integration.", link: "Micronaut setup →", href: "/docs/micronaut/" }
+    ],
+    boundaryEyebrow: "DOCUMENTATION BOUNDARY",
+    boundaryTitle: "Examples follow the current code.",
+    boundaryDescription: "Backend pages explain vendor setup and ownership. The common API pages explain how to define, mutate, query, and recover collections without changing those backend choices."
+  },
+  ko: {
+    seoTitle: "R2D1 문서 | 개요",
+    seoDescription: "R2D1 문서 저장소와 인덱스 백엔드를 선택하고 모듈을 설정한 뒤 공통 Java API를 사용하는 방법입니다.",
+    eyebrow: "R2D1 / 문서",
+    title: "백엔드를 선택한 다음 하나의 API를 사용하세요.",
+    intro: "먼저 두 backend 역할을 이해하세요. DocumentStore는 완전한 문서를 소유하고, IndexStore는 인덱스 조회에 사용하는 필드를 소유합니다. 둘 다 설정한 뒤에는 모든 조합에서 같은 컬렉션 API를 사용합니다.",
+    documentLabel: "문서 저장소",
+    documentTitle: "완전한 문서",
+    documentDescription: "권위 있는 직렬화 문서를 저장할 위치를 선택하세요.",
+    documentLinks: [
+      { label: "R2 DocumentStore →", href: "/docs/document-stores/r2/" },
+      { label: "Filesystem DocumentStore →", href: "/docs/document-stores/filesystem/" }
+    ],
+    indexLabel: "인덱스 저장소",
+    indexTitle: "인덱스 조회",
+    indexDescription: "문서 식별자와 인덱스 필드를 투영할 위치를 선택하세요.",
+    indexLinks: [
+      { label: "D1 IndexStore →", href: "/docs/index-stores/d1/" },
+      { label: "JDBC IndexStore →", href: "/docs/index-stores/jdbc/" }
+    ],
+    apiEyebrow: "공통 API",
+    apiTitle: "사용법은 동일합니다.",
+    apiCards: [
+      { title: "시작하기", description: "두 backend 역할을 설정하고 문서를 정의한 뒤 첫 인덱스 쿼리를 실행합니다.", link: "공통 경로 시작 →", href: "/docs/getting-started/" },
+      { title: "핵심 개념", description: "컬렉션, metadata, 권위 있는 문서, 인덱스, cursor를 이해합니다.", link: "핵심 개념 읽기 →", href: "/docs/concepts/" },
+      { title: "쿼리", description: "인덱스 필드를 필터링하고 정렬한 뒤 opaque cursor 페이지를 이어갑니다.", link: "쿼리 읽기 →", href: "/docs/querying/" },
+      { title: "일관성과 복구", description: "부분 실패를 처리하고 권위 있는 문서에서 파생 인덱스를 재구축합니다.", link: "일관성 읽기 →", href: "/docs/consistency/" }
+    ],
+    modulesEyebrow: "공개 모듈",
+    modulesTitle: "공개된 네 가지 artifact.",
+    modules: [
+      { label: "CORE + CLOUDFLARE", name: "R2D1", coordinate: "dev.nexcraft:r2d1", description: "공통 API와 R2 및 D1 adapter입니다.", link: "구성 →", href: "/docs/configuration/" },
+      { label: "INDEX STORE", name: "R2D1-JDBC", coordinate: "dev.nexcraft:r2d1-jdbc", description: "H2, HSQLDB, 로컬 SQLite 인덱스 지원입니다.", link: "JDBC 설정 →", href: "/docs/index-stores/jdbc/" },
+      { label: "DOCUMENT STORE", name: "R2D1-FILESYSTEM", coordinate: "dev.nexcraft:r2d1-filesystem", description: "canonical 로컬 문서 파일입니다.", link: "Filesystem 설정 →", href: "/docs/document-stores/filesystem/" },
+      { label: "FRAMEWORK INTEGRATION", name: "R2D1-MICRONAUT", coordinate: "dev.nexcraft:r2d1-micronaut", description: "Micronaut 5 bean 및 resource 통합입니다.", link: "Micronaut 설정 →", href: "/docs/micronaut/" }
+    ],
+    boundaryEyebrow: "문서 범위",
+    boundaryTitle: "예제는 현재 코드에 맞습니다.",
+    boundaryDescription: "backend 페이지는 vendor 설정과 소유권을 설명합니다. 공통 API 페이지는 backend 선택을 바꾸지 않고 컬렉션을 정의하고 변경하고 쿼리하고 복구하는 방법을 설명합니다."
+  },
+  zh: {
+    seoTitle: "R2D1 文档 | 概览",
+    seoDescription: "选择 R2D1 文档与索引后端，配置所需模块，并使用通用 Java API。",
+    eyebrow: "R2D1 / 文档",
+    title: "选择后端，然后使用一个 API。",
+    intro: "先了解两个后端角色。DocumentStore 负责完整文档，IndexStore 负责索引查找所需的字段。配置完成后，所有组合都共享同一个集合 API。",
+    documentLabel: "文档存储",
+    documentTitle: "完整文档",
+    documentDescription: "选择权威序列化文档的存储位置。",
+    documentLinks: [
+      { label: "R2 DocumentStore →", href: "/docs/document-stores/r2/" },
+      { label: "Filesystem DocumentStore →", href: "/docs/document-stores/filesystem/" }
+    ],
+    indexLabel: "索引存储",
+    indexTitle: "索引查找",
+    indexDescription: "选择文档标识和索引字段的投影位置。",
+    indexLinks: [
+      { label: "D1 IndexStore →", href: "/docs/index-stores/d1/" },
+      { label: "JDBC IndexStore →", href: "/docs/index-stores/jdbc/" }
+    ],
+    apiEyebrow: "通用 API",
+    apiTitle: "使用方式保持不变。",
+    apiCards: [
+      { title: "开始使用", description: "设置两个后端角色，定义文档，并运行第一个索引查询。", link: "开始通用流程 →", href: "/docs/getting-started/" },
+      { title: "核心概念", description: "了解集合、元数据、权威文档、索引和游标。", link: "阅读核心概念 →", href: "/docs/concepts/" },
+      { title: "查询", description: "过滤索引字段，应用一个排序，并继续使用不透明游标分页。", link: "阅读查询 →", href: "/docs/querying/" },
+      { title: "一致性与恢复", description: "处理部分失败，并从权威文档重建派生索引。", link: "阅读一致性 →", href: "/docs/consistency/" }
+    ],
+    modulesEyebrow: "公开模块",
+    modulesTitle: "四个已发布的 artifact。",
+    modules: [
+      { label: "CORE + CLOUDFLARE", name: "R2D1", coordinate: "dev.nexcraft:r2d1", description: "通用 API 以及 R2、D1 适配器。", link: "配置 →", href: "/docs/configuration/" },
+      { label: "INDEX STORE", name: "R2D1-JDBC", coordinate: "dev.nexcraft:r2d1-jdbc", description: "H2、HSQLDB 和本地 SQLite 索引支持。", link: "JDBC 设置 →", href: "/docs/index-stores/jdbc/" },
+      { label: "DOCUMENT STORE", name: "R2D1-FILESYSTEM", coordinate: "dev.nexcraft:r2d1-filesystem", description: "规范的本地文档文件。", link: "Filesystem 设置 →", href: "/docs/document-stores/filesystem/" },
+      { label: "FRAMEWORK INTEGRATION", name: "R2D1-MICRONAUT", coordinate: "dev.nexcraft:r2d1-micronaut", description: "Micronaut 5 bean 和资源集成。", link: "Micronaut 设置 →", href: "/docs/micronaut/" }
+    ],
+    boundaryEyebrow: "文档范围",
+    boundaryTitle: "示例与当前代码保持一致。",
+    boundaryDescription: "后端页面说明厂商设置与资源所有权。通用 API 页面说明如何在不更换后端选择的情况下定义、修改、查询和恢复集合。"
+  },
+  ja: {
+    seoTitle: "R2D1 ドキュメント | 概要",
+    seoDescription: "R2D1 のドキュメントストアとインデックスストアを選び、モジュールを設定して共通 Java API を使います。",
+    eyebrow: "R2D1 / ドキュメント",
+    title: "バックエンドを選び、1つの API を使います。",
+    intro: "まず2つのバックエンド役割を確認します。DocumentStore は完全なドキュメントを管理し、IndexStore はインデックス検索に使うフィールドを管理します。両方を設定したあとは、すべての組み合わせで同じコレクション API を使います。",
+    documentLabel: "ドキュメントストア",
+    documentTitle: "完全なドキュメント",
+    documentDescription: "権威ドキュメントをシリアライズして保存する場所を選びます。",
+    documentLinks: [
+      { label: "R2 DocumentStore →", href: "/docs/document-stores/r2/" },
+      { label: "Filesystem DocumentStore →", href: "/docs/document-stores/filesystem/" }
+    ],
+    indexLabel: "インデックスストア",
+    indexTitle: "インデックス検索",
+    indexDescription: "ドキュメント ID とインデックスフィールドの投影先を選びます。",
+    indexLinks: [
+      { label: "D1 IndexStore →", href: "/docs/index-stores/d1/" },
+      { label: "JDBC IndexStore →", href: "/docs/index-stores/jdbc/" }
+    ],
+    apiEyebrow: "共通 API",
+    apiTitle: "使い方は変わりません。",
+    apiCards: [
+      { title: "はじめに", description: "2つのバックエンド役割を設定し、ドキュメントを定義して最初のインデックスクエリを実行します。", link: "共通の流れを始める →", href: "/docs/getting-started/" },
+      { title: "基本概念", description: "コレクション、メタデータ、権威ドキュメント、インデックス、カーソルを理解します。", link: "基本概念を読む →", href: "/docs/concepts/" },
+      { title: "クエリ", description: "インデックスフィールドをフィルタし、1つのソートを適用して不透明なカーソルでページを続けます。", link: "クエリを読む →", href: "/docs/querying/" },
+      { title: "整合性と復旧", description: "部分的な失敗を処理し、権威ドキュメントから派生インデックスを再構築します。", link: "整合性を読む →", href: "/docs/consistency/" }
+    ],
+    modulesEyebrow: "公開モジュール",
+    modulesTitle: "公開されている4つの artifact。",
+    modules: [
+      { label: "CORE + CLOUDFLARE", name: "R2D1", coordinate: "dev.nexcraft:r2d1", description: "共通 API と R2、D1 アダプター。", link: "設定 →", href: "/docs/configuration/" },
+      { label: "INDEX STORE", name: "R2D1-JDBC", coordinate: "dev.nexcraft:r2d1-jdbc", description: "H2、HSQLDB、ローカル SQLite インデックスのサポート。", link: "JDBC の設定 →", href: "/docs/index-stores/jdbc/" },
+      { label: "DOCUMENT STORE", name: "R2D1-FILESYSTEM", coordinate: "dev.nexcraft:r2d1-filesystem", description: "正規のローカルドキュメントファイル。", link: "Filesystem の設定 →", href: "/docs/document-stores/filesystem/" },
+      { label: "FRAMEWORK INTEGRATION", name: "R2D1-MICRONAUT", coordinate: "dev.nexcraft:r2d1-micronaut", description: "Micronaut 5 の bean とリソース統合。", link: "Micronaut の設定 →", href: "/docs/micronaut/" }
+    ],
+    boundaryEyebrow: "ドキュメントの範囲",
+    boundaryTitle: "例は現在のコードに合わせています。",
+    boundaryDescription: "バックエンドページではベンダー設定と所有権を説明します。共通 API ページでは、バックエンドの選択を変えずにコレクションを定義、変更、クエリ、復旧する方法を説明します。"
+  }
+};
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const c = copy[locale];
+---
+
+<SiteLayout title={c.seoTitle} description={c.seoDescription} locale={locale}>
+  <section class="section" aria-labelledby="docs-title">
+    <div class="section-eyebrow section-eyebrow-sky">
+      <span>{c.eyebrow}</span>
+      <h1 id="docs-title">{c.title}</h1>
+    </div>
+    <p class="section-intro">{c.intro}</p>
+    <div class="backend-grid">
+      <article class="backend-panel backend-document">
+        <div class="backend-panel-heading">
+          <span>{c.documentLabel}</span>
+          <h2>{c.documentTitle}</h2>
+        </div>
+        <p>{c.documentDescription}</p>
+        <div class="docs-link-list">
+          {c.documentLinks.map((link) => <a href={localePath(link.href, locale)}>{link.label}</a>)}
+        </div>
+      </article>
+      <article class="backend-panel backend-index">
+        <div class="backend-panel-heading">
+          <span>{c.indexLabel}</span>
+          <h2>{c.indexTitle}</h2>
+        </div>
+        <p>{c.indexDescription}</p>
+        <div class="docs-link-list">
+          {c.indexLinks.map((link) => <a href={localePath(link.href, locale)}>{link.label}</a>)}
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="api-title">
+    <div class="section-eyebrow section-eyebrow-olive">
+      <span>{c.apiEyebrow}</span>
+      <h2 id="api-title">{c.apiTitle}</h2>
+    </div>
+    <div class="docs-card-grid">
+      {c.apiCards.map((card) => (
+        <div class="docs-card">
+          <h2>{card.title}</h2>
+          <p>{card.description}</p>
+          <a href={localePath(card.href, locale)}>{card.link}</a>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="modules-title">
+    <div class="section-eyebrow section-eyebrow-salmon">
+      <span>{c.modulesEyebrow}</span>
+      <h2 id="modules-title">{c.modulesTitle}</h2>
+    </div>
+    <div class="module-grid">
+      {c.modules.map((module) => (
+        <article class:list={{ "module-card": true, [`module-card-${module.name.toLowerCase().replace("r2d1-", "")}`]: true }}>
+          <span class="module-label">{module.label}</span>
+          <h3>{module.name}</h3>
+          <code>{module.coordinate}</code>
+          <p>{module.description}</p>
+          <a href={localePath(module.href, locale)}>{module.link}</a>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="doc-boundary-title">
+    <div class="section-eyebrow section-eyebrow-olive">
+      <span>{c.boundaryEyebrow}</span>
+      <h2 id="doc-boundary-title">{c.boundaryTitle}</h2>
+    </div>
+    <p class="section-intro">{c.boundaryDescription}</p>
+  </section>
+</SiteLayout>

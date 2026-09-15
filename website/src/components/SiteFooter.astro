@@ -1,0 +1,50 @@
+---
+import { localePath, type Locale } from "../i18n/config";
+import { ui } from "../i18n/ui";
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = "en" } = Astro.props;
+const texts = ui[locale];
+---
+
+<footer class="site-footer">
+  <nav class="footer-icon-nav" aria-label={texts.footerDocs}>
+    <a href={localePath("/", locale)} class="footer-icon-link">
+      <span class="footer-icon" aria-hidden="true">
+        <svg viewBox="0 0 32 32" role="img"><path d="m5 15 11-9 11 9"></path><path d="M8 14v12h16V14"></path></svg>
+      </span>
+      <span>{texts.footerHome}</span>
+    </a>
+    <a href={localePath("/docs/", locale)} class="footer-icon-link">
+      <span class="footer-icon" aria-hidden="true">
+        <svg viewBox="0 0 32 32" role="img"><path d="M7 5h14a4 4 0 0 1 4 4v18H11a4 4 0 0 1-4-4Z"></path><path d="M11 27V9a4 4 0 0 1 4-4"></path><path d="M15 12h6M15 17h6M15 22h4"></path></svg>
+      </span>
+      <span>{texts.footerDocs}</span>
+    </a>
+    <a href="https://github.com/nexcraft-dev/r2d1" class="footer-icon-link" rel="noreferrer">
+      <span class="footer-icon" aria-hidden="true">
+        <svg viewBox="0 0 32 32" role="img"><path d="m7 24 6-6"></path><path d="m13 18 5 5"></path><path d="m18 23 7-7a3 3 0 0 0 0-4l-2-2a3 3 0 0 0-4 0l-7 7"></path><path d="m10 14-2-2a3 3 0 0 1 0-4l2-2a3 3 0 0 1 4 0l2 2"></path></svg>
+      </span>
+      <span>{texts.github}</span>
+    </a>
+  </nav>
+
+  <div class="footer-rule" aria-hidden="true"></div>
+  <div class="footer-meta">
+    <div>
+      <a href={localePath("/", locale)}>R2D1</a>
+      <span> · </span>
+      <a href={localePath("/docs/", locale)}>{texts.footerDocs}</a>
+      <span> · </span>
+      <a href="https://github.com/nexcraft-dev/r2d1/blob/main/LICENSE" rel="noreferrer">{texts.footerLicense}</a>
+    </div>
+    <div>
+      <a href="https://nexcraft.dev" rel="noreferrer">Nexcraft</a>
+      <span> · </span>
+      <span>{texts.footerTagline}</span>
+    </div>
+  </div>
+</footer>
