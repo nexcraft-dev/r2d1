@@ -1,0 +1,57 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import { localePath, type Locale } from "../i18n/config";
+
+interface Props {
+  locale: Locale;
+}
+
+const copy: Record<Locale, { title: string; description: string; home: string; docs: string }> = {
+  en: {
+    title: "This page is not in the index.",
+    description: "The URL may have changed, or the page may not have been published yet.",
+    home: "RETURN HOME",
+    docs: "OPEN DOCUMENTATION"
+  },
+  ko: {
+    title: "이 페이지는 문서 색인에 없습니다.",
+    description: "URL이 변경되었거나 아직 문서로 공개되지 않았을 수 있습니다.",
+    home: "홈으로 돌아가기",
+    docs: "문서 열기"
+  },
+  zh: {
+    title: "此页面不在文档索引中。",
+    description: "URL 可能已经改变，或者该页面尚未发布。",
+    home: "返回首页",
+    docs: "打开文档"
+  },
+  ja: {
+    title: "このページはインデックスにありません。",
+    description: "URL が変更されたか、まだ公開されていない可能性があります。",
+    home: "ホームへ戻る",
+    docs: "ドキュメントを開く"
+  }
+};
+
+const { locale } = Astro.props;
+const c = copy[locale];
+---
+
+<SiteLayout
+  title={`R2D1 | ${c.title}`}
+  description={c.description}
+  noindex
+  locale={locale}
+>
+  <section class="section" aria-labelledby="not-found-title">
+    <div class="section-eyebrow section-eyebrow-salmon">
+      <span>404 / NOT FOUND</span>
+      <h1 id="not-found-title">{c.title}</h1>
+    </div>
+    <p class="section-intro">{c.description}</p>
+    <div class="hero-actions">
+      <a class="button-primary" href={localePath("/", locale)}>{c.home}</a>
+      <a class="button-secondary" href={localePath("/docs/", locale)}>{c.docs}</a>
+    </div>
+  </section>
+</SiteLayout>

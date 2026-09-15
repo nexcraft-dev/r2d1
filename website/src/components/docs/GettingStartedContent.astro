@@ -1,0 +1,208 @@
+---
+import { localePath, type LocalizedLocale } from "../../i18n/config";
+
+interface Props {
+  locale: LocalizedLocale;
+}
+
+const coreDependency = `dependencies {
+    implementation("dev.nexcraft:r2d1:<version>")
+}`;
+
+const optionalDependencies = `dependencies {
+    implementation("dev.nexcraft:r2d1-filesystem:<version>")
+    implementation("dev.nexcraft:r2d1-jdbc:<version>")
+    implementation("dev.nexcraft:r2d1-micronaut:<version>")
+}`;
+
+const documentExample = `import dev.nexcraft.r2d1.annotation.Document;
+import dev.nexcraft.r2d1.annotation.Id;
+import dev.nexcraft.r2d1.annotation.Index;
+
+@Document("users")
+public record User(
+    @Id String id,
+    @Index String country,
+    @Index long score,
+    String name) {}`;
+
+const configurationExample = `import dev.nexcraft.r2d1.DocumentCodec;
+import dev.nexcraft.r2d1.PersistenceCollectionFactory;
+import dev.nexcraft.r2d1.R2D1;
+import dev.nexcraft.r2d1.R2D1Collection;
+import dev.nexcraft.r2d1.spi.DocumentStore;
+import dev.nexcraft.r2d1.spi.IndexStore;
+
+DocumentStore documentStore = applicationDocumentStore;
+IndexStore indexStore = applicationIndexStore;
+DocumentCodec documentCodec = applicationDocumentCodec;
+
+R2D1 database =
+    R2D1.builder()
+        .collectionFactory(
+            new PersistenceCollectionFactory(
+                documentStore, indexStore, documentCodec, indexStore::initialize))
+        .build();
+
+R2D1Collection<User> users = database.collection(User.class);`;
+
+const mutationExample = `User user = new User("user-123", "NZ", 42, "Ada");
+users.put(user);
+
+Optional<User> stored = users.get("user-123");
+
+users.delete("user-123");
+Optional<User> absent = users.get("user-123");`;
+
+const queryExample = `import dev.nexcraft.r2d1.Page;
+import dev.nexcraft.r2d1.SortDirection;
+
+Page<User> first =
+    users.query()
+        .where("country")
+        .eq("NZ")
+        .sortBy("score", SortDirection.DESC)
+        .limit(20)
+        .fetch();
+
+if (first.nextCursor() != null) {
+  Page<User> second =
+      users.query()
+          .where("country")
+          .eq("NZ")
+          .sortBy("score", SortDirection.DESC)
+          .limit(20)
+          .after(first.nextCursor())
+          .fetch();
+}`;
+
+const copy = {
+  ko: {
+    intro: "R2D1 설정은 두 backend 선택으로 시작하고 하나의 공통 API 경로로 이어집니다. 완전한 문서를 저장할 위치와 인덱스 필드를 저장할 위치를 선택한 뒤, 두 store로 collection facade를 구성하세요.",
+    step1: "1. 문서 저장소 선택",
+    step1Body: "DocumentStore는 완전한 직렬화 문서, 식별자 조회, 논리적 존재의 권위 있는 원본입니다. 하나를 선택하세요:",
+    documentLinks: ["R2 DocumentStore는 AWS SDK 비동기 클라이언트를 통해 Cloudflare R2에 문서를 저장합니다.", "Filesystem DocumentStore는 원자적 교체를 사용하는 canonical 로컬 문서를 저장합니다."],
+    step2: "2. 인덱스 저장소 선택",
+    step2Body: "IndexStore는 문서 식별자와 명시적으로 인덱싱한 필드의 재구축 가능한 projection입니다. 하나를 선택하세요:",
+    indexLinks: ["D1 IndexStore는 Java 비동기 HttpClient를 통해 Cloudflare D1 REST API를 사용합니다.", "JDBC IndexStore는 애플리케이션 소유 DataSource를 통해 H2, HSQLDB, 로컬 SQLite를 지원합니다."],
+    pairing: "이 선택으로 R2 + D1, R2 + JDBC, Filesystem + D1, Filesystem + JDBC 네 조합을 만들 수 있지만, 컬렉션 API가 네 개로 나뉘지는 않습니다.",
+    step3: "3. 필요한 모듈 추가",
+    step3Body: "core artifact는 공통 API와 Cloudflare R2/D1 adapter를 제공합니다:",
+    optionalBody: "애플리케이션에서 사용하는 통합 모듈만 추가하세요:",
+    jdbcNote: "JDBC driver는 애플리케이션이 제공하며 r2d1-jdbc에 포함되지 않습니다. 전체 모듈 표와 소유권 규칙은",
+    configurationLink: "Configuration",
+    step4: "4. 문서 정의",
+    step4Body: "식별자로 사용할 비어 있지 않은 String member 하나에 @Id를 붙이고, 인덱스에 저장할 필드에 @Index를 붙입니다. 필터와 정렬에는 인덱싱한 필드만 사용할 수 있습니다.",
+    codecNote: "R2D1은 JSON library를 선택하지 않습니다. domain object를 StoredDocument로 직렬화하고 collection이 결과를 hydrate할 때 다시 역직렬화하는 DocumentCodec을 제공하세요.",
+    step5: "5. 공통 collection API 구성",
+    step5Body: "아래 예제는 두 storage 역할이 보이도록 adapter 생성을 애플리케이션에 남겨둡니다. documentStore, indexStore, documentCodec은 애플리케이션 소유 값입니다.",
+    initializeNote: "collection을 열면 collection metadata를 초기화하거나 검증한 뒤 collection을 반환합니다. factory는 store, codec, caller-owned execution resource의 소유권을 가져가지 않습니다.",
+    step6: "6. put, get, delete",
+    mutationNote: "put은 @Id 값으로 문서를 생성하거나 교체합니다. get은 authoritative document storage를 읽고, 없는 식별자를 삭제해도 효과가 없습니다.",
+    step7: "7. 인덱스 쿼리 실행",
+    cursorNote: "cursor는 opaque 값입니다. 다음 페이지를 요청할 때 같은 filter와 sort를 유지하세요. 지원 연산자와 정렬 규칙은",
+    queryingLink: "Querying",
+    recoveryNote: "를, 두 store를 운영 환경에서 사용하기 전 복구 의미는",
+    consistencyLink: "Consistency and Recovery"
+  },
+  zh: {
+    intro: "R2D1 的设置从两个后端选择开始，之后进入一条通用 API 流程。选择完整文档的存储位置和索引字段的存储位置，然后用这两个 store 配置集合 facade。",
+    step1: "1. 选择文档存储",
+    step1Body: "DocumentStore 是完整序列化文档、按标识读取和逻辑存在性的权威来源。请选择一个：",
+    documentLinks: ["R2 DocumentStore 通过 AWS SDK 异步客户端将文档存储在 Cloudflare R2。", "Filesystem DocumentStore 使用原子替换保存规范的本地文档。"],
+    step2: "2. 选择索引存储",
+    step2Body: "IndexStore 是文档标识和显式索引字段的可重建投影。请选择一个：",
+    indexLinks: ["D1 IndexStore 通过 Java 异步 HttpClient 使用 Cloudflare D1 REST API。", "JDBC IndexStore 通过应用拥有的 DataSource 支持 H2、HSQLDB 和本地 SQLite。"],
+    pairing: "这些选择形成 R2 + D1、R2 + JDBC、Filesystem + D1 和 Filesystem + JDBC 四种组合，但不会产生四套不同的集合 API。",
+    step3: "3. 添加所需模块",
+    step3Body: "核心 artifact 提供通用 API 以及 Cloudflare R2/D1 适配器：",
+    optionalBody: "只添加应用实际使用的集成模块：",
+    jdbcNote: "JDBC 驱动由应用提供，r2d1-jdbc 不会将其打包。完整的模块表和所有权规则请参阅",
+    configurationLink: "Configuration",
+    step4: "4. 定义文档",
+    step4Body: "为一个非空 String 成员添加 @Id 作为标识，并为需要写入索引的字段添加 @Index。只有显式索引的字段才能参与过滤和排序。",
+    codecNote: "R2D1 不选择 JSON library。请提供 DocumentCodec，将 domain object 序列化为 StoredDocument，并在集合生成结果时再次反序列化。",
+    step5: "5. 配置通用集合 API",
+    step5Body: "下面的示例将适配器创建留给应用，以便清楚展示两个存储角色。documentStore、indexStore 和 documentCodec 都由应用拥有。",
+    initializeNote: "打开集合时，R2D1 会先初始化或验证集合 metadata，然后返回集合。factory 不会接管 store、codec 或调用方拥有的执行资源。",
+    step6: "6. put、get 和 delete",
+    mutationNote: "put 使用 @Id 值创建或替换文档。get 读取权威文档存储，删除不存在的标识不会产生效果。",
+    step7: "7. 运行索引查询",
+    cursorNote: "cursor 是不透明值。请求下一页时保持相同的 filter 和 sort。支持的比较运算符和排序规则请参阅",
+    queryingLink: "Querying",
+    recoveryNote: "；在生产环境使用两个 store 前，请阅读",
+    consistencyLink: "Consistency and Recovery"
+  },
+  ja: {
+    intro: "R2D1 の設定は2つのバックエンド選択から始まり、共通 API の流れへ続きます。完全なドキュメントの保存先とインデックスフィールドの保存先を選び、その2つの store でコレクション facade を設定します。",
+    step1: "1. ドキュメントストアを選ぶ",
+    step1Body: "DocumentStore は完全なシリアライズ済みドキュメント、IDによる読み取り、論理的な存在の権威ソースです。次から1つ選びます。",
+    documentLinks: ["R2 DocumentStore は AWS SDK の非同期クライアント経由で Cloudflare R2 にドキュメントを保存します。", "Filesystem DocumentStore はアトミックな置換を使って正規のローカルドキュメントを保存します。"],
+    step2: "2. インデックスストアを選ぶ",
+    step2Body: "IndexStore はドキュメント ID と明示的なインデックスフィールドからなる再構築可能な projection です。次から1つ選びます。",
+    indexLinks: ["D1 IndexStore は Java の非同期 HttpClient 経由で Cloudflare D1 REST API を使います。", "JDBC IndexStore はアプリケーション所有の DataSource 経由で H2、HSQLDB、ローカル SQLite をサポートします。"],
+    pairing: "この選択で R2 + D1、R2 + JDBC、Filesystem + D1、Filesystem + JDBC の4つを組み合わせられますが、コレクション API が4つに分かれるわけではありません。",
+    step3: "3. 必要なモジュールを追加する",
+    step3Body: "コア artifact は共通 API と Cloudflare R2/D1 アダプターを提供します。",
+    optionalBody: "アプリケーションで使う統合モジュールだけを追加します。",
+    jdbcNote: "JDBC ドライバーはアプリケーションが提供し、r2d1-jdbc には含まれません。モジュール一覧と所有権のルールは",
+    configurationLink: "Configuration",
+    step4: "4. ドキュメントを定義する",
+    step4Body: "空でない String member の1つに @Id を付けて ID とし、インデックスに保存するフィールドに @Index を付けます。フィルタとソートには明示的にインデックスされたフィールドだけを使えます。",
+    codecNote: "R2D1 は JSON library を選びません。domain object を StoredDocument にシリアライズし、コレクションが結果を hydrate するときに戻せる DocumentCodec を提供します。",
+    step5: "5. 共通コレクション API を設定する",
+    step5Body: "次の例では2つのストレージ役割が見えるよう、アダプターの生成をアプリケーションに任せています。documentStore、indexStore、documentCodec はアプリケーション所有の値です。",
+    initializeNote: "コレクションを開くと metadata を初期化または検証してからコレクションを返します。factory は store、codec、呼び出し側が所有する実行リソースを取得しません。",
+    step6: "6. put、get、delete",
+    mutationNote: "put は @Id の値でドキュメントを作成または置換します。get は権威ドキュメントストレージを読み、存在しない ID の削除は何もしません。",
+    step7: "7. インデックスクエリを実行する",
+    cursorNote: "cursor は opaque な値です。次のページを要求するときも同じ filter と sort を維持します。比較演算子と順序付けのルールは",
+    queryingLink: "Querying",
+    recoveryNote: "を、2つの store を本番で使う前の復旧の意味は",
+    consistencyLink: "Consistency and Recovery"
+  }
+};
+
+const { locale } = Astro.props;
+const c = copy[locale];
+---
+
+<p>{c.intro}</p>
+
+<h2>{c.step1}</h2>
+<p>{c.step1Body}</p>
+<ul>
+  {c.documentLinks.map((item) => <li>{item}</li>)}
+</ul>
+
+<h2>{c.step2}</h2>
+<p>{c.step2Body}</p>
+<ul>
+  {c.indexLinks.map((item) => <li>{item}</li>)}
+</ul>
+<p>{c.pairing}</p>
+
+<h2>{c.step3}</h2>
+<p>{c.step3Body}</p>
+<pre><code class="language-kotlin">{coreDependency}</code></pre>
+<p>{c.optionalBody}</p>
+<pre><code class="language-kotlin">{optionalDependencies}</code></pre>
+<p>{c.jdbcNote} <a href={localePath("/docs/configuration/", locale)}>{c.configurationLink}</a>.</p>
+
+<h2>{c.step4}</h2>
+<p>{c.step4Body}</p>
+<pre><code class="language-java">{documentExample}</code></pre>
+<p>{c.codecNote}</p>
+
+<h2>{c.step5}</h2>
+<p>{c.step5Body}</p>
+<pre><code class="language-java">{configurationExample}</code></pre>
+<p>{c.initializeNote}</p>
+
+<h2>{c.step6}</h2>
+<pre><code class="language-java">{mutationExample}</code></pre>
+<p>{c.mutationNote}</p>
+
+<h2>{c.step7}</h2>
+<pre><code class="language-java">{queryExample}</code></pre>
+<p>{c.cursorNote} <a href={localePath("/docs/querying/", locale)}>{c.queryingLink}</a>{c.recoveryNote} <a href={localePath("/docs/consistency/", locale)}>{c.consistencyLink}</a>.</p>

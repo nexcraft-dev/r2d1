@@ -1,0 +1,155 @@
+---
+import DocsLayout from "../layouts/DocsLayout.astro";
+import LocalizedDocContent from "./docs/LocalizedDocContent.astro";
+import GettingStartedContent from "./docs/GettingStartedContent.astro";
+import type { LocalizedLocale } from "../i18n/config";
+
+interface Props {
+  locale: LocalizedLocale;
+  slug: string;
+}
+
+const meta = {
+  ko: {
+    "getting-started": {
+      title: "시작하기",
+      description: "두 backend 역할을 설정하고 문서를 정의한 뒤 공통 API로 첫 인덱스 쿼리를 실행합니다."
+    },
+    concepts: {
+      title: "핵심 개념",
+      description: "R2D1의 문서, 컬렉션, 인덱스, 쿼리와 cursor 모델을 이해합니다."
+    },
+    configuration: {
+      title: "구성",
+      description: "공개 artifact, backend 조합, resource 소유권과 runtime 경계를 설정합니다."
+    },
+    "document-stores/r2": {
+      title: "R2 DocumentStore",
+      description: "비동기 AWS SDK client를 사용하는 Cloudflare R2 문서 저장소를 구성합니다."
+    },
+    "document-stores/filesystem": {
+      title: "Filesystem DocumentStore",
+      description: "원자적 canonical-file 교체를 사용하는 로컬 파일시스템 문서 저장소입니다."
+    },
+    "index-stores/d1": {
+      title: "D1 IndexStore",
+      description: "Java HttpClient 기반 Cloudflare D1 REST 인덱스 저장소와 schema 경계를 구성합니다."
+    },
+    "index-stores/jdbc": {
+      title: "JDBC IndexStore",
+      description: "H2, HSQLDB 또는 로컬 SQLite용 JDBC 인덱스 저장소를 구성합니다."
+    },
+    querying: {
+      title: "쿼리",
+      description: "명시적으로 인덱싱한 필드를 필터링하고 정렬하며 cursor 페이지를 이어갑니다."
+    },
+    consistency: {
+      title: "일관성과 복구",
+      description: "권위 있는 문서, 파생 인덱스, PartialFailure와 rebuildIndex()의 의미를 이해합니다."
+    },
+    micronaut: {
+      title: "Micronaut 5",
+      description: "선택적인 Micronaut 5 통합과 애플리케이션 소유 resource를 구성합니다."
+    }
+  },
+  zh: {
+    "getting-started": {
+      title: "开始使用",
+      description: "设置两个后端角色，定义文档，并使用通用 API 运行第一个索引查询。"
+    },
+    concepts: {
+      title: "核心概念",
+      description: "了解 R2D1 的文档、集合、索引、查询和游标模型。"
+    },
+    configuration: {
+      title: "配置",
+      description: "配置公开 artifact、后端组合、资源所有权和运行时边界。"
+    },
+    "document-stores/r2": {
+      title: "R2 DocumentStore",
+      description: "配置使用异步 AWS SDK 客户端的 Cloudflare R2 文档存储。"
+    },
+    "document-stores/filesystem": {
+      title: "Filesystem DocumentStore",
+      description: "使用原子规范文件替换将权威文档保存到本地文件系统。"
+    },
+    "index-stores/d1": {
+      title: "D1 IndexStore",
+      description: "配置基于 Java HttpClient 的 Cloudflare D1 REST 索引存储和 schema 边界。"
+    },
+    "index-stores/jdbc": {
+      title: "JDBC IndexStore",
+      description: "为 H2、HSQLDB 或本地 SQLite 配置 JDBC 索引存储。"
+    },
+    querying: {
+      title: "查询",
+      description: "过滤显式索引字段，应用排序，并使用游标继续分页。"
+    },
+    consistency: {
+      title: "一致性与恢复",
+      description: "理解权威文档、派生索引、PartialFailure 和 rebuildIndex() 的语义。"
+    },
+    micronaut: {
+      title: "Micronaut 5",
+      description: "配置可选的 Micronaut 5 集成以及由应用拥有的资源。"
+    }
+  },
+  ja: {
+    "getting-started": {
+      title: "はじめに",
+      description: "2つのバックエンド役割を設定し、ドキュメントを定義して共通 API で最初のインデックスクエリを実行します。"
+    },
+    concepts: {
+      title: "基本概念",
+      description: "R2D1 のドキュメント、コレクション、インデックス、クエリ、カーソルのモデルを理解します。"
+    },
+    configuration: {
+      title: "設定",
+      description: "公開 artifact、バックエンドの組み合わせ、リソース所有権、ランタイム境界を設定します。"
+    },
+    "document-stores/r2": {
+      title: "R2 DocumentStore",
+      description: "非同期 AWS SDK クライアントを使う Cloudflare R2 ドキュメントストアを設定します。"
+    },
+    "document-stores/filesystem": {
+      title: "Filesystem DocumentStore",
+      description: "アトミックな正規ファイル置換でローカルファイルシステムに文書を保存します。"
+    },
+    "index-stores/d1": {
+      title: "D1 IndexStore",
+      description: "Java HttpClient による Cloudflare D1 REST インデックスストアと schema 境界を設定します。"
+    },
+    "index-stores/jdbc": {
+      title: "JDBC IndexStore",
+      description: "H2、HSQLDB、またはローカル SQLite 用の JDBC インデックスストアを設定します。"
+    },
+    querying: {
+      title: "クエリ",
+      description: "明示的にインデックス化したフィールドをフィルタし、ソートしてカーソルページを続けます。"
+    },
+    consistency: {
+      title: "整合性と復旧",
+      description: "権威ドキュメント、派生インデックス、PartialFailure、rebuildIndex() の意味を理解します。"
+    },
+    micronaut: {
+      title: "Micronaut 5",
+      description: "オプションの Micronaut 5 統合とアプリケーション所有リソースを設定します。"
+    }
+  }
+} as const;
+
+const { locale, slug } = Astro.props;
+const page = meta[locale][slug as keyof (typeof meta)[typeof locale]];
+
+if (!page) {
+  throw new Error(`Unknown localized documentation slug: ${slug}`);
+}
+---
+
+<DocsLayout title={page.title} description={page.description} locale={locale}>
+  {slug === "getting-started" ? (
+    <GettingStartedContent locale={locale} />
+  ) : (
+    <LocalizedDocContent locale={locale} slug={slug} />
+  )}
+</DocsLayout>

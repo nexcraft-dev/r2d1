@@ -1,0 +1,389 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import { localePath, type Locale } from "../i18n/config";
+
+interface BackendOption {
+  name: string;
+  vendor: string;
+  description: string;
+  setup: string;
+  href: string;
+}
+
+interface ModuleCopy {
+  label: string;
+  name: string;
+  coordinate: string;
+  description: string;
+  setup: string;
+  href: string;
+}
+
+interface HomeCopy {
+  seoTitle: string;
+  seoDescription: string;
+  kicker: string;
+  title: string;
+  description: string;
+  primaryCta: string;
+  githubCta: string;
+  heroAria: string;
+  heroMark: string;
+  heroMarkSub: string;
+  backendsEyebrow: string;
+  backendsTitle: string;
+  backendsIntro: string;
+  documentLabel: string;
+  documentTitle: string;
+  documentDescription: string;
+  documentOptions: BackendOption[];
+  indexLabel: string;
+  indexTitle: string;
+  indexDescription: string;
+  indexOptions: BackendOption[];
+  pairingStrong: string;
+  pairingNote: string;
+  commonEyebrow: string;
+  commonTitle: string;
+  commonIntro: string;
+  commonLinkIntro: string;
+  commonLink: string;
+  modulesEyebrow: string;
+  modulesTitle: string;
+  modulesIntro: string;
+  modules: ModuleCopy[];
+  ctaTitle: string;
+  ctaDescription: string;
+  ctaLink: string;
+}
+
+const quickStart = String.raw`@Document("users")
+record User(@Id String id, @Index String country, @Index long score) {}
+
+R2D1 database = R2D1.builder()
+    .collectionFactory(new PersistenceCollectionFactory(
+        documentStore, indexStore, documentCodec, indexStore::initialize))
+    .build();
+
+R2D1Collection<User> users = database.collection(User.class);
+users.put(new User("user-123", "NZ", 42));
+
+Page<User> page = users.query()
+    .where("country").eq("NZ")
+    .sortBy("score", SortDirection.DESC)
+    .limit(20)
+    .fetch();`;
+
+const copy: Record<Locale, HomeCopy> = {
+  en: {
+    seoTitle: "R2D1 | Java document storage and indexed queries",
+    seoDescription: "R2D1 is a framework-independent Java library for authoritative document storage and indexed queries.",
+    kicker: "R2D1 / MODULAR JAVA PERSISTENCE",
+    title: "Document storage and indexed queries for Java.",
+    description: "Choose one DocumentStore for complete documents and one IndexStore for indexed lookup. R2D1 keeps the collection API the same across the supported backends and integrations.",
+    primaryCta: "GET STARTED",
+    githubCta: "VIEW ON GITHUB",
+    heroAria: "R2D1 module set",
+    heroMark: "R2D1",
+    heroMarkSub: "ONE COLLECTION API",
+    backendsEyebrow: "SUPPORTED BACKENDS",
+    backendsTitle: "Choose the two halves first.",
+    backendsIntro: "R2D1 combines one DocumentStore with one IndexStore. Select one backend from each column, follow its setup guide, and then use the shared collection API.",
+    documentLabel: "DOCUMENT STORE",
+    documentTitle: "Complete documents",
+    documentDescription: "Authoritative serialized content, reads by identifier, and the document list.",
+    documentOptions: [
+      { name: "R2", vendor: "CLOUDFLARE", description: "Cloudflare R2 through the asynchronous AWS SDK client.", setup: "R2 setup →", href: "/docs/document-stores/r2/" },
+      { name: "FILESYSTEM", vendor: "LOCAL", description: "Canonical local files with atomic replacement semantics.", setup: "Filesystem setup →", href: "/docs/document-stores/filesystem/" }
+    ],
+    indexLabel: "INDEX STORE",
+    indexTitle: "Indexed lookup",
+    indexDescription: "Document identifiers and explicitly indexed fields for filtering and sorting.",
+    indexOptions: [
+      { name: "D1", vendor: "CLOUDFLARE", description: "Cloudflare D1 through the Java asynchronous REST client.", setup: "D1 setup →", href: "/docs/index-stores/d1/" },
+      { name: "JDBC", vendor: "H2 / HSQLDB / SQLITE", description: "Application-owned DataSource and JDBC execution boundary.", setup: "JDBC setup →", href: "/docs/index-stores/jdbc/" }
+    ],
+    pairingStrong: "Four pairings, one API.",
+    pairingNote: "R2 + D1, R2 + JDBC, Filesystem + D1, and Filesystem + JDBC are combinations of these two backend roles—not separate collection APIs.",
+    commonEyebrow: "COMMON API",
+    commonTitle: "Configure once, use the same API.",
+    commonIntro: "Once the two backends are configured, every pairing uses the same annotations, collection lifecycle, mutation methods, and indexed query builder.",
+    commonLinkIntro: "The complete setup, adapter choices, and lifecycle rules are covered in",
+    commonLink: "Getting Started",
+    modulesEyebrow: "PUBLIC MODULES",
+    modulesTitle: "One set of modules. One collection API.",
+    modulesIntro: "The core artifact covers the common API and Cloudflare backends. Add the module that supplies local files, JDBC indexing, or Micronaut wiring.",
+    modules: [
+      { label: "CORE + CLOUDFLARE", name: "R2D1", coordinate: "dev.nexcraft:r2d1", description: "Common collection API plus the R2 DocumentStore and D1 IndexStore adapters.", setup: "Module setup →", href: "/docs/configuration/" },
+      { label: "INDEX STORE", name: "R2D1-JDBC", coordinate: "dev.nexcraft:r2d1-jdbc", description: "H2, HSQLDB, and local SQLite indexes behind an application-owned DataSource.", setup: "JDBC setup →", href: "/docs/index-stores/jdbc/" },
+      { label: "DOCUMENT STORE", name: "R2D1-FILESYSTEM", coordinate: "dev.nexcraft:r2d1-filesystem", description: "Canonical local document files with atomic replacement and explicit executor ownership.", setup: "Filesystem setup →", href: "/docs/document-stores/filesystem/" },
+      { label: "FRAMEWORK INTEGRATION", name: "R2D1-MICRONAUT", coordinate: "dev.nexcraft:r2d1-micronaut", description: "Micronaut 5 bean configuration around the same framework-neutral collection API.", setup: "Micronaut setup →", href: "/docs/micronaut/" }
+    ],
+    ctaTitle: "Choose backends, then use one API.",
+    ctaDescription: "Set up one document store, one index store, define the metadata, and open the collection.",
+    ctaLink: "READ GETTING STARTED"
+  },
+  ko: {
+    seoTitle: "R2D1 | Java 문서 저장과 인덱스 쿼리",
+    seoDescription: "R2D1은 권위 있는 문서 저장과 인덱스 쿼리를 제공하는 프레임워크 독립적인 Java 라이브러리입니다.",
+    kicker: "R2D1 / 모듈형 JAVA 영속성",
+    title: "Java를 위한 문서 저장과 인덱스 쿼리.",
+    description: "완전한 문서는 하나의 DocumentStore에, 인덱스 조회는 하나의 IndexStore에 맡기세요. R2D1은 지원되는 백엔드와 통합 방식에 관계없이 컬렉션 API를 동일하게 유지합니다.",
+    primaryCta: "시작하기",
+    githubCta: "GitHub에서 보기",
+    heroAria: "R2D1 모듈 구성",
+    heroMark: "R2D1",
+    heroMarkSub: "하나의 컬렉션 API",
+    backendsEyebrow: "지원 백엔드",
+    backendsTitle: "두 부분을 먼저 선택하세요.",
+    backendsIntro: "R2D1은 하나의 DocumentStore와 하나의 IndexStore를 조합합니다. 각 열에서 하나를 선택하고 설정 가이드를 따른 다음 공통 컬렉션 API를 사용하세요.",
+    documentLabel: "문서 저장소",
+    documentTitle: "완전한 문서",
+    documentDescription: "직렬화된 원본 콘텐츠, 식별자 조회, 문서 목록을 담당합니다.",
+    documentOptions: [
+      { name: "R2", vendor: "CLOUDFLARE", description: "비동기 AWS SDK 클라이언트를 통한 Cloudflare R2입니다.", setup: "R2 설정 →", href: "/docs/document-stores/r2/" },
+      { name: "FILESYSTEM", vendor: "LOCAL", description: "원자적 교체 의미를 제공하는 로컬 canonical 파일입니다.", setup: "Filesystem 설정 →", href: "/docs/document-stores/filesystem/" }
+    ],
+    indexLabel: "인덱스 저장소",
+    indexTitle: "인덱스 조회",
+    indexDescription: "필터와 정렬에 사용하는 문서 식별자 및 명시적으로 인덱싱한 필드를 담당합니다.",
+    indexOptions: [
+      { name: "D1", vendor: "CLOUDFLARE", description: "Java 비동기 REST 클라이언트를 통한 Cloudflare D1입니다.", setup: "D1 설정 →", href: "/docs/index-stores/d1/" },
+      { name: "JDBC", vendor: "H2 / HSQLDB / SQLITE", description: "애플리케이션이 소유하는 DataSource와 JDBC 실행 경계입니다.", setup: "JDBC 설정 →", href: "/docs/index-stores/jdbc/" }
+    ],
+    pairingStrong: "네 가지 조합, 하나의 API.",
+    pairingNote: "R2 + D1, R2 + JDBC, Filesystem + D1, Filesystem + JDBC는 두 backend 역할의 조합일 뿐, 별도의 컬렉션 API가 아닙니다.",
+    commonEyebrow: "공통 API",
+    commonTitle: "한 번 설정하고 같은 API를 사용하세요.",
+    commonIntro: "두 백엔드를 설정하면 어떤 조합에서도 같은 annotation, 컬렉션 생명주기, 변경 메서드, 인덱스 쿼리 빌더를 사용합니다.",
+    commonLinkIntro: "전체 설정, adapter 선택, 생명주기 규칙은",
+    commonLink: "시작하기 문서",
+    modulesEyebrow: "공개 모듈",
+    modulesTitle: "하나의 모듈 세트. 하나의 컬렉션 API.",
+    modulesIntro: "core artifact는 공통 API와 Cloudflare 백엔드를 제공합니다. 로컬 파일, JDBC 인덱스, Micronaut wiring이 필요할 때 해당 모듈만 추가하세요.",
+    modules: [
+      { label: "CORE + CLOUDFLARE", name: "R2D1", coordinate: "dev.nexcraft:r2d1", description: "공통 컬렉션 API와 R2 DocumentStore 및 D1 IndexStore adapter입니다.", setup: "모듈 설정 →", href: "/docs/configuration/" },
+      { label: "INDEX STORE", name: "R2D1-JDBC", coordinate: "dev.nexcraft:r2d1-jdbc", description: "애플리케이션 소유 DataSource를 통한 H2, HSQLDB, 로컬 SQLite 인덱스입니다.", setup: "JDBC 설정 →", href: "/docs/index-stores/jdbc/" },
+      { label: "DOCUMENT STORE", name: "R2D1-FILESYSTEM", coordinate: "dev.nexcraft:r2d1-filesystem", description: "원자적 교체와 명시적 executor 소유권을 사용하는 canonical 로컬 문서 파일입니다.", setup: "Filesystem 설정 →", href: "/docs/document-stores/filesystem/" },
+      { label: "FRAMEWORK INTEGRATION", name: "R2D1-MICRONAUT", coordinate: "dev.nexcraft:r2d1-micronaut", description: "동일한 프레임워크 독립 컬렉션 API를 Micronaut 5 bean 설정과 연결합니다.", setup: "Micronaut 설정 →", href: "/docs/micronaut/" }
+    ],
+    ctaTitle: "백엔드를 선택하고 하나의 API를 사용하세요.",
+    ctaDescription: "문서 저장소와 인덱스 저장소를 설정하고 metadata를 정의한 다음 컬렉션을 여세요.",
+    ctaLink: "시작하기 읽기"
+  },
+  zh: {
+    seoTitle: "R2D1 | Java 文档存储与索引查询",
+    seoDescription: "R2D1 是一个与框架无关的 Java 库，用于权威文档存储和索引查询。",
+    kicker: "R2D1 / 模块化 JAVA 持久化",
+    title: "面向 Java 的文档存储与索引查询。",
+    description: "选择一个 DocumentStore 保存完整文档，再选择一个 IndexStore 进行索引查找。无论使用哪种后端或集成方式，R2D1 都保持相同的集合 API。",
+    primaryCta: "开始使用",
+    githubCta: "在 GitHub 查看",
+    heroAria: "R2D1 模块集合",
+    heroMark: "R2D1",
+    heroMarkSub: "一个集合 API",
+    backendsEyebrow: "支持的后端",
+    backendsTitle: "先选择两个部分。",
+    backendsIntro: "R2D1 将一个 DocumentStore 与一个 IndexStore 组合起来。分别从两列选择后端，按照设置指南配置，然后使用共享的集合 API。",
+    documentLabel: "文档存储",
+    documentTitle: "完整文档",
+    documentDescription: "负责权威序列化内容、按标识读取以及文档列表。",
+    documentOptions: [
+      { name: "R2", vendor: "CLOUDFLARE", description: "通过异步 AWS SDK 客户端使用 Cloudflare R2。", setup: "R2 设置 →", href: "/docs/document-stores/r2/" },
+      { name: "FILESYSTEM", vendor: "LOCAL", description: "使用原子替换语义的本地规范文件。", setup: "Filesystem 设置 →", href: "/docs/document-stores/filesystem/" }
+    ],
+    indexLabel: "索引存储",
+    indexTitle: "索引查找",
+    indexDescription: "负责过滤和排序所需的文档标识与显式索引字段。",
+    indexOptions: [
+      { name: "D1", vendor: "CLOUDFLARE", description: "通过 Java 异步 REST 客户端使用 Cloudflare D1。", setup: "D1 设置 →", href: "/docs/index-stores/d1/" },
+      { name: "JDBC", vendor: "H2 / HSQLDB / SQLITE", description: "由应用拥有的 DataSource 和 JDBC 执行边界。", setup: "JDBC 设置 →", href: "/docs/index-stores/jdbc/" }
+    ],
+    pairingStrong: "四种组合，一个 API。",
+    pairingNote: "R2 + D1、R2 + JDBC、Filesystem + D1 和 Filesystem + JDBC 是两个后端角色的组合，并不是四套不同的集合 API。",
+    commonEyebrow: "通用 API",
+    commonTitle: "配置一次，使用相同的 API。",
+    commonIntro: "配置两个后端后，所有组合都使用相同的注解、集合生命周期、写入方法和索引查询构建器。",
+    commonLinkIntro: "完整的设置、适配器选择和生命周期规则请参阅",
+    commonLink: "开始使用",
+    modulesEyebrow: "公开模块",
+    modulesTitle: "一组模块，一个集合 API。",
+    modulesIntro: "核心 artifact 提供通用 API 和 Cloudflare 后端。需要本地文件、JDBC 索引或 Micronaut wiring 时，只添加对应模块。",
+    modules: [
+      { label: "CORE + CLOUDFLARE", name: "R2D1", coordinate: "dev.nexcraft:r2d1", description: "通用集合 API，以及 R2 DocumentStore 和 D1 IndexStore 适配器。", setup: "模块设置 →", href: "/docs/configuration/" },
+      { label: "INDEX STORE", name: "R2D1-JDBC", coordinate: "dev.nexcraft:r2d1-jdbc", description: "通过应用拥有的 DataSource 支持 H2、HSQLDB 和本地 SQLite 索引。", setup: "JDBC 设置 →", href: "/docs/index-stores/jdbc/" },
+      { label: "DOCUMENT STORE", name: "R2D1-FILESYSTEM", coordinate: "dev.nexcraft:r2d1-filesystem", description: "具有原子替换和显式 executor 所有权的规范本地文档文件。", setup: "Filesystem 设置 →", href: "/docs/document-stores/filesystem/" },
+      { label: "FRAMEWORK INTEGRATION", name: "R2D1-MICRONAUT", coordinate: "dev.nexcraft:r2d1-micronaut", description: "围绕相同框架无关集合 API 的 Micronaut 5 bean 配置。", setup: "Micronaut 设置 →", href: "/docs/micronaut/" }
+    ],
+    ctaTitle: "选择后端，然后使用一个 API。",
+    ctaDescription: "设置一个文档存储和一个索引存储，定义元数据，然后打开集合。",
+    ctaLink: "阅读开始使用"
+  },
+  ja: {
+    seoTitle: "R2D1 | Java ドキュメントストレージとインデックスクエリ",
+    seoDescription: "R2D1 は、権威ドキュメントの保存とインデックスクエリを提供するフレームワーク非依存の Java ライブラリです。",
+    kicker: "R2D1 / モジュール型 JAVA 永続化",
+    title: "Java のためのドキュメントストレージとインデックスクエリ。",
+    description: "完全なドキュメントには DocumentStore、インデックス検索には IndexStore を1つずつ選びます。R2D1 はバックエンドや統合方法に関係なく、同じコレクション API を保ちます。",
+    primaryCta: "はじめる",
+    githubCta: "GitHubで見る",
+    heroAria: "R2D1 モジュールセット",
+    heroMark: "R2D1",
+    heroMarkSub: "1つのコレクション API",
+    backendsEyebrow: "対応バックエンド",
+    backendsTitle: "まず2つの役割を選びます。",
+    backendsIntro: "R2D1 は1つの DocumentStore と1つの IndexStore を組み合わせます。それぞれの列からバックエンドを選び、設定ガイドに従ったあと、共通のコレクション API を使います。",
+    documentLabel: "ドキュメントストア",
+    documentTitle: "完全なドキュメント",
+    documentDescription: "シリアライズされた内容、IDによる読み取り、ドキュメント一覧を管理します。",
+    documentOptions: [
+      { name: "R2", vendor: "CLOUDFLARE", description: "非同期 AWS SDK クライアント経由の Cloudflare R2。", setup: "R2 の設定 →", href: "/docs/document-stores/r2/" },
+      { name: "FILESYSTEM", vendor: "LOCAL", description: "アトミックな置換を行うローカルの正規ファイル。", setup: "Filesystem の設定 →", href: "/docs/document-stores/filesystem/" }
+    ],
+    indexLabel: "インデックスストア",
+    indexTitle: "インデックス検索",
+    indexDescription: "フィルタとソートに使うドキュメント ID と明示的なインデックスフィールドを管理します。",
+    indexOptions: [
+      { name: "D1", vendor: "CLOUDFLARE", description: "Java の非同期 REST クライアント経由の Cloudflare D1。", setup: "D1 の設定 →", href: "/docs/index-stores/d1/" },
+      { name: "JDBC", vendor: "H2 / HSQLDB / SQLITE", description: "アプリケーションが所有する DataSource と JDBC 実行境界。", setup: "JDBC の設定 →", href: "/docs/index-stores/jdbc/" }
+    ],
+    pairingStrong: "4つの組み合わせ、1つの API。",
+    pairingNote: "R2 + D1、R2 + JDBC、Filesystem + D1、Filesystem + JDBC は2つのバックエンド役割の組み合わせであり、別々のコレクション API ではありません。",
+    commonEyebrow: "共通 API",
+    commonTitle: "一度設定すれば、同じ API を使えます。",
+    commonIntro: "2つのバックエンドを設定したあとは、どの組み合わせでも同じアノテーション、コレクションのライフサイクル、更新メソッド、インデックスクエリビルダーを使います。",
+    commonLinkIntro: "設定、アダプターの選択、ライフサイクルのルールは",
+    commonLink: "はじめに",
+    modulesEyebrow: "公開モジュール",
+    modulesTitle: "1つのモジュールセット、1つのコレクション API。",
+    modulesIntro: "コア artifact は共通 API と Cloudflare バックエンドを提供します。ローカルファイル、JDBC インデックス、Micronaut wiring が必要な場合だけ対応モジュールを追加します。",
+    modules: [
+      { label: "CORE + CLOUDFLARE", name: "R2D1", coordinate: "dev.nexcraft:r2d1", description: "共通コレクション API と R2 DocumentStore、D1 IndexStore アダプター。", setup: "モジュール設定 →", href: "/docs/configuration/" },
+      { label: "INDEX STORE", name: "R2D1-JDBC", coordinate: "dev.nexcraft:r2d1-jdbc", description: "アプリケーション所有の DataSource による H2、HSQLDB、ローカル SQLite インデックス。", setup: "JDBC の設定 →", href: "/docs/index-stores/jdbc/" },
+      { label: "DOCUMENT STORE", name: "R2D1-FILESYSTEM", coordinate: "dev.nexcraft:r2d1-filesystem", description: "アトミックな置換と明示的な executor 所有権を持つローカル文書ファイル。", setup: "Filesystem の設定 →", href: "/docs/document-stores/filesystem/" },
+      { label: "FRAMEWORK INTEGRATION", name: "R2D1-MICRONAUT", coordinate: "dev.nexcraft:r2d1-micronaut", description: "同じフレームワーク非依存コレクション API を Micronaut 5 の bean 設定と接続。", setup: "Micronaut の設定 →", href: "/docs/micronaut/" }
+    ],
+    ctaTitle: "バックエンドを選び、1つの API を使います。",
+    ctaDescription: "ドキュメントストアとインデックスストアを設定し、メタデータを定義してコレクションを開きます。",
+    ctaLink: "はじめに読む"
+  }
+};
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const c = copy[locale];
+---
+
+<SiteLayout title={c.seoTitle} description={c.seoDescription} locale={locale}>
+  <section class="hero" aria-labelledby="home-title">
+    <div class="hero-copy">
+      <p class="hero-kicker">{c.kicker}</p>
+      <h1 id="home-title">{c.title}</h1>
+      <p>{c.description}</p>
+      <div class="hero-actions">
+        <a class="button-primary" href={localePath("/docs/getting-started/", locale)}>{c.primaryCta}</a>
+        <a class="button-secondary" href="https://github.com/nexcraft-dev/r2d1" rel="noreferrer">{c.githubCta}</a>
+      </div>
+    </div>
+    <div class="hero-mark" aria-label={c.heroAria}>
+      <strong>{c.heroMark}</strong>
+      <span>{c.heroMarkSub}</span>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="backends-title">
+    <div class="section-eyebrow section-eyebrow-olive">
+      <span>{c.backendsEyebrow}</span>
+      <h2 id="backends-title">{c.backendsTitle}</h2>
+    </div>
+    <p class="section-intro">{c.backendsIntro}</p>
+    <div class="backend-grid">
+      <section class="backend-panel backend-document" aria-labelledby="document-backends-title">
+        <div class="backend-panel-heading">
+          <span>{c.documentLabel}</span>
+          <h3 id="document-backends-title">{c.documentTitle}</h3>
+        </div>
+        <p>{c.documentDescription}</p>
+        <div class="backend-options">
+          {c.documentOptions.map((option) => (
+            <article class="backend-option">
+              <div class="backend-option-heading">
+                <h4>{option.name}</h4>
+                <span>{option.vendor}</span>
+              </div>
+              <p>{option.description}</p>
+              <a href={localePath(option.href, locale)}>{option.setup}</a>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section class="backend-panel backend-index" aria-labelledby="index-backends-title">
+        <div class="backend-panel-heading">
+          <span>{c.indexLabel}</span>
+          <h3 id="index-backends-title">{c.indexTitle}</h3>
+        </div>
+        <p>{c.indexDescription}</p>
+        <div class="backend-options">
+          {c.indexOptions.map((option) => (
+            <article class="backend-option">
+              <div class="backend-option-heading">
+                <h4>{option.name}</h4>
+                <span>{option.vendor}</span>
+              </div>
+              <p>{option.description}</p>
+              <a href={localePath(option.href, locale)}>{option.setup}</a>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+    <aside class="backend-note">
+      <strong>{c.pairingStrong}</strong> {c.pairingNote}
+    </aside>
+  </section>
+
+  <section class="section" aria-labelledby="quick-start-title">
+    <div class="section-eyebrow section-eyebrow-sky">
+      <span>{c.commonEyebrow}</span>
+      <h2 id="quick-start-title">{c.commonTitle}</h2>
+    </div>
+    <p class="section-intro">{c.commonIntro}</p>
+    <pre class="code-block"><code class="language-java">{quickStart}</code></pre>
+    <p class="section-intro">
+      {c.commonLinkIntro} <a href={localePath("/docs/getting-started/", locale)}>{c.commonLink}</a>.
+    </p>
+  </section>
+
+  <section class="section" aria-labelledby="modules-title">
+    <div class="section-eyebrow section-eyebrow-olive">
+      <span>{c.modulesEyebrow}</span>
+      <h2 id="modules-title">{c.modulesTitle}</h2>
+    </div>
+    <p class="section-intro">{c.modulesIntro}</p>
+    <div class="module-grid">
+      {c.modules.map((module) => (
+        <article class:list={{ "module-card": true, [`module-card-${module.name.toLowerCase().replace("r2d1-", "")}`]: true }}>
+          <span class="module-label">{module.label}</span>
+          <h3>{module.name}</h3>
+          <code>{module.coordinate}</code>
+          <p>{module.description}</p>
+          <a href={localePath(module.href, locale)}>{module.setup}</a>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section" aria-label={c.ctaTitle}>
+    <div class="cta-block">
+      <div>
+        <h2>{c.ctaTitle}</h2>
+        <p>{c.ctaDescription}</p>
+      </div>
+      <a class="button-secondary" href={localePath("/docs/getting-started/", locale)}>{c.ctaLink}</a>
+    </div>
+  </section>
+</SiteLayout>

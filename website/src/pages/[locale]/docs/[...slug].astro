@@ -1,0 +1,28 @@
+---
+import LocalizedDocPage from "../../../components/LocalizedDocPage.astro";
+import { type LocalizedLocale } from "../../../i18n/config";
+
+export function getStaticPaths() {
+  const locales: LocalizedLocale[] = ["ko", "zh", "ja"];
+  const slugs = [
+    "getting-started",
+    "concepts",
+    "configuration",
+    "document-stores/r2",
+    "document-stores/filesystem",
+    "index-stores/d1",
+    "index-stores/jdbc",
+    "querying",
+    "consistency",
+    "micronaut"
+  ];
+
+  return locales.flatMap((locale) =>
+    slugs.map((slug) => ({ params: { locale, slug }, props: { locale, slug } }))
+  );
+}
+
+const { locale, slug } = Astro.props as { locale: LocalizedLocale; slug: string };
+---
+
+<LocalizedDocPage locale={locale} slug={slug} />

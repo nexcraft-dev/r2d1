@@ -1,0 +1,48 @@
+---
+import SiteLayout from "./SiteLayout.astro";
+import DocsNav from "../components/DocsNav.astro";
+import { type Locale } from "../i18n/config";
+import { ui } from "../i18n/ui";
+
+interface Props {
+  title?: string;
+  description?: string;
+  frontmatter?: {
+    title?: string;
+    description?: string;
+  };
+  locale?: Locale;
+}
+
+const title = Astro.props.title ?? Astro.props.frontmatter?.title ?? "Documentation";
+const description =
+  Astro.props.description ??
+  Astro.props.frontmatter?.description ??
+  "R2D1 documentation for document stores, index stores, querying, and consistency.";
+const locale = Astro.props.locale ?? "en";
+const texts = ui[locale];
+const currentPath = Astro.url.pathname;
+---
+
+<SiteLayout title={`R2D1 ${texts.docsTitle} | ${title}`} description={description} locale={locale}>
+  <div class="docs-mobile-nav">
+    <details>
+      <summary>{texts.docsMobileOpen}</summary>
+      <DocsNav currentPath={currentPath} locale={locale} />
+    </details>
+  </div>
+  <div class="docs-shell">
+    <aside class="docs-sidebar">
+      <DocsNav currentPath={currentPath} locale={locale} />
+    </aside>
+    <article class="doc-content">
+      <div class="section-eyebrow section-eyebrow-sky">
+        <span>{texts.docsEyebrow}</span>
+        <h1>{title}</h1>
+      </div>
+      <div class="doc-body">
+        <slot />
+      </div>
+    </article>
+  </div>
+</SiteLayout>
