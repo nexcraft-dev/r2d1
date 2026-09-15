@@ -16,6 +16,7 @@ rootProject.name = "r2d1"
 
 include(
     "r2d1",
+    "r2d1-filesystem",
     "r2d1-jdbc",
     "r2d1-micronaut",
     "r2d1-integration-tests",

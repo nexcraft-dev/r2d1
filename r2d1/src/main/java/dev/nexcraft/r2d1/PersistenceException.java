@@ -53,7 +53,12 @@ public class PersistenceException extends RuntimeException {
     }
   }
 
-  /** Failure caused by disagreement between a derived index and authoritative document storage. */
+  /**
+   * Failure caused by disagreement between a derived index and authoritative document storage.
+   *
+   * <p>Query hydration fails explicitly for a missing authoritative document; orchestration does
+   * not silently skip the row and thereby change page size or cursor semantics.
+   */
   public static final class InconsistentState extends PersistenceException {
 
     /** Inconsistent document identity. */

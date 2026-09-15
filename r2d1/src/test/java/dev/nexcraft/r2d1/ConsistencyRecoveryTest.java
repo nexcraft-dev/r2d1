@@ -78,6 +78,52 @@ class ConsistencyRecoveryTest {
   }
 
   @Test
+  void keepsAuthoritativeExistenceAfterPartialIndexDeleteAndRecoversWithoutResurrection() {
+    Fixture fixture = new Fixture();
+    fixture.store(new User("A", "NZ", 1L));
+    fixture.indexes.rows.put(key("A"), entry(new User("A", "NZ", 1L)));
+    StorageException failure = new StorageException.Unavailable("D1 unavailable");
+    fixture.indexes.deleteFailure = failure;
+    R2D1Collection<User> collection = fixture.collection();
+
+    assertThatThrownBy(() -> collection.delete("A"))
+        .isInstanceOfSatisfying(
+            PersistenceException.PartialFailure.class,
+            partial -> {
+              assertThat(partial.documentKey()).isEqualTo(key("A"));
+              assertThat(partial.getCause()).isSameAs(failure);
+            });
+
+    assertThat(collection.get("A")).isEmpty();
+    assertThatThrownBy(() -> collection.query().limit(20).fetch())
+        .isInstanceOfSatisfying(
+            PersistenceException.InconsistentState.class,
+            inconsistent -> assertThat(inconsistent.documentKey()).isEqualTo(key("A")));
+
+    collection.rebuildIndex();
+
+    assertThat(fixture.indexes.rows).isEmpty();
+    assertThat(collection.get("A")).isEmpty();
+  }
+
+  @Test
+  void doesNotSilentlySkipStaleRowsOrInventAShortPage() {
+    Fixture fixture = new Fixture();
+    for (int index = 0; index < 20; index++) {
+      User user = new User("user-" + index, "NZ", (long) index);
+      fixture.indexes.rows.put(key(user.id()), entry(user));
+      if (index != 7) {
+        fixture.store(user);
+      }
+    }
+
+    assertThatThrownBy(() -> fixture.collection().query().limit(20).fetch())
+        .isInstanceOf(PersistenceException.InconsistentState.class)
+        .extracting(Throwable::getCause)
+        .isInstanceOf(DocumentNotFoundException.class);
+  }
+
+  @Test
   void repeatedRebuildsProduceTheSameIndex() {
     Fixture fixture = new Fixture();
     fixture.store(new User("A", "NZ", 1L));
@@ -365,6 +411,7 @@ class ConsistencyRecoveryTest {
     private final Map<DocumentKey, IndexEntry> rows = new LinkedHashMap<>();
     private final Map<DocumentKey, RuntimeException> upsertFailures = new LinkedHashMap<>();
     private @Nullable RuntimeException clearFailure;
+    private @Nullable RuntimeException deleteFailure;
     private int clearCalls;
 
     private FakeIndexStore(List<String> events) {
@@ -395,11 +442,19 @@ class ConsistencyRecoveryTest {
 
     @Override
     public CompletionStage<IndexPage> query(IndexQuery query) {
-      return CompletableFuture.completedFuture(new IndexPage(List.of(), Optional.empty()));
+      List<DocumentKey> keys =
+          rows.keySet().stream()
+              .filter(key -> key.collection().equals(query.collection()))
+              .limit(query.limit())
+              .toList();
+      return CompletableFuture.completedFuture(new IndexPage(keys, Optional.empty()));
     }
 
     @Override
     public CompletionStage<@Nullable Void> delete(DocumentKey key) {
+      if (deleteFailure != null) {
+        return CompletableFuture.failedFuture(deleteFailure);
+      }
       rows.remove(key);
       return completedVoid();
     }

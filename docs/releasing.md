@@ -1,9 +1,10 @@
 # R2D1 Release
 
 R2D1 publishes its reusable Java libraries to Maven Central through the Sonatype Central Portal.
-The release workflow publishes these three artifacts with the same version:
+The release workflow publishes these four artifacts with the same version:
 
 - `dev.nexcraft:r2d1`
+- `dev.nexcraft:r2d1-filesystem`
 - `dev.nexcraft:r2d1-jdbc`
 - `dev.nexcraft:r2d1-micronaut`
 
@@ -69,7 +70,7 @@ Before the first release, review the generated POMs and artifacts locally:
 ./gradlew -Pr2d1.version=1.0.0 publishToMavenLocal
 ```
 
-Inspect the three Maven Local directories under `~/.m2/repository/dev/nexcraft/` and confirm each
+Inspect the four Maven Local directories under `~/.m2/repository/dev/nexcraft/` and confirm each
 contains the main JAR, sources JAR, javadoc JAR, POM, and expected module dependencies.
 The release workflow additionally requires detached ASCII-armored signatures for all four files
 before it starts the Maven Central upload.

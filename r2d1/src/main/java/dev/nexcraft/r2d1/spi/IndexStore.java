@@ -7,8 +7,9 @@ import org.jspecify.annotations.Nullable;
  * Asynchronous, derived, rebuildable storage for indexed fields and document discovery.
  *
  * <p>Query results contain only authoritative document identities for later resolution through
- * {@link DocumentStore}. Operations on this store and the document store are not one atomic
- * transaction, so callers must tolerate temporary cross-store inconsistency.
+ * {@link DocumentStore}. This store is a derived membership and field projection; it does not
+ * establish logical document existence. Operations on this store and the document store are not one
+ * atomic transaction, so callers must tolerate temporary cross-store inconsistency.
  *
  * <p>Every operation returns a non-null {@link CompletionStage}. Storage failures are reported by
  * exceptional completion with {@link StorageException}. Adapters may use {@code CompletableFuture}
