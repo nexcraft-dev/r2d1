@@ -323,6 +323,15 @@ main {
   font-size: 18px;
 }
 
+.hero-copy .hero-version {
+  margin-top: 8px;
+  font-family: var(--ui);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .hero-kicker {
   display: inline-block;
   margin: 0 0 12px;
@@ -651,6 +660,7 @@ main {
 .module-card-jdbc { background: var(--steel); }
 .module-card-filesystem { background: var(--sage); }
 .module-card-micronaut { background: var(--salmon); }
+.module-card-spring { background: var(--yellow-sticker); }
 
 .module-card h3 {
   margin: 0;
