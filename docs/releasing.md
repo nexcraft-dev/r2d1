@@ -1,100 +1,91 @@
-# R2D1 Release
+# R2D1 release guide
 
 R2D1 publishes its reusable Java libraries to Maven Central through the Sonatype Central Portal.
-The release workflow publishes these four artifacts with the same version:
+The release process is assembled on a versioned release branch. Merging its pull request into
+`main` starts the automated verification, tagging, and publication workflow.
 
-- `dev.nexcraft:r2d1`
-- `dev.nexcraft:r2d1-filesystem`
-- `dev.nexcraft:r2d1-jdbc`
-- `dev.nexcraft:r2d1-micronaut`
+## Published artifacts
 
-The repository root and `r2d1-integration-tests` are not published artifacts.
-The legacy `r2d1-core`, `r2d1-d1`, and `r2d1-r2` coordinates from earlier releases remain
-untouched; new releases do not delete or overwrite them.
+The workflow publishes these six artifacts with the same version:
 
-## Required GitHub Secrets
+- `dev.nexcraft:r2d1` — core API with the Cloudflare R2 and D1 adapters
+- `dev.nexcraft:r2d1-filesystem` — filesystem `DocumentStore` adapter
+- `dev.nexcraft:r2d1-jdbc` — H2, HSQLDB, and SQLite `IndexStore` adapter
+- `dev.nexcraft:r2d1-micronaut` — Micronaut 5 integration
+- `dev.nexcraft:r2d1-spring-boot-autoconfigure` — Spring Boot 4 auto-configuration
+- `dev.nexcraft:r2d1-spring-boot-starter` — Spring Boot 4 convenience starter depending on the auto-configuration
 
-Configure these repository secrets before the first release:
+The repository root and `r2d1-integration-tests` are not published artifacts. The legacy
+`r2d1-core`, `r2d1-d1`, and `r2d1-r2` coordinates remain untouched; new releases do not delete or
+overwrite them.
+
+## Branch and tag lifecycle
+
+For the `1.7.0` release, use this lifecycle:
+
+1. Create `release/1.7.0` from the current `main` commit.
+2. Create feature branches, such as `feature/spring-integration`, from `release/1.7.0`.
+3. Merge completed feature branches into `release/1.7.0`. Use that branch as the integration and
+   stabilization branch for the release.
+4. Open a pull request from `release/1.7.0` into `main` and merge it after the release checks pass.
+5. The `maven-central-release.yml` workflow runs for a merged `release/<major>.<minor>.<patch>` PR
+   into `main`. It derives the version from the release branch name, verifies the merge commit is
+   reachable from `main`, runs the verification and local publication checks, and creates the
+   matching annotated tag (for example, `v1.7.0`).
+6. After creating the tag, the same workflow publishes all six artifacts to Maven Central. A separate
+   dependent job creates the GitHub Release only after Central publication succeeds.
+
+Feature PRs into a release branch, unmerged/closed PRs, and PRs from non-release branches do not
+publish. A push to `main` outside a merged `release/<version>` PR does not publish. The workflow
+does not auto-increment versions: the release branch name is the version source, so the next cycle
+uses a new branch such as `release/1.8.0`.
+
+The release tag is pushed by the workflow with `GITHUB_TOKEN`; tag creation and publication happen
+in the same run. This avoids relying on a second workflow run from the tag push.
+
+## Required secrets
+
+Configure these repository secrets before the first production release:
 
 - `MAVEN_CENTRAL_USERNAME`
 - `MAVEN_CENTRAL_PASSWORD`
 - `GPG_PRIVATE_KEY`
 - `GPG_PASSPHRASE`
 
-The expected public signing key ID is `3D84F8C994DA0DBB`. Gradle derives the signing key ID from the
-private key; the workflow does not pass `signingInMemoryKeyId` because that property accepts only an
-eight-character short key ID.
+The expected public signing key ID is `3D84F8C994DA0DBB`. Gradle derives the signing key ID from
+the in-memory key and signs every published artifact file.
 
-The workflow passes the values to Gradle as in-memory project properties. Secret values must never
-be committed, copied into `gradle.properties`, or printed in workflow logs.
+## Local preflight
 
-## Version and tag policy
+Use the release version explicitly when checking the publication surface locally:
 
-Development builds use the default `0.1.0-SNAPSHOT` version. A release supplies the version through
-the `r2d1.version` Gradle property.
-
-A push to `main` creates and publishes the next release automatically. If no release tag exists, the
-workflow starts at `v1.0.0`. Later `main` changes increment the minor version and reset the patch
-version:
-
-```text
-no release tag -> v1.0.0
-v1.0.0 -> v1.1.0
-v1.1.0 -> v1.2.0
+```bash
+./gradlew -Pr2d1.version=1.7.0 clean check build javadoc
+./gradlew -Pr2d1.version=1.7.0 publishToMavenLocal
 ```
 
-Major versions are selected manually. Push the chosen major tag, such as `v2.0.0`, on the intended
-`main` commit. The tag-triggered workflow publishes that exact version, and later `main` changes
-continue with `v2.1.0`, `v2.2.0`, and so on.
+Inspect the six Maven Local directories under `~/.m2/repository/dev/nexcraft/`. Each release
+directory must contain the main JAR, Gradle module metadata, sources JAR, Javadoc JAR, POM, and
+detached ASCII-armored signatures. Review the generated POMs and Gradle metadata for optional
+adapter leakage before merging the release pull request into `main`.
 
-On a retried run, the workflow reuses a valid release tag that already points at the same commit
-instead of incrementing the version again. Snapshot versions and malformed manual tags are rejected
-before publication.
+The default development version is `1.7.0-SNAPSHOT` in `gradle.properties`. The workflow derives
+the production version from the merged release branch name and passes that exact non-SNAPSHOT
+version with `-Pr2d1.version`, so the tag and published coordinates cannot silently diverge.
 
-## Release flow
+## Production workflow boundary
 
-The `maven-central-release.yml` workflow runs for pushes to `main` and manually pushed semantic-version
-tags. It resolves the release version, runs the complete verification build, validates the release
-properties, and publishes to Maven Local to verify the generated artifacts and signatures. For an
-automatic minor release, it then creates the resolved tag on the verified commit. Finally, it invokes
-`publishToMavenCentral`; the Vanniktech publisher waits for Central validation and automatically
-releases a validated deployment.
+The publish job runs the complete verification build, validates Central credentials, publishes all
+six artifacts to Maven Local, checks their metadata and signatures, and then creates the release tag
+and submits the complete batch to Maven Central. The GitHub Release job depends on that publish job
+and creates the release only after Central publication succeeds.
 
-The workflow does not run for feature branch pushes or pull requests. Release runs are serialized so
-concurrent `main` changes cannot claim the same version.
+If verification or local artifact validation fails, no tag is created; fix the release branch and
+merge an updated release PR. If Maven Central publication fails after tagging, keep the tag
+unchanged and confirm Central did not accept the version before retrying. If code changes are needed
+after tagging, use a new version. Maven Central releases are immutable: do not upload a second
+deployment for coordinates that Central has already accepted.
 
-Before the first release, review the generated POMs and artifacts locally:
-
-```shell
-./gradlew clean build
-./gradlew -Pr2d1.version=1.0.0 publishToMavenLocal
-```
-
-Inspect the four Maven Local directories under `~/.m2/repository/dev/nexcraft/` and confirm each
-contains the main JAR, sources JAR, javadoc JAR, POM, and expected module dependencies.
-The release workflow additionally requires detached ASCII-armored signatures for all four files
-before it starts the Maven Central upload.
-
-## Starting v1.0.0
-
-After confirming all required secrets, merge the release configuration into `main`. That `main` push
-creates `v1.0.0` and starts the production publication automatically. No manual tag command is needed
-for the initial release or later minor releases.
-
-For a future major release, tag the selected `main` commit explicitly:
-
-```shell
-git tag -a v2.0.0 -m "Release v2.0.0"
-git push origin v2.0.0
-```
-
-The tag push starts the same production workflow for the explicit major version. Do not repeat a tag
-or upload a second deployment for coordinates that Maven Central has already published; published
-releases are immutable.
-
-## Failed releases
-
-If a run fails, first check whether Central published any coordinates. A rerun for the same commit
-reuses its existing tag. If Central already published the version, do not retry or overwrite it;
-published releases are immutable. Otherwise, inspect the deployment validation details in the Central
-Portal and rerun only after correcting the failure.
+The website keeps `1.6.0` as its stable version until the `1.7.0` publication is independently
+confirmed. After that confirmation, update `website/src/data/release.json` in the website change;
+the Spring page is labeled as upcoming until then.

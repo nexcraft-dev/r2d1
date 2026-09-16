@@ -3,6 +3,9 @@ import { join } from "node:path";
 
 const root = new URL("../dist/", import.meta.url);
 const rootPath = root.pathname;
+const release = JSON.parse(
+  readFileSync(new URL("../src/data/release.json", import.meta.url), "utf8")
+);
 
 const requiredFiles = [
   "index.html",
@@ -17,6 +20,7 @@ const requiredFiles = [
   "docs/querying/index.html",
   "docs/consistency/index.html",
   "docs/micronaut/index.html",
+  "docs/spring/index.html",
   "404.html",
   "robots.txt"
 ];
@@ -32,7 +36,8 @@ const localizedSlugs = [
   "index-stores/jdbc",
   "querying",
   "consistency",
-  "micronaut"
+  "micronaut",
+  "spring"
 ];
 
 for (const locale of localizedLocales) {
@@ -55,6 +60,7 @@ const gettingStarted = readFileSync(
   "utf8"
 );
 const micronaut = readFileSync(join(rootPath, "docs/micronaut/index.html"), "utf8");
+const spring = readFileSync(join(rootPath, "docs/spring/index.html"), "utf8");
 const robots = readFileSync(join(rootPath, "robots.txt"), "utf8");
 
 for (const [locale, htmlLang] of [["ko", "ko"], ["zh", "zh-CN"], ["ja", "ja"]]) {
@@ -95,6 +101,29 @@ if (!micronaut.includes('data-language="yaml"')) {
 
 if (!home.includes('href="/docs/getting-started/"') || !home.includes('href="/docs/"')) {
   throw new Error("Home page is missing required internal documentation links");
+}
+
+if (!home.includes(`Latest stable: ${release.latestStableVersion}`)) {
+  throw new Error("Home page is missing the current stable release marker");
+}
+
+if (!home.includes("R2D1-SPRING-BOOT-STARTER") || !home.includes("dev.nexcraft:r2d1-spring-boot-starter")) {
+  throw new Error("Home page is missing the upcoming Spring integration");
+}
+
+if (!docsOverview.includes("R2D1-SPRING-BOOT-STARTER") || !docsOverview.includes("upcoming")) {
+  throw new Error("Documentation overview is missing the upcoming Spring integration");
+}
+
+if (!gettingStarted.includes(`dev.nexcraft:r2d1:${release.latestStableVersion}`)) {
+  throw new Error("Getting Started does not use the current stable release token");
+}
+
+if (
+  !spring.includes(`Upcoming in ${release.nextReleaseVersion}`) ||
+  !spring.includes("not yet available from Maven Central")
+) {
+  throw new Error("Spring documentation is missing its upcoming-release boundary");
 }
 
 for (const requiredLabel of [
@@ -138,6 +167,10 @@ for (const relativePath of generatedHtmlFiles) {
 
   if (!html.includes('rel="canonical"') || html.includes("undefined")) {
     throw new Error(`Invalid canonical metadata or title in generated file: ${relativePath}`);
+  }
+
+  if (html.includes("{{latestStableVersion}}") || html.includes("&lt;version&gt;")) {
+    throw new Error(`Unresolved website dependency version token: ${relativePath}`);
   }
 
   for (const [, href] of html.matchAll(/<a\b[^>]*\bhref="(\/[^"#?]*)"/g)) {
