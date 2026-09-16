@@ -1,0 +1,247 @@
+{
+  "schema_version": 5,
+  "slug": "backpressure-admission-control",
+  "phase": "DONE",
+  "git": {
+    "base_branch": "release/1.7.0",
+    "integration_branch": "feat/backpressure-admission-control"
+  },
+  "approvals": {
+    "plan": true,
+    "walkthrough": true
+  },
+  "execution": {
+    "tasks": [
+      {
+        "task_id": "T01",
+        "status": "DONE",
+        "planned_executor": "CLI_WORKER",
+        "actual_executor": "MAIN",
+        "worker_request_id": "bpa-implement-t01-core",
+        "fallback_reason": "CLI Worker provider initialization failed with Operation not permitted; Main fallback.",
+        "result_notes": "Core admission API and lifecycle tests implemented; GRADLE_USER_HOME=/tmp/r2d1-gradle-home ./gradlew --no-daemon :r2d1:test passed."
+      },
+      {
+        "task_id": "T02",
+        "status": "DONE",
+        "planned_executor": "CLI_WORKER",
+        "actual_executor": "MAIN",
+        "worker_request_id": null,
+        "fallback_reason": "CLI Worker provider initialization failed during T01 with Operation not permitted; Worker execution is unavailable in this environment.",
+        "result_notes": "R2 put/get/delete/list admission and owned Netty maxConcurrency derivation/override warning implemented; GRADLE_USER_HOME=/tmp/r2d1-gradle-home ./gradlew --no-daemon :r2d1:test passed."
+      },
+      {
+        "task_id": "T03",
+        "status": "DONE",
+        "planned_executor": "CLI_WORKER",
+        "actual_executor": "MAIN",
+        "worker_request_id": null,
+        "fallback_reason": "CLI Worker provider initialization failed during T01 with Operation not permitted; Worker execution is unavailable in this environment.",
+        "result_notes": "D1 transport admission covers schema and CRUD/query execution; rejection preservation and release tests pass with ./gradlew --no-daemon :r2d1:test."
+      },
+      {
+        "task_id": "T04",
+        "status": "DONE",
+        "planned_executor": "CLI_WORKER",
+        "actual_executor": "MAIN",
+        "worker_request_id": null,
+        "fallback_reason": "CLI Worker provider initialization failed during T01 with Operation not permitted; Worker execution is unavailable in this environment.",
+        "result_notes": "Added deterministic query fan-out and 100-key rebuild admission regressions; GRADLE_USER_HOME=/tmp/r2d1-gradle-home ./gradlew --no-daemon :r2d1:test passed."
+      },
+      {
+        "task_id": "T05",
+        "status": "DONE",
+        "planned_executor": "CLI_WORKER",
+        "actual_executor": "MAIN",
+        "worker_request_id": null,
+        "fallback_reason": "CLI Worker provider initialization failed during T01 with Operation not permitted; Worker execution is unavailable in this environment.",
+        "result_notes": "JdbcExecution now delegates bounded admission to Core while preserving executor/mode ownership and error mapping; GRADLE_USER_HOME=/tmp/r2d1-gradle-home ./gradlew --no-daemon :r2d1-jdbc:test passed."
+      },
+      {
+        "task_id": "T06",
+        "status": "DONE",
+        "planned_executor": "CLI_WORKER",
+        "actual_executor": "MAIN",
+        "worker_request_id": null,
+        "fallback_reason": "CLI Worker provider initialization failed during T01 with Operation not permitted; Worker execution is unavailable in this environment.",
+        "result_notes": "FileSystemDocumentStore now applies BackpressureConfig before caller-executor dispatch; controlled tests cover active/pending bounds, cancellation lifecycle, executor rejection mapping, and borrowed-executor ownership. GRADLE_USER_HOME=/tmp/r2d1-gradle-home ./gradlew --no-daemon :r2d1-filesystem:spotlessApply :r2d1-filesystem:test passed."
+      },
+      {
+        "task_id": "T07",
+        "status": "DONE",
+        "planned_executor": "CLI_WORKER",
+        "actual_executor": "MAIN",
+        "worker_request_id": "bpa-implement-t07-spring-properties-06",
+        "fallback_reason": "failed to initialize in-process app-server client: Operation not permitted (os error 1)",
+        "result_notes": "Added nullable Spring global and adapter backpressure properties, R2 client capacity, and nullable legacy JDBC values while retaining legacy int accessors and constructors. Binding/absence and compatibility tests pass: GRADLE_USER_HOME=/tmp/r2d1-gradle-home ./gradlew --no-daemon :r2d1-spring-boot-autoconfigure:spotlessApply :r2d1-spring-boot-autoconfigure:test."
+      },
+      {
+        "task_id": "T08",
+        "status": "DONE",
+        "planned_executor": "CLI_WORKER",
+        "actual_executor": "MAIN",
+        "worker_request_id": null,
+        "fallback_reason": "CLI Worker provider initialization failed in T01 and again for T07; Main fallback.",
+        "result_notes": "Added per-field inheritance resolver and wired R2/D1/JDBC/Filesystem factories with independent budgets, caller-owned client/executor handling, and R2 client override warning behavior. ApplicationContext tests cover inheritance, JDBC nested/legacy precedence, zero-config defaults, and low R2 capacity warning. :r2d1-spring-boot-autoconfigure:spotlessApply :r2d1-spring-boot-autoconfigure:test passed."
+      },
+      {
+        "task_id": "T09",
+        "status": "DONE",
+        "planned_executor": "CLI_WORKER",
+        "actual_executor": "MAIN",
+        "worker_request_id": null,
+        "fallback_reason": "CLI Worker provider initialization failed in T01 and T07; Main fallback.",
+        "result_notes": "Added Micronaut global/R2/D1/JDBC nested backpressure models and R2 client settings with nullable sub-values, retained JDBC flat metadata/accessor defaults, and retained prior constructors. Java 25 clean property binding/absence/compatibility and metadata tests pass."
+      },
+      {
+        "task_id": "T10",
+        "status": "DONE",
+        "planned_executor": "CLI_WORKER",
+        "actual_executor": "MAIN",
+        "worker_request_id": null,
+        "fallback_reason": "CLI Worker provider initialization failed in T01 and T07; Main fallback.",
+        "result_notes": "Added Micronaut inheritance resolver and passed separate effective limits to R2/D1/JDBC factories without mutating borrowed resources or changing execution-mode selection. Context tests verify flat legacy/global and nested/legacy/global admission precedence, pending-field inheritance, and the owned R2 low-capacity warning. Java 25 Micronaut tests pass."
+      },
+      {
+        "task_id": "T11",
+        "status": "DONE",
+        "planned_executor": "CLI_WORKER",
+        "actual_executor": "MAIN",
+        "worker_request_id": null,
+        "fallback_reason": "CLI Worker unavailable after provider initialization failed for T01 and T07; Main fallback.",
+        "result_notes": "Updated the six website configuration and adapter pages; npm run check passed in website (25 files, 0 errors, warnings, or hints)."
+      },
+      {
+        "task_id": "T12",
+        "status": "DONE",
+        "planned_executor": "CLI_WORKER",
+        "actual_executor": "MAIN",
+        "worker_request_id": null,
+        "fallback_reason": "CLI Worker unavailable after provider initialization failed for T01 and T07; Main fallback.",
+        "result_notes": "Updated root, Micronaut, Spring auto-configuration, and starter READMEs with defaults, precedence, R2 client behavior, and canonical documentation links."
+      },
+      {
+        "task_id": "T13",
+        "status": "DONE",
+        "planned_executor": "CLI_WORKER",
+        "actual_executor": "MAIN",
+        "worker_request_id": null,
+        "fallback_reason": "CLI Worker unavailable after provider initialization failed for T01 and T07; Main fallback.",
+        "result_notes": "Updated JDBC and Filesystem READMEs with admission limits, overload rejection, cancellation lifecycle, framework inheritance, and resource ownership."
+      }
+    ],
+    "phase_executors": {
+      "research": "MAIN",
+      "planning": "MAIN",
+      "implementation": "WORKER_FIRST",
+      "testing": "MAIN",
+      "review": "MAIN",
+      "walkthrough": "CLI_WORKER",
+      "commit": "MAIN"
+    },
+    "worker_runs": [
+      {
+        "request_id": "bpa-research-core-01",
+        "task_id": null,
+        "gate": "RESEARCH",
+        "operation": "bulk_read",
+        "status": "provider_error",
+        "started_at": "2026-09-16T10:08:04Z",
+        "completed_at": "2026-09-16T10:08:04Z",
+        "outputs": []
+      },
+      {
+        "request_id": "bpa-implement-t01-core",
+        "task_id": "T01",
+        "gate": "IMPLEMENTATION",
+        "operation": "code_write",
+        "status": "provider_error",
+        "started_at": "2026-09-16 11:04:23 UTC",
+        "completed_at": "2026-09-16 11:04:23 UTC",
+        "outputs": [
+          "r2d1/build.gradle.kts",
+          "r2d1/src/main/java/dev/nexcraft/r2d1/BackpressureConfig.java",
+          "r2d1/src/main/java/dev/nexcraft/r2d1/AdmissionController.java",
+          "r2d1/src/main/java/dev/nexcraft/r2d1/spi/AdmissionProvider.java",
+          "r2d1/src/main/java/dev/nexcraft/r2d1/spi/AdmissionRejectedException.java",
+          "r2d1/src/main/java/dev/nexcraft/r2d1/internal/backpressure/AdmissionControllerCore.java",
+          "r2d1/src/main/java/dev/nexcraft/r2d1/internal/backpressure/failsafe/FailsafeAdmissionProvider.java",
+          "r2d1/src/main/resources/META-INF/services/dev.nexcraft.r2d1.spi.AdmissionProvider",
+          "r2d1/src/test/java/dev/nexcraft/r2d1/BackpressureConfigTest.java",
+          "r2d1/src/test/java/dev/nexcraft/r2d1/AdmissionControllerTest.java",
+          "r2d1/src/test/java/dev/nexcraft/r2d1/OptionalFailsafeClassLoadingTest.java"
+        ],
+        "artifact": null,
+        "error": "failed to initialize in-process app-server client: Operation not permitted (os error 1)"
+      },
+      {
+        "request_id": "bpa-implement-t07-spring-properties-06",
+        "task_id": "T07",
+        "gate": "IMPLEMENTATION",
+        "operation": "code_write",
+        "status": "provider_error",
+        "started_at": "2026-09-16T11:52:16+00:00",
+        "completed_at": "2026-09-16T11:52:16+00:00",
+        "outputs": [
+          "r2d1-spring-boot-autoconfigure/src/main/java/dev/nexcraft/r2d1/spring/R2D1Properties.java",
+          "R2D1R2Properties.java",
+          "R2D1D1Properties.java",
+          "R2D1JdbcProperties.java",
+          "R2D1FilesystemProperties.java",
+          "R2D1R2ClientProperties.java",
+          "r2d1-spring-boot-autoconfigure/src/test/java/dev/nexcraft/r2d1/spring/SpringAutoConfigurationTest.java"
+        ],
+        "artifact": null,
+        "error": "failed to initialize in-process app-server client: Operation not permitted (os error 1)"
+      },
+      {
+        "request_id": "bpa-walkthrough-20260917-01",
+        "task_id": null,
+        "gate": "WALKTHROUGH",
+        "operation": "walkthrough",
+        "status": "approval_rejected_before_start",
+        "started_at": "2026-09-16T13:11:27Z",
+        "completed_at": "2026-09-16T13:13:24Z",
+        "outputs": [
+          {
+            "path": "docs/walkthrough/backpressure-admission-control.md",
+            "action": "create"
+          }
+        ]
+      },
+      {
+        "request_id": "bpa-walkthrough-20260917-02",
+        "task_id": null,
+        "gate": "WALKTHROUGH",
+        "operation": "walkthrough",
+        "status": "needs_main",
+        "started_at": "2026-09-16T13:26:26Z",
+        "completed_at": "2026-09-16T13:28:40Z",
+        "outputs": [
+          {
+            "path": "docs/walkthrough/backpressure-admission-control.md",
+            "action": "create"
+          }
+        ]
+      },
+      {
+        "request_id": "bpa-walkthrough-20260917-03",
+        "task_id": null,
+        "gate": "WALKTHROUGH",
+        "operation": "walkthrough",
+        "status": "completed",
+        "started_at": "2026-09-16T13:36:38Z",
+        "completed_at": "2026-09-16T13:42:07Z",
+        "outputs": [
+          {
+            "path": "docs/walkthrough/backpressure-admission-control.md",
+            "action": "create"
+          }
+        ],
+        "artifact_path": "/Users/sean/.codex/workers/artifacts/f58d19af3c452670622286de/ea1c68789cf71ac8.patch",
+        "artifact_sha256": "ea1c68789cf71ac86bba1eca87cb0eb28107307900701dadf6b8f062249eb866"
+      }
+    ],
+    "role_invocations": []
+  }
+}

@@ -23,3 +23,4 @@ configured backend; JDBC drivers remain application-provided. For custom starter
 
 See the [auto-configuration guide](../r2d1-spring-boot-autoconfigure/README.md) for configuration,
 backend selection, bean precedence, resource ownership, and the supported scope.
+The guide also documents per-adapter admission limits and their global 8-active/32-pending defaults.

@@ -1,10 +1,12 @@
 package dev.nexcraft.r2d1.micronaut.internal;
 
+import dev.nexcraft.r2d1.BackpressureConfig;
 import dev.nexcraft.r2d1.PersistenceCollectionFactory;
 import dev.nexcraft.r2d1.jdbc.JdbcExecution;
 import dev.nexcraft.r2d1.jdbc.JdbcExecutionConfig;
 import dev.nexcraft.r2d1.jdbc.JdbcExecutionMode;
 import dev.nexcraft.r2d1.jdbc.JdbcIndexStore;
+import dev.nexcraft.r2d1.micronaut.R2D1Configuration;
 import dev.nexcraft.r2d1.micronaut.R2D1JdbcConfiguration;
 import dev.nexcraft.r2d1.micronaut.R2D1JdbcExecutionMode;
 import dev.nexcraft.r2d1.spi.IndexStore;
@@ -30,8 +32,15 @@ final class JdbcFactory {
   @Requires(missingBeans = JdbcExecution.class)
   JdbcExecution jdbcExecution(
       R2D1JdbcConfiguration configuration,
+      R2D1Configuration globalConfiguration,
       BeanProvider<Executor> executors,
       Environment environment) {
+    BackpressureConfig backpressure =
+        BackpressureConfigurationSupport.resolveJdbc(
+            configuration.backpressure(),
+            environment.getProperty("r2d1.jdbc.max-concurrency", Integer.class).orElse(null),
+            environment.getProperty("r2d1.jdbc.max-pending", Integer.class).orElse(null),
+            globalConfiguration.backpressure());
     String executorName = configuration.executor();
     String configuredMode =
         environment.getProperty("r2d1.jdbc.execution-mode", String.class).orElse(null);
@@ -43,12 +52,12 @@ final class JdbcFactory {
       Executor executor =
           BeanSelection.required(executors, executorName, "Executor", "r2d1.jdbc.executor");
       return JdbcExecution.using(
-          executor, configuration.maxConcurrency(), configuration.maxPending());
+          executor, backpressure.maxConcurrency(), backpressure.maxPending());
     }
 
     JdbcExecutionMode mode = resolveExecutionMode(configuredMode, configuration.executionMode());
     return JdbcExecution.create(
-        new JdbcExecutionConfig(mode, configuration.maxConcurrency(), configuration.maxPending()));
+        new JdbcExecutionConfig(mode, backpressure.maxConcurrency(), backpressure.maxPending()));
   }
 
   @Singleton
