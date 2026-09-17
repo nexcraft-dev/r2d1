@@ -16,6 +16,7 @@ dependencies {
     implementation("software.amazon.awssdk:netty-nio-client")
 
     implementation("io.avaje:avaje-jsonb:3.15")
+    implementation("dev.failsafe:failsafe:3.3.2")
     annotationProcessor("io.avaje:avaje-jsonb-generator:3.15")
 
     testFixturesImplementation(platform("org.junit:junit-bom:5.14.4"))

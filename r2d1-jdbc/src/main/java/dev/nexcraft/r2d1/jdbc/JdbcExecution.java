@@ -1,9 +1,9 @@
 package dev.nexcraft.r2d1.jdbc;
 
+import dev.nexcraft.r2d1.AdmissionController;
+import dev.nexcraft.r2d1.BackpressureConfig;
+import dev.nexcraft.r2d1.spi.AdmissionRejectedException;
 import dev.nexcraft.r2d1.spi.StorageException;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
@@ -15,6 +15,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.jspecify.annotations.Nullable;
 
@@ -42,14 +43,10 @@ public final class JdbcExecution implements AutoCloseable {
   private static final AtomicLong EXECUTION_IDS = new AtomicLong();
   private static final int MIN_VIRTUAL_THREAD_RUNTIME = 25;
 
-  private final Object lifecycleLock = new Object();
   private final Executor executor;
   private final @Nullable ExecutorService ownedExecutor;
-  private final int maxConcurrency;
-  private final int maxPending;
-  private final ArrayDeque<Task<?>> pending = new ArrayDeque<>();
-  private int active;
-  private boolean closed;
+  private final AdmissionController admission;
+  private final AtomicBoolean closed = new AtomicBoolean();
 
   private JdbcExecution(
       Executor executor,
@@ -58,8 +55,10 @@ public final class JdbcExecution implements AutoCloseable {
       int maxPending) {
     this.executor = Objects.requireNonNull(executor, "executor");
     this.ownedExecutor = ownedExecutor;
-    this.maxConcurrency = requireMaxConcurrency(maxConcurrency);
-    this.maxPending = requireMaxPending(maxPending);
+    this.admission =
+        new AdmissionController(
+            new BackpressureConfig(
+                requireMaxConcurrency(maxConcurrency), requireMaxPending(maxPending)));
   }
 
   /**
@@ -141,28 +140,18 @@ public final class JdbcExecution implements AutoCloseable {
 
   <T extends @Nullable Object> CompletionStage<T> execute(Callable<T> operation) {
     Objects.requireNonNull(operation, "operation");
-    Task<T> task = new Task<>(operation, new CompletableFuture<>());
-    boolean dispatch;
-    synchronized (lifecycleLock) {
-      if (closed) {
-        task.reject("JDBC execution is closed");
-        return task.result();
-      }
-      if (active < maxConcurrency) {
-        active++;
-        dispatch = true;
-      } else if (pending.size() < maxPending) {
-        pending.addLast(task);
-        dispatch = false;
-      } else {
-        task.reject("JDBC execution capacity is exhausted");
-        return task.result();
-      }
-    }
-    if (dispatch) {
-      dispatch(task);
-    }
-    return task.result();
+    CompletableFuture<T> result = new CompletableFuture<>();
+    admission
+        .submit(() -> executeOnExecutor(operation))
+        .whenComplete(
+            (value, failure) -> {
+              if (failure == null) {
+                result.complete(value);
+              } else {
+                result.completeExceptionally(failureForCaller(failure));
+              }
+            });
+    return result;
   }
 
   /**
@@ -172,57 +161,39 @@ public final class JdbcExecution implements AutoCloseable {
    */
   @Override
   public void close() {
-    List<Task<?>> rejected;
-    synchronized (lifecycleLock) {
-      if (closed) {
-        return;
-      }
-      closed = true;
-      rejected = new ArrayList<>(pending);
-      pending.clear();
+    if (!closed.compareAndSet(false, true)) {
+      return;
     }
-    rejected.forEach(task -> task.reject("JDBC execution is closed"));
+    admission.close();
     if (ownedExecutor != null) {
       ownedExecutor.shutdown();
     }
   }
 
-  private void dispatch(Task<?> first) {
-    Task<?> current = first;
-    while (current != null) {
-      Task<?> submitted = current;
-      try {
-        executor.execute(() -> run(submitted));
-        return;
-      } catch (RuntimeException failure) {
-        submitted.fail(executorFailure(failure));
-        current = releaseAndTakeNext();
-      }
-    }
-  }
-
-  private <T extends @Nullable Object> void run(Task<T> task) {
+  private <T extends @Nullable Object> CompletionStage<T> executeOnExecutor(Callable<T> operation) {
+    CompletableFuture<T> result = new CompletableFuture<>();
     try {
-      task.result().complete(task.operation().call());
-    } catch (Throwable failure) {
-      task.result().completeExceptionally(failure);
-    } finally {
-      Task<?> next = releaseAndTakeNext();
-      if (next != null) {
-        dispatch(next);
-      }
+      executor.execute(
+          () -> {
+            try {
+              result.complete(operation.call());
+            } catch (Throwable failure) {
+              result.completeExceptionally(failure);
+            }
+          });
+    } catch (RuntimeException failure) {
+      result.completeExceptionally(executorFailure(failure));
     }
+    return result;
   }
 
-  private @Nullable Task<?> releaseAndTakeNext() {
-    synchronized (lifecycleLock) {
-      active--;
-      if (closed || pending.isEmpty()) {
-        return null;
-      }
-      active++;
-      return pending.removeFirst();
+  private static Throwable failureForCaller(Throwable failure) {
+    if (failure instanceof AdmissionRejectedException rejection
+        && "Admission controller is closed".equals(rejection.getMessage())) {
+      return new StorageException.Unavailable(
+          "JDBC execution is closed", new RejectedExecutionException("JDBC execution is closed"));
     }
+    return failure;
   }
 
   private static StorageException executorFailure(RuntimeException failure) {
@@ -255,18 +226,5 @@ public final class JdbcExecution implements AutoCloseable {
       throw new IllegalArgumentException("maxPending must not be negative");
     }
     return value;
-  }
-
-  private record Task<T extends @Nullable Object>(
-      Callable<T> operation, CompletableFuture<T> result) {
-
-    private void reject(String message) {
-      result.completeExceptionally(
-          new StorageException.Unavailable(message, new RejectedExecutionException(message)));
-    }
-
-    private void fail(RuntimeException failure) {
-      result.completeExceptionally(failure);
-    }
   }
 }

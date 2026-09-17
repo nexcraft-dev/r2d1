@@ -44,6 +44,24 @@ The adapter does not create, own, close, or globally share an executor. A bounde
 executor is recommended. The adapter never uses `ForkJoinPool.commonPool()` and does not add retry,
 lock, or scheduler behavior.
 
+Each store defaults to 8 active and 32 pending operations. Pass a `BackpressureConfig` as the third
+constructor argument to choose different limits:
+
+```java
+import dev.nexcraft.r2d1.BackpressureConfig;
+
+FileSystemDocumentStore documents =
+    new FileSystemDocumentStore(
+        Path.of("/var/lib/my-app/r2d1"), executor, new BackpressureConfig(4, 16));
+```
+
+Every operation is admitted before it is submitted to the caller's executor. When both limits are
+full, it fails immediately with `AdmissionRejectedException`. Canceling a returned stage does not
+free capacity before a running filesystem operation completes. Admission capacity is separate from
+executor capacity and ownership. See the
+[configuration guide](https://r2d1.nexcraft.dev/docs/configuration/) for framework settings and
+fan-out behavior.
+
 ## Storage model
 
 The root contains one encoded directory per collection and one encoded canonical file per document:
