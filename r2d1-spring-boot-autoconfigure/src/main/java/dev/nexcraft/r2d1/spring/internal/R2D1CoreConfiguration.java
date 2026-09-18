@@ -1,6 +1,5 @@
 package dev.nexcraft.r2d1.spring.internal;
 
-import dev.nexcraft.r2d1.DocumentCodec;
 import dev.nexcraft.r2d1.PersistenceCollectionFactory;
 import dev.nexcraft.r2d1.R2D1;
 import dev.nexcraft.r2d1.spi.DocumentStore;
@@ -21,7 +20,6 @@ public class R2D1CoreConfiguration {
       ListableBeanFactory beanFactory,
       ObjectProvider<DocumentStore> documentStores,
       ObjectProvider<IndexStore> indexStores,
-      ObjectProvider<DocumentCodec> documentCodecs,
       ObjectProvider<PersistenceCollectionFactory.CollectionInitializer> initializers) {
     DocumentStore documentStore =
         BeanSelection.required(
@@ -34,14 +32,6 @@ public class R2D1CoreConfiguration {
     IndexStore indexStore =
         BeanSelection.required(
             beanFactory, IndexStore.class, indexStores, null, "IndexStore", "r2d1.index.type");
-    DocumentCodec documentCodec =
-        BeanSelection.required(
-            beanFactory,
-            DocumentCodec.class,
-            documentCodecs,
-            null,
-            "DocumentCodec",
-            "r2d1.document.codec");
     PersistenceCollectionFactory.CollectionInitializer initializer =
         BeanSelection.required(
             beanFactory,
@@ -50,7 +40,7 @@ public class R2D1CoreConfiguration {
             null,
             "PersistenceCollectionFactory.CollectionInitializer",
             "r2d1.collection-initializer");
-    return new PersistenceCollectionFactory(documentStore, indexStore, documentCodec, initializer);
+    return new PersistenceCollectionFactory(documentStore, indexStore, initializer);
   }
 
   @Bean

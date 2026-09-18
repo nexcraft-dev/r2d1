@@ -74,7 +74,8 @@ deployment topology; it receives the two stores through `PersistenceCollectionFa
 
 The application owns resources it supplies:
 
-- `DocumentCodec`, `DataSource`, JDBC driver, connection pool, and database server;
+- custom `DocumentCodec` instances supplied to collections, `DataSource`, JDBC driver, connection
+  pool, and database server;
 - caller-provided executors used by the filesystem or JDBC adapters; and
 - any `S3AsyncClient` or `HttpClient` passed to an adapter.
 

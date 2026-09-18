@@ -359,7 +359,6 @@ Create one bounded execution resource for blocking JDBC work and pass the select
 `indexStore::initialize` as the collection initializer:
 
 ```java
-import dev.nexcraft.r2d1.DocumentCodec;
 import dev.nexcraft.r2d1.PersistenceCollectionFactory;
 import dev.nexcraft.r2d1.R2D1;
 import dev.nexcraft.r2d1.R2D1Collection;
@@ -370,7 +369,6 @@ import javax.sql.DataSource;
 
 DataSource dataSource = applicationH2DataSource;
 DocumentStore documentStore = applicationDocumentStore;
-DocumentCodec documentCodec = applicationDocumentCodec;
 
 try (JdbcExecution execution = JdbcExecution.create(4, 64)) {
   JdbcIndexStore indexStore = new JdbcIndexStore(dataSource, execution);
@@ -379,7 +377,7 @@ try (JdbcExecution execution = JdbcExecution.create(4, 64)) {
       R2D1.builder()
           .collectionFactory(
               new PersistenceCollectionFactory(
-                  documentStore, indexStore, documentCodec, indexStore::initialize))
+                  documentStore, indexStore, indexStore::initialize))
           .build();
 
   R2D1Collection<User> users = database.collection(User.class);
@@ -387,10 +385,12 @@ try (JdbcExecution execution = JdbcExecution.create(4, 64)) {
 }
 ```
 
-`database.collection(User.class)` invokes the initializer and waits for schema initialization to
-complete before returning the collection. When using `JdbcIndexStore` directly through the
-asynchronous SPI, wait for or compose from `indexStore.initialize(User.class)` before issuing any
-operation for that collection.
+`database.collection(User.class)` invokes the initializer and waits for codec metadata and schema
+initialization to complete before returning the collection. It uses the built-in Avaje JSON-B
+generated-adapter codec. Select a custom codec for one collection with
+`database.collection(User.class, applicationDocumentCodec)`. When using `JdbcIndexStore` directly
+through the asynchronous SPI, wait for or compose from `indexStore.initialize(User.class)` before
+issuing any operation for that collection.
 
 ## Automatic database detection
 

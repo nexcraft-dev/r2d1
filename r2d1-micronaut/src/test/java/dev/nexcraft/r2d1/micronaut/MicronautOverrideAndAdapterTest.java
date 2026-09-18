@@ -90,7 +90,7 @@ class MicronautOverrideAndAdapterTest {
   void applicationIndexStoreAndInitializerWinWithoutBackendSelection() {
     IndexStore indexStore = unsupportedProxy(IndexStore.class);
     dev.nexcraft.r2d1.PersistenceCollectionFactory.CollectionInitializer initializer =
-        documentType -> CompletableFuture.completedFuture(null);
+        (documentType, format, codec) -> CompletableFuture.completedFuture(null);
 
     try (ApplicationContext context =
         ApplicationContext.builder()

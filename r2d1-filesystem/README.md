@@ -36,7 +36,7 @@ R2D1 database =
     R2D1.builder()
         .collectionFactory(
             new PersistenceCollectionFactory(
-                documents, indexStore, codec, collectionInitializer))
+                documents, indexStore, collectionInitializer))
         .build();
 ```
 
@@ -67,7 +67,7 @@ fan-out behavior.
 The root contains one encoded directory per collection and one encoded canonical file per document:
 
 ```text
-<root>/<encoded-collection>/<encoded-document-id>.json
+<root>/<encoded-collection>/<encoded-document-id>.r2d1
 ```
 
 Collection names and document IDs are percent-encoded as UTF-8 path segments. Separators,
@@ -75,7 +75,7 @@ absolute-path text, traversal components, and platform-reserved names cannot esc
 collide with another valid identity. The mapping is deterministic and reversible for canonical
 files.
 
-GET reads only a canonical regular file. LIST recognizes only canonical `.json` files and ignores
+GET reads only a canonical regular file. LIST recognizes only canonical `.r2d1` files and ignores
 temporary, orphan, symlink, and unrelated files. A missing GET fails with
 `DocumentNotFoundException`; DELETE is idempotent for a missing canonical file.
 

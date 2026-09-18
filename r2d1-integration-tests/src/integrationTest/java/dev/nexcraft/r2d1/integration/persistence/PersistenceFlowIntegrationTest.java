@@ -24,6 +24,7 @@ import dev.nexcraft.r2d1.spi.DocumentNotFoundException;
 import dev.nexcraft.r2d1.spi.DocumentStore;
 import dev.nexcraft.r2d1.spi.IndexPage;
 import dev.nexcraft.r2d1.spi.IndexStore;
+import dev.nexcraft.r2d1.spi.StoredDocument;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -34,7 +35,8 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(value = 5, unit = TimeUnit.MINUTES)
 class PersistenceFlowIntegrationTest {
 
-  private static final IntegrationDocumentCodec CODEC = new IntegrationDocumentCodec();
+  private static final IntegrationDocumentCodec<PersistenceDocument> CODEC =
+      new IntegrationDocumentCodec<>(PersistenceDocument.class);
 
   @Test
   void putsIntoR2BeforeUpsertingD1() {
@@ -46,10 +48,9 @@ class PersistenceFlowIntegrationTest {
 
           assertThat(fixture.events()).containsExactly("r2.put:put", "d1.upsert:put");
           assertThat(
-                  CODEC.deserialize(
-                      await(
-                          fixture.documents().get(new DocumentKey(PERSISTENCE_COLLECTION, "put"))),
-                      PersistenceDocument.class))
+                  CODEC.decode(
+                      await(fixture.documents().get(new DocumentKey(PERSISTENCE_COLLECTION, "put")))
+                          .content()))
               .isEqualTo(document);
           assertThat(
                   await(
@@ -72,7 +73,7 @@ class PersistenceFlowIntegrationTest {
                   .documents()
                   .put(
                       new DocumentKey(PERSISTENCE_COLLECTION, document.id()),
-                      CODEC.serialize(document)));
+                      new StoredDocument(CODEC.encode(document))));
           fixture.events().clear();
 
           Optional<PersistenceDocument> result = fixture.collection().get(document.id());
@@ -95,11 +96,15 @@ class PersistenceFlowIntegrationTest {
           await(
               fixture
                   .documents()
-                  .put(new DocumentKey(PERSISTENCE_COLLECTION, b.id()), CODEC.serialize(b)));
+                  .put(
+                      new DocumentKey(PERSISTENCE_COLLECTION, b.id()),
+                      new StoredDocument(CODEC.encode(b))));
           await(
               fixture
                   .documents()
-                  .put(new DocumentKey(PERSISTENCE_COLLECTION, a.id()), CODEC.serialize(a)));
+                  .put(
+                      new DocumentKey(PERSISTENCE_COLLECTION, a.id()),
+                      new StoredDocument(CODEC.encode(a))));
           fixture.events().clear();
 
           Page<PersistenceDocument> page =
@@ -157,11 +162,10 @@ class PersistenceFlowIntegrationTest {
                     new PersistenceCollectionFactory(
                         new RecordingDocumentStore(documents, events),
                         new RecordingIndexStore(indexes, events),
-                        CODEC,
                         indexes::initialize))
                 .build();
         R2D1Collection<PersistenceDocument> collection =
-            client.collection(PersistenceDocument.class);
+            client.collection(PersistenceDocument.class, CODEC);
         events.clear();
         test.run(new Fixture(documents, indexes, collection, events));
       } finally {

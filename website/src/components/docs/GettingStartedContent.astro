@@ -29,8 +29,7 @@ public record User(
     @Index long score,
     String name) {}`;
 
-const configurationExample = `import dev.nexcraft.r2d1.DocumentCodec;
-import dev.nexcraft.r2d1.PersistenceCollectionFactory;
+const configurationExample = `import dev.nexcraft.r2d1.PersistenceCollectionFactory;
 import dev.nexcraft.r2d1.R2D1;
 import dev.nexcraft.r2d1.R2D1Collection;
 import dev.nexcraft.r2d1.spi.DocumentStore;
@@ -38,13 +37,12 @@ import dev.nexcraft.r2d1.spi.IndexStore;
 
 DocumentStore documentStore = applicationDocumentStore;
 IndexStore indexStore = applicationIndexStore;
-DocumentCodec documentCodec = applicationDocumentCodec;
 
 R2D1 database =
     R2D1.builder()
         .collectionFactory(
             new PersistenceCollectionFactory(
-                documentStore, indexStore, documentCodec, indexStore::initialize))
+                documentStore, indexStore, indexStore::initialize))
         .build();
 
 R2D1Collection<User> users = database.collection(User.class);`;
@@ -96,10 +94,10 @@ const copy = {
     configurationLink: "Configuration",
     step4: "4. 문서 정의",
     step4Body: "식별자로 사용할 비어 있지 않은 String member 하나에 @Id를 붙이고, 인덱스에 저장할 필드에 @Index를 붙입니다. 필터와 정렬에는 인덱싱한 필드만 사용할 수 있습니다.",
-    codecNote: "R2D1은 JSON library를 선택하지 않습니다. domain object를 StoredDocument로 직렬화하고 collection이 결과를 hydrate할 때 다시 역직렬화하는 DocumentCodec을 제공하세요.",
+    codecNote: "R2D1은 adapter가 생성된 타입에 Avaje JSON-B codec을 기본으로 사용합니다(format=json, id=avaje-jsonb-3). 다른 형식이나 serialization 정책이 필요하면 collection API에 해당 DocumentCodec<T>를 명시적으로 전달하세요.",
     step5: "5. 공통 collection API 구성",
-    step5Body: "아래 예제는 두 storage 역할이 보이도록 adapter 생성을 애플리케이션에 남겨둡니다. documentStore, indexStore, documentCodec은 애플리케이션 소유 값입니다.",
-    initializeNote: "collection을 열면 collection metadata를 초기화하거나 검증한 뒤 collection을 반환합니다. factory는 store, codec, caller-owned execution resource의 소유권을 가져가지 않습니다.",
+    step5Body: "아래 예제는 두 storage 역할이 보이도록 adapter 생성을 애플리케이션에 남겨둡니다. documentStore와 indexStore는 애플리케이션 소유 값입니다. custom codec이 필요하면 collection API에 전달합니다.",
+    initializeNote: "collection을 열면 codec metadata와 collection metadata를 초기화하거나 검증한 뒤 collection을 반환합니다. factory는 store, codec, caller-owned execution resource의 소유권을 가져가지 않습니다.",
     step6: "6. put, get, delete",
     mutationNote: "put은 @Id 값으로 문서를 생성하거나 교체합니다. get은 authoritative document storage를 읽고, 없는 식별자를 삭제해도 효과가 없습니다.",
     step7: "7. 인덱스 쿼리 실행",
@@ -124,10 +122,10 @@ const copy = {
     configurationLink: "Configuration",
     step4: "4. 定义文档",
     step4Body: "为一个非空 String 成员添加 @Id 作为标识，并为需要写入索引的字段添加 @Index。只有显式索引的字段才能参与过滤和排序。",
-    codecNote: "R2D1 不选择 JSON library。请提供 DocumentCodec，将 domain object 序列化为 StoredDocument，并在集合生成结果时再次反序列化。",
+    codecNote: "R2D1 默认对生成了 adapter 的类型使用 Avaje JSON-B codec（format=json，id=avaje-jsonb-3）。如果应用需要其他格式或 serialization policy，请在 collection API 中显式传入相应的 DocumentCodec<T>。",
     step5: "5. 配置通用集合 API",
-    step5Body: "下面的示例将适配器创建留给应用，以便清楚展示两个存储角色。documentStore、indexStore 和 documentCodec 都由应用拥有。",
-    initializeNote: "打开集合时，R2D1 会先初始化或验证集合 metadata，然后返回集合。factory 不会接管 store、codec 或调用方拥有的执行资源。",
+    step5Body: "下面的示例将适配器创建留给应用，以便清楚展示两个存储角色。documentStore 和 indexStore 由应用拥有；需要 custom codec 时在 collection API 中传入。",
+    initializeNote: "打开集合时，R2D1 会先初始化或验证 codec metadata 和 collection metadata，然后返回集合。factory 不会接管 store、codec 或调用方拥有的执行资源。",
     step6: "6. put、get 和 delete",
     mutationNote: "put 使用 @Id 值创建或替换文档。get 读取权威文档存储，删除不存在的标识不会产生效果。",
     step7: "7. 运行索引查询",
@@ -152,10 +150,10 @@ const copy = {
     configurationLink: "Configuration",
     step4: "4. ドキュメントを定義する",
     step4Body: "空でない String member の1つに @Id を付けて ID とし、インデックスに保存するフィールドに @Index を付けます。フィルタとソートには明示的にインデックスされたフィールドだけを使えます。",
-    codecNote: "R2D1 は JSON library を選びません。domain object を StoredDocument にシリアライズし、コレクションが結果を hydrate するときに戻せる DocumentCodec を提供します。",
+    codecNote: "R2D1 は adapter が生成された型に Avaje JSON-B codec をデフォルトで使います（format=json、id=avaje-jsonb-3）。別の形式や serialization policy が必要な場合は、collection API に対応する DocumentCodec<T> を明示的に渡します。",
     step5: "5. 共通コレクション API を設定する",
-    step5Body: "次の例では2つのストレージ役割が見えるよう、アダプターの生成をアプリケーションに任せています。documentStore、indexStore、documentCodec はアプリケーション所有の値です。",
-    initializeNote: "コレクションを開くと metadata を初期化または検証してからコレクションを返します。factory は store、codec、呼び出し側が所有する実行リソースを取得しません。",
+    step5Body: "次の例では2つのストレージ役割が見えるよう、アダプターの生成をアプリケーションに任せています。documentStore と indexStore はアプリケーション所有の値で、custom codec が必要な場合は collection API に渡します。",
+    initializeNote: "コレクションを開くと codec metadata と collection metadata を初期化または検証してからコレクションを返します。factory は store、codec、呼び出し側が所有する実行リソースを取得しません。",
     step6: "6. put、get、delete",
     mutationNote: "put は @Id の値でドキュメントを作成または置換します。get は権威ドキュメントストレージを読み、存在しない ID の削除は何もしません。",
     step7: "7. インデックスクエリを実行する",

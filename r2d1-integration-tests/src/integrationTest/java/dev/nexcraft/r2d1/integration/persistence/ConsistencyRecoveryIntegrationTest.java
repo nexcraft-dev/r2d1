@@ -33,13 +33,14 @@ class ConsistencyRecoveryIntegrationTest {
       clearR2Collection(documents, RECOVERY_COLLECTION);
       clearD1Collection(indexes, RecoveryDocument.class, RECOVERY_COLLECTION);
       try {
+        IntegrationDocumentCodec<RecoveryDocument> codec =
+            new IntegrationDocumentCodec<>(RecoveryDocument.class);
         R2D1Collection<RecoveryDocument> collection =
             R2D1.builder()
                 .collectionFactory(
-                    new PersistenceCollectionFactory(
-                        documents, indexes, new IntegrationDocumentCodec(), indexes::initialize))
+                    new PersistenceCollectionFactory(documents, indexes, indexes::initialize))
                 .build()
-                .collection(RecoveryDocument.class);
+                .collection(RecoveryDocument.class, codec);
         RecoveryDocument restored = new RecoveryDocument("restored", "NZ", 10L, "restore-me");
         RecoveryDocument retained = new RecoveryDocument("retained", "NZ", 20L, "keep-me");
         collection.put(restored);

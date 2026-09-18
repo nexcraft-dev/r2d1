@@ -1,6 +1,5 @@
 package dev.nexcraft.r2d1.micronaut.internal;
 
-import dev.nexcraft.r2d1.DocumentCodec;
 import dev.nexcraft.r2d1.PersistenceCollectionFactory;
 import dev.nexcraft.r2d1.R2D1;
 import dev.nexcraft.r2d1.micronaut.IndexBackend;
@@ -25,7 +24,6 @@ final class R2D1CoreFactory {
       BeanProvider<R2D1.CollectionFactory> collectionFactories,
       BeanProvider<DocumentStore> documentStores,
       BeanProvider<IndexStore> indexStores,
-      BeanProvider<DocumentCodec> documentCodecs,
       BeanProvider<PersistenceCollectionFactory.CollectionInitializer> initializers,
       R2D1IndexConfiguration indexConfiguration,
       Environment environment) {
@@ -33,11 +31,9 @@ final class R2D1CoreFactory {
     if (collectionFactory == null) {
       DocumentStore documentStore = requiredDocumentStore(documentStores, environment);
       IndexStore indexStore = requiredIndexStore(indexStores, indexConfiguration, environment);
-      DocumentCodec documentCodec = requiredDocumentCodec(documentCodecs);
       PersistenceCollectionFactory.CollectionInitializer initializer =
           requiredInitializer(initializers);
-      collectionFactory =
-          new PersistenceCollectionFactory(documentStore, indexStore, documentCodec, initializer);
+      collectionFactory = new PersistenceCollectionFactory(documentStore, indexStore, initializer);
     }
     return R2D1.builder().collectionFactory(collectionFactory).build();
   }
@@ -80,14 +76,6 @@ final class R2D1CoreFactory {
               + "' was selected but no IndexStore was created; add the matching R2D1 adapter or define an IndexStore bean");
     }
     return requiredUnique(provider, "IndexStore");
-  }
-
-  private static DocumentCodec requiredDocumentCodec(BeanProvider<DocumentCodec> provider) {
-    if (!provider.isPresent()) {
-      throw new ConfigurationException(
-          "No DocumentCodec bean exists; define the application serialization boundary as a Micronaut bean");
-    }
-    return requiredUnique(provider, "DocumentCodec");
   }
 
   private static PersistenceCollectionFactory.CollectionInitializer requiredInitializer(

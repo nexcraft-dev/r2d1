@@ -432,6 +432,12 @@ val verifyPublishedConsumer =
                     check(!module.contains("r2d1-jdbc")) {
                         "r2d1-micronaut Gradle Module Metadata leaks its compileOnly JDBC adapter"
                     }
+                    check(!pom.contains("<groupId>io.micronaut</groupId>")) {
+                        "r2d1-micronaut POM leaks its compileOnly Micronaut framework"
+                    }
+                    check(!module.contains("io.micronaut")) {
+                        "r2d1-micronaut Gradle Module Metadata leaks its compileOnly Micronaut framework"
+                    }
                 }
                 if (artifactId == "r2d1-spring-boot-autoconfigure") {
                     check(pom.contains("<artifactId>r2d1</artifactId>")) {
@@ -451,6 +457,12 @@ val verifyPublishedConsumer =
                     }
                     check(!module.contains("r2d1-jdbc")) {
                         "r2d1-spring-boot-autoconfigure Gradle Module Metadata leaks its compileOnly JDBC adapter"
+                    }
+                    check(!pom.contains("<groupId>org.springframework.boot</groupId>")) {
+                        "r2d1-spring-boot-autoconfigure POM leaks its compileOnly Spring Boot framework"
+                    }
+                    check(!module.contains("org.springframework.boot")) {
+                        "r2d1-spring-boot-autoconfigure Gradle Module Metadata leaks its compileOnly Spring Boot framework"
                     }
                 }
                 if (artifactId == "r2d1-spring-boot-starter") {
@@ -703,9 +715,16 @@ val verifyPublishedConsumer =
                         "core" to listOf("dev.nexcraft:r2d1:$version"),
                         "filesystem" to listOf("dev.nexcraft:r2d1-filesystem:$version"),
                         "jdbc" to listOf("dev.nexcraft:r2d1-jdbc:$version"),
-                        "micronaut" to listOf("dev.nexcraft:r2d1-micronaut:$version"),
+                        "micronaut" to
+                            listOf(
+                                "dev.nexcraft:r2d1-micronaut:$version",
+                                "io.micronaut:micronaut-context:5.1.15",
+                            ),
                         "spring-autoconfigure" to
-                            listOf("dev.nexcraft:r2d1-spring-boot-autoconfigure:$version"),
+                            listOf(
+                                "dev.nexcraft:r2d1-spring-boot-autoconfigure:$version",
+                                "org.springframework.boot:spring-boot-autoconfigure:4.0.6",
+                            ),
                         "spring-starter" to listOf("dev.nexcraft:r2d1-spring-boot-starter:$version"),
                         "combined" to
                             listOf(
@@ -714,6 +733,7 @@ val verifyPublishedConsumer =
                                 "dev.nexcraft:r2d1-jdbc:$version",
                                 "dev.nexcraft:r2d1-micronaut:$version",
                                 "dev.nexcraft:r2d1-spring-boot-starter:$version",
+                                "io.micronaut:micronaut-context:5.1.15",
                             ),
                     )
 

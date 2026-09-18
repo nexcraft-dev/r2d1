@@ -1,34 +1,45 @@
 package dev.nexcraft.r2d1;
 
-import dev.nexcraft.r2d1.spi.StoredDocument;
-
 /**
- * Converts domain documents to and from the bytes owned by the authoritative document store.
+ * Converts one concrete document type to and from authoritative-store bytes.
  *
- * <p>The {@code r2d1} artifact supplies no default serialization format. Implementations may use an
- * application-selected codec, but implementation-specific types do not become part of this
- * contract. Codec failures propagate through the synchronous collection operation that invoked
- * them.
+ * @param <T> concrete document type handled by this codec
  */
-public interface DocumentCodec {
+public interface DocumentCodec<T> {
 
   /**
-   * Serializes a non-null domain document.
+   * Returns the stable implementation identity for this codec.
    *
-   * @param document document to serialize
-   * @return serialized document content
+   * @return codec identity such as {@code avaje-jsonb-3}
+   */
+  String id();
+
+  /**
+   * Returns the storage format handled by this codec.
+   *
+   * @return format such as {@code json}
+   */
+  String format();
+
+  /**
+   * Encodes a document into bytes.
+   *
+   * <p>Codec instances are used concurrently by their collection and must be thread-safe.
+   *
+   * @param document document to encode
+   * @return encoded bytes
    * @throws NullPointerException if {@code document} is {@code null}
    */
-  StoredDocument serialize(Object document);
+  byte[] encode(T document);
 
   /**
-   * Deserializes stored content as the requested domain type.
+   * Decodes bytes into a document.
    *
-   * @param document serialized document content
-   * @param documentType requested domain type
-   * @param <T> domain document type
-   * @return deserialized document
-   * @throws NullPointerException if either argument is {@code null}
+   * <p>Codec instances are used concurrently by their collection and must be thread-safe.
+   *
+   * @param data encoded document bytes
+   * @return decoded document
+   * @throws NullPointerException if {@code data} is {@code null}
    */
-  <T> T deserialize(StoredDocument document, Class<T> documentType);
+  T decode(byte[] data);
 }

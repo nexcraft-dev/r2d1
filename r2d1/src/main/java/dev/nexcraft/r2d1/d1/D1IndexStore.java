@@ -4,6 +4,8 @@ import dev.nexcraft.r2d1.AdmissionController;
 import dev.nexcraft.r2d1.BackpressureConfig;
 import dev.nexcraft.r2d1.d1.internal.metadata.D1CollectionMetadata;
 import dev.nexcraft.r2d1.d1.internal.metadata.D1Metadata;
+import dev.nexcraft.r2d1.d1.internal.schema.D1CodecMetadataStore;
+import dev.nexcraft.r2d1.d1.internal.schema.D1CodecMetadataStore.StoredCodecMetadata;
 import dev.nexcraft.r2d1.d1.internal.schema.D1SchemaManager;
 import dev.nexcraft.r2d1.d1.internal.sql.D1Result;
 import dev.nexcraft.r2d1.d1.internal.sql.D1SqlCompiler;
@@ -44,6 +46,7 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
 
   private final D1Transport transport;
   private final D1SchemaManager schemaManager;
+  private final D1CodecMetadataStore codecMetadataStore;
   private final AdmissionController admission;
   private final D1SqlCompiler sqlCompiler = new D1SqlCompiler();
   private final ConcurrentMap<String, Registration> registrations = new ConcurrentHashMap<>();
@@ -117,6 +120,7 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
     this.transport =
         new AdmittedD1Transport(Objects.requireNonNull(transport, "transport"), admission);
     this.schemaManager = new D1SchemaManager(this.transport);
+    this.codecMetadataStore = new D1CodecMetadataStore(this.transport);
     this.ownsTransport = ownsTransport;
   }
 
@@ -132,21 +136,54 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
    * @throws IllegalArgumentException if annotation metadata violates D1 v1 constraints
    */
   public CompletionStage<@Nullable Void> initialize(Class<?> documentType) {
+    return initialize(documentType, "json", "avaje-jsonb-3");
+  }
+
+  /**
+   * Validates document annotations and codec metadata before preparing the collection schema.
+   *
+   * @param documentType document class annotated with {@code @Document}
+   * @param format current codec storage format
+   * @param codec current codec identity
+   * @return non-null stage that completes when metadata and schema are ready
+   * @throws NullPointerException if any argument is {@code null}
+   */
+  public CompletionStage<@Nullable Void> initialize(
+      Class<?> documentType, String format, String codec) {
+    requireText(format, "format");
+    requireText(codec, "codec");
     D1CollectionMetadata metadata = D1Metadata.inspect(documentType);
-    Registration candidate = new Registration(metadata, new CompletableFuture<>());
+    Registration candidate =
+        new Registration(
+            metadata, format, codec, new CompletableFuture<>(), new CompletableFuture<>());
     Registration registration = registrations.putIfAbsent(metadata.collection(), candidate);
     if (registration != null) {
       if (!registration.metadata().hasSameSchema(metadata)) {
         throw new IllegalArgumentException(
             "collection is already initialized with different metadata: " + metadata.collection());
       }
-      return registration.initialization();
+      if (registration.format().equals(format)) {
+        return registration.initialization();
+      }
+      return registration
+          .codecMetadata()
+          .thenCompose(
+              stored -> {
+                requireCompatible(metadata.collection(), stored, format, codec);
+                return registration.initialization();
+              });
     }
 
     try {
       CompletionStage<@Nullable Void> initialization =
-          Objects.requireNonNull(
-              schemaManager.initialize(metadata), "schema manager returned a null stage");
+          candidate
+              .codecMetadata()
+              .thenCompose(
+                  stored -> {
+                    requireCompatible(metadata.collection(), stored, format, codec);
+                    return Objects.requireNonNull(
+                        schemaManager.initialize(metadata), "schema manager returned a null stage");
+                  });
       initialization.whenComplete(
           (ignored, failure) -> {
             if (failure == null) {
@@ -155,8 +192,19 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
               candidate.initialization().completeExceptionally(initializationFailure(failure));
             }
           });
+      codecMetadataStore
+          .initialize(metadata.collection(), format, codec)
+          .whenComplete(
+              (stored, failure) -> {
+                if (failure == null) {
+                  candidate.codecMetadata().complete(stored);
+                } else {
+                  candidate.codecMetadata().completeExceptionally(failure);
+                }
+              });
     } catch (RuntimeException failure) {
       candidate.initialization().completeExceptionally(initializationFailure(failure));
+      candidate.codecMetadata().completeExceptionally(failure);
     }
     return candidate.initialization();
   }
@@ -261,6 +309,32 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
     return collection;
   }
 
+  private static String requireText(String value, String description) {
+    Objects.requireNonNull(value, description);
+    if (value.isBlank()) {
+      throw new IllegalArgumentException(description + " must not be blank");
+    }
+    return value;
+  }
+
+  private static void requireCompatible(
+      String collection, StoredCodecMetadata stored, String format, String codec) {
+    if (!stored.format().equals(format)) {
+      throw new StorageException.CodecMismatch(
+          collection, stored.format(), stored.codec(), format, codec);
+    }
+  }
+
   private record Registration(
-      D1CollectionMetadata metadata, CompletableFuture<@Nullable Void> initialization) {}
+      D1CollectionMetadata metadata,
+      String format,
+      String codec,
+      CompletableFuture<@Nullable Void> initialization,
+      CompletableFuture<StoredCodecMetadata> codecMetadata) {
+
+    private Registration {
+      Objects.requireNonNull(format, "format");
+      Objects.requireNonNull(codec, "codec");
+    }
+  }
 }

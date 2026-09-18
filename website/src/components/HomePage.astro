@@ -63,7 +63,7 @@ record User(@Id String id, @Index String country, @Index long score) {}
 
 R2D1 database = R2D1.builder()
     .collectionFactory(new PersistenceCollectionFactory(
-        documentStore, indexStore, documentCodec, indexStore::initialize))
+        documentStore, indexStore, indexStore::initialize))
     .build();
 
 R2D1Collection<User> users = database.collection(User.class);

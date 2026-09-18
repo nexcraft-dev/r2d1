@@ -2,7 +2,6 @@ package dev.nexcraft.r2d1.micronaut;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import dev.nexcraft.r2d1.DocumentCodec;
 import dev.nexcraft.r2d1.spi.DocumentStore;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.RuntimeBeanDefinition;
@@ -18,7 +17,7 @@ class MissingJdbcAdapterTest {
             () ->
                 ApplicationContext.builder()
                     .properties(Map.of("r2d1.enabled", true, "r2d1.index.type", "jdbc"))
-                    .beanDefinitions(bean(DocumentStore.class), bean(DocumentCodec.class))
+                    .beanDefinitions(bean(DocumentStore.class))
                     .start())
         .hasMessageContaining("index backend 'jdbc'")
         .hasMessageContaining("add the matching R2D1 adapter");

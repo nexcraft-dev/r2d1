@@ -39,7 +39,7 @@ import org.jspecify.annotations.Nullable;
  * Asynchronous {@link DocumentStore} backed by one filesystem directory tree.
  *
  * <p>Each document has one canonical file under {@code rootDirectory}: the collection and document
- * identifier are encoded as safe path segments and the document file ends in {@code .json}. A put
+ * identifier are encoded as safe path segments and the document file ends in {@code .r2d1}. A put
  * writes a unique temporary file in the collection directory and publishes it with an atomic move
  * that replaces the canonical file. The adapter never falls back to a non-atomic move.
  *

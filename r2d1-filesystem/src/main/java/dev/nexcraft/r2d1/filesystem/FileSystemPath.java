@@ -14,7 +14,7 @@ import java.util.Objects;
 final class FileSystemPath {
 
   private static final char[] HEX = "0123456789ABCDEF".toCharArray();
-  private static final String DOCUMENT_SUFFIX = ".json";
+  private static final String DOCUMENT_SUFFIX = ".r2d1";
 
   private FileSystemPath() {}
 

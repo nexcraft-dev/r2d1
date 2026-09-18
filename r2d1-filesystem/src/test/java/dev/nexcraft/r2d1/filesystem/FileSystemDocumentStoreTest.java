@@ -66,7 +66,7 @@ class FileSystemDocumentStoreTest {
     await(store.put(KEY, bytes("second")));
 
     assertThat(await(store.get(KEY))).isEqualTo(bytes("second"));
-    assertThat(fileNames(root.resolve("users"))).containsExactly("user-1.json");
+    assertThat(fileNames(root.resolve("users"))).containsExactly("user-1.r2d1");
   }
 
   @Test
@@ -301,7 +301,7 @@ class FileSystemDocumentStoreTest {
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Filesystem put failed for document: users/user-1");
     assertThat(await(initial.get(KEY))).isEqualTo(bytes("old"));
-    assertThat(fileNames(root.resolve("users"))).containsExactly("user-1.json");
+    assertThat(fileNames(root.resolve("users"))).containsExactly("user-1.r2d1");
   }
 
   @Test
@@ -322,7 +322,7 @@ class FileSystemDocumentStoreTest {
     assertThat(failure).isInstanceOf(dev.nexcraft.r2d1.spi.StorageException.Operation.class);
     assertThat(failure.getCause()).isInstanceOf(AtomicMoveNotSupportedException.class);
     assertThat(await(initial.get(KEY))).isEqualTo(bytes("old"));
-    assertThat(fileNames(root.resolve("users"))).containsExactly("user-1.json");
+    assertThat(fileNames(root.resolve("users"))).containsExactly("user-1.r2d1");
   }
 
   @Test

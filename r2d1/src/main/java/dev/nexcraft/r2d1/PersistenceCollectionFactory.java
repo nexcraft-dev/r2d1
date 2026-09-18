@@ -18,7 +18,6 @@ public final class PersistenceCollectionFactory implements R2D1.CollectionFactor
 
   private final DocumentStore documentStore;
   private final IndexStore indexStore;
-  private final DocumentCodec documentCodec;
   private final CollectionInitializer collectionInitializer;
 
   /**
@@ -26,24 +25,32 @@ public final class PersistenceCollectionFactory implements R2D1.CollectionFactor
    *
    * @param documentStore authoritative serialized document storage
    * @param indexStore derived query index
-   * @param documentCodec domain document serialization boundary
    * @param collectionInitializer asynchronous collection schema initializer
    * @throws NullPointerException if any argument is {@code null}
    */
   public PersistenceCollectionFactory(
       DocumentStore documentStore,
       IndexStore indexStore,
-      DocumentCodec documentCodec,
       CollectionInitializer collectionInitializer) {
     this.documentStore = Objects.requireNonNull(documentStore, "documentStore");
     this.indexStore = Objects.requireNonNull(indexStore, "indexStore");
-    this.documentCodec = Objects.requireNonNull(documentCodec, "documentCodec");
     this.collectionInitializer =
         Objects.requireNonNull(collectionInitializer, "collectionInitializer");
   }
 
   @Override
   public <T> R2D1Collection<T> create(Class<T> documentType) {
+    Objects.requireNonNull(documentType, "documentType");
+    return PersistenceRuntime.createWithCodecSupplier(
+        documentType,
+        documentStore,
+        indexStore,
+        () -> JsonDocumentCodec.forType(documentType),
+        collectionInitializer);
+  }
+
+  @Override
+  public <T> R2D1Collection<T> create(Class<T> documentType, DocumentCodec<T> documentCodec) {
     return PersistenceRuntime.create(
         Objects.requireNonNull(documentType, "documentType"),
         documentStore,
@@ -57,12 +64,14 @@ public final class PersistenceCollectionFactory implements R2D1.CollectionFactor
   public interface CollectionInitializer {
 
     /**
-     * Initializes or validates storage for a document type.
+     * Initializes or validates storage for a document type and codec identity.
      *
      * @param documentType annotated document class
+     * @param format current codec storage format
+     * @param codec current codec identity
      * @return stage that completes when the collection is ready
-     * @throws NullPointerException if {@code documentType} is {@code null}
+     * @throws NullPointerException if any argument is {@code null}
      */
-    CompletionStage<@Nullable Void> initialize(Class<?> documentType);
+    CompletionStage<@Nullable Void> initialize(Class<?> documentType, String format, String codec);
   }
 }

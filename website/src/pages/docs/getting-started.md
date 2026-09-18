@@ -72,16 +72,17 @@ public record User(
     String name) {}
 ```
 
-R2D1 does not select a JSON library. Supply a `DocumentCodec` that serializes the domain object to
-`StoredDocument` and deserializes it again when the collection hydrates a result.
+R2D1 uses the built-in Avaje JSON-B generated-adapter codec by default (`format=json`, codec id
+`avaje-jsonb-3`). Document types must be adapter-capable. Supply a custom `DocumentCodec<T>` to a
+collection when the application requires a different format or serialization policy.
 
 ## 5. Configure the common collection API
 
 The following example leaves backend construction to the application so the two storage roles stay
-visible. `documentStore`, `indexStore`, and `documentCodec` are application-owned values.
+visible. `documentStore` and `indexStore` are application-owned values; a custom codec, when used,
+is supplied on the collection API.
 
 ```java
-import dev.nexcraft.r2d1.DocumentCodec;
 import dev.nexcraft.r2d1.PersistenceCollectionFactory;
 import dev.nexcraft.r2d1.R2D1;
 import dev.nexcraft.r2d1.R2D1Collection;
@@ -90,20 +91,21 @@ import dev.nexcraft.r2d1.spi.IndexStore;
 
 DocumentStore documentStore = applicationDocumentStore;
 IndexStore indexStore = applicationIndexStore;
-DocumentCodec documentCodec = applicationDocumentCodec;
 
 R2D1 database =
     R2D1.builder()
         .collectionFactory(
             new PersistenceCollectionFactory(
-                documentStore, indexStore, documentCodec, indexStore::initialize))
+                documentStore, indexStore, indexStore::initialize))
         .build();
 
 R2D1Collection<User> users = database.collection(User.class);
 ```
 
-Opening the collection initializes or validates the index metadata before returning the collection.
-The factory does not take ownership of the stores, codec, or caller-owned execution resources.
+Opening the collection initializes or validates the codec metadata and index metadata before
+returning the collection. Use `database.collection(AuditEvent.class, auditEventCodec)` when a
+collection needs a custom codec. The factory does not take ownership of the stores, codec, or
+caller-owned execution resources.
 
 ## 6. Put, get, and delete
 

@@ -685,15 +685,25 @@ class SpringAutoConfigurationTest {
     };
   }
 
-  private static DocumentCodec codec() {
-    return new DocumentCodec() {
+  private static DocumentCodec<Object> codec() {
+    return new DocumentCodec<>() {
       @Override
-      public StoredDocument serialize(Object document) {
-        return new StoredDocument(new byte[0]);
+      public String id() {
+        return "spring-test-codec";
       }
 
       @Override
-      public <T> T deserialize(StoredDocument document, Class<T> documentType) {
+      public String format() {
+        return "spring-test";
+      }
+
+      @Override
+      public byte[] encode(Object document) {
+        return new byte[0];
+      }
+
+      @Override
+      public Object decode(byte[] data) {
         throw new UnsupportedOperationException("test codec");
       }
     };
@@ -722,7 +732,7 @@ class SpringAutoConfigurationTest {
   }
 
   private static PersistenceCollectionFactory.CollectionInitializer initializer() {
-    return ignored -> CompletableFuture.completedFuture(null);
+    return (documentType, format, codec) -> CompletableFuture.completedFuture(null);
   }
 
   private static JdbcDataSource dataSource(String name) {

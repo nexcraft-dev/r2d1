@@ -28,19 +28,28 @@ final class TestDocumentSupport {
   @ReflectiveAccess
   record User(@Id String id, @Index String country, String name) {}
 
-  static final class UserCodec implements DocumentCodec {
+  static final class UserCodec implements DocumentCodec<User> {
 
     @Override
-    public StoredDocument serialize(Object document) {
-      User user = (User) document;
-      String encoded = user.id() + "\n" + user.country() + "\n" + user.name();
-      return new StoredDocument(encoded.getBytes(StandardCharsets.UTF_8));
+    public String id() {
+      return "test-codec-1";
     }
 
     @Override
-    public <T> T deserialize(StoredDocument document, Class<T> documentType) {
-      String[] values = new String(document.content(), StandardCharsets.UTF_8).split("\\n", -1);
-      return documentType.cast(new User(values[0], values[1], values[2]));
+    public String format() {
+      return "test";
+    }
+
+    @Override
+    public byte[] encode(User user) {
+      String encoded = user.id() + "\n" + user.country() + "\n" + user.name();
+      return encoded.getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public User decode(byte[] data) {
+      String[] values = new String(data, StandardCharsets.UTF_8).split("\\n", -1);
+      return new User(values[0], values[1], values[2]);
     }
   }
 

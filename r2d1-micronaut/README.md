@@ -7,8 +7,9 @@ that the integration creates itself. It does not add Micronaut APIs to `r2d1`.
 ## Requirements and dependencies
 
 Micronaut 5 and this module require Java 25. The `r2d1` and `r2d1-jdbc` artifacts remain compiled
-for Java 21. The module uses Micronaut Platform 5.1.5 and is built with the Micronaut library Gradle
-plugin 5.0.2.
+for Java 21. The published integration does not bring Micronaut framework dependencies
+transitively; the consuming application must already provide Micronaut 5. The module uses
+Micronaut Platform 5.1.5 for its build and is built with the Micronaut library Gradle plugin 5.0.2.
 
 Add the integration. It transitively provides `r2d1`, including the Cloudflare R2 and D1 adapters:
 
@@ -129,8 +130,7 @@ The following application beans take precedence, from highest to lowest:
 
 1. `R2D1`
 2. `R2D1.CollectionFactory`
-3. `DocumentStore`, `IndexStore`, `DocumentCodec`, and
-   `PersistenceCollectionFactory.CollectionInitializer`
+3. `DocumentStore`, `IndexStore`, and `PersistenceCollectionFactory.CollectionInitializer`
 
 An application `R2D1` prevents integration-owned storage resources from being instantiated. A
 custom `IndexStore` must have a matching `PersistenceCollectionFactory.CollectionInitializer`;

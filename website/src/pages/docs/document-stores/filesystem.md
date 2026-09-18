@@ -43,11 +43,11 @@ filesystem operation is still running. The executor's own capacity remains a sep
 The root contains one encoded directory per collection and one encoded canonical file per document:
 
 ```text
-<root>/<encoded-collection>/<encoded-document-id>.json
+<root>/<encoded-collection>/<encoded-document-id>.r2d1
 ```
 
 Collection names and identifiers are encoded as UTF-8 path segments. `list` recognizes canonical
-`.json` files only. Temporary files, orphan temporary files, symlinks, and unrelated files are not
+`.r2d1` files only. Temporary files, orphan temporary files, symlinks, and unrelated files are not
 documents. A missing canonical file makes `get` fail with `DocumentNotFoundException`; deleting a
 missing file is idempotent.
 

@@ -148,7 +148,7 @@ class ConsistencyRecoveryTest {
     }
     DocumentKey archiveKey = new DocumentKey("users_archive", "archive-1");
     fixture.documents.stored.put(
-        archiveKey, fixture.codec.serialize(new User("archive-1", "AU", 999L)));
+        archiveKey, bytes(fixture.codec.encode(new User("archive-1", "AU", 999L))));
     fixture.indexes.rows.put(archiveKey, new IndexEntry(archiveKey, Map.of()));
 
     fixture.collection().rebuildIndex();
@@ -171,9 +171,9 @@ class ConsistencyRecoveryTest {
 
     assertThat(fixture.documents.allControlledGetsStarted.await(2, TimeUnit.SECONDS)).isTrue();
     assertThat(fixture.indexes.clearCalls).isZero();
-    fixture.documents.completeGet(key("C"), fixture.codec.serialize(new User("C", "US", 3L)));
-    fixture.documents.completeGet(key("A"), fixture.codec.serialize(new User("A", "NZ", 1L)));
-    fixture.documents.completeGet(key("B"), fixture.codec.serialize(new User("B", "AU", 2L)));
+    fixture.documents.completeGet(key("C"), bytes(fixture.codec.encode(new User("C", "US", 3L))));
+    fixture.documents.completeGet(key("A"), bytes(fixture.codec.encode(new User("A", "NZ", 1L))));
+    fixture.documents.completeGet(key("B"), bytes(fixture.codec.encode(new User("B", "AU", 2L))));
 
     rebuild.get(2, TimeUnit.SECONDS);
     assertThat(fixture.indexes.rows.keySet()).containsExactly(key("A"), key("B"), key("C"));
@@ -189,12 +189,12 @@ class ConsistencyRecoveryTest {
     keys.forEach(
         documentKey ->
             documentDelegate.stored.put(
-                documentKey, codec.serialize(new User(documentKey.id(), "NZ", 1L))));
+                documentKey, bytes(codec.encode(new User(documentKey.id(), "NZ", 1L)))));
     documentDelegate.controlGets(keys);
     keys.forEach(
         documentKey ->
             documentDelegate.stored.put(
-                documentKey, codec.serialize(new User(documentKey.id(), "NZ", 1L))));
+                documentKey, bytes(codec.encode(new User(documentKey.id(), "NZ", 1L)))));
     CompletableFuture<IndexPage> controlledQuery = new CompletableFuture<>();
     indexDelegate.controlQuery(controlledQuery);
     AdmissionController r2Admission = new AdmissionController(new BackpressureConfig(2, 1));
@@ -203,8 +203,8 @@ class ConsistencyRecoveryTest {
     AdmittedIndexStore indexes = new AdmittedIndexStore(indexDelegate, d1Admission);
     PersistenceCollectionFactory factory =
         new PersistenceCollectionFactory(
-            documents, indexes, new UserCodec(), ignored -> completedVoid());
-    R2D1Collection<User> collection = factory.create(User.class);
+            documents, indexes, (ignored, format, codecId) -> completedVoid());
+    R2D1Collection<User> collection = factory.create(User.class, new UserCodec());
     CompletableFuture<Void> query =
         CompletableFuture.runAsync(() -> collection.query().limit(4).fetch());
 
@@ -246,15 +246,15 @@ class ConsistencyRecoveryTest {
     for (int index = 0; index < keys.size(); index++) {
       DocumentKey documentKey = keys.get(index);
       documentDelegate.stored.put(
-          documentKey, codec.serialize(new User(documentKey.id(), "NZ", (long) index)));
+          documentKey, bytes(codec.encode(new User(documentKey.id(), "NZ", (long) index))));
     }
     AdmissionController r2Admission = new AdmissionController(BackpressureConfig.DEFAULT);
     AdmittedDocumentStore documents = new AdmittedDocumentStore(documentDelegate, r2Admission);
     documents.expectGetSubmissions(100);
     PersistenceCollectionFactory factory =
         new PersistenceCollectionFactory(
-            documents, indexes, new UserCodec(), ignored -> completedVoid());
-    R2D1Collection<User> collection = factory.create(User.class);
+            documents, indexes, (ignored, format, codecId) -> completedVoid());
+    R2D1Collection<User> collection = factory.create(User.class, codec);
     CompletableFuture<Void> rebuild = CompletableFuture.runAsync(collection::rebuildIndex);
 
     assertThat(documents.awaitGetSubmissions(2, TimeUnit.SECONDS)).isTrue();
@@ -307,7 +307,9 @@ class ConsistencyRecoveryTest {
     IllegalArgumentException failure = new IllegalArgumentException("invalid document");
     fixture.codec.deserializeFailure = failure;
 
-    assertThatThrownBy(() -> fixture.collection().rebuildIndex()).isSameAs(failure);
+    assertThatThrownBy(() -> fixture.collection().rebuildIndex())
+        .isInstanceOf(StorageException.CodecFailure.class)
+        .hasCause(failure);
     assertThat(fixture.indexes.rows).containsOnlyKeys(key("existing"));
     assertThat(fixture.indexes.clearCalls).isZero();
   }
@@ -354,7 +356,7 @@ class ConsistencyRecoveryTest {
   @Test
   void rejectsAListedKeyWhoseDocumentContentHasAnotherIdentity() {
     Fixture fixture = new Fixture();
-    fixture.documents.stored.put(key("A"), fixture.codec.serialize(new User("B", "NZ", 1L)));
+    fixture.documents.stored.put(key("A"), bytes(fixture.codec.encode(new User("B", "NZ", 1L))));
     fixture.indexes.rows.put(key("existing"), entry(new User("existing", "NZ", 1L)));
 
     assertThatThrownBy(() -> fixture.collection().rebuildIndex())
@@ -389,6 +391,10 @@ class ConsistencyRecoveryTest {
     return new StoredDocument(value.getBytes(StandardCharsets.UTF_8));
   }
 
+  private static StoredDocument bytes(byte[] value) {
+    return new StoredDocument(value);
+  }
+
   private static CompletionStage<@Nullable Void> completedVoid() {
     return CompletableFuture.<@Nullable Void>completedFuture(null);
   }
@@ -403,18 +409,17 @@ class ConsistencyRecoveryTest {
         new PersistenceCollectionFactory(
             documents,
             indexes,
-            codec,
-            ignored -> {
+            (ignored, format, codecId) -> {
               events.add("initialize");
               return completedVoid();
             });
 
     private void store(User user) {
-      documents.stored.put(key(user.id()), codec.serialize(user));
+      documents.stored.put(key(user.id()), bytes(codec.encode(user)));
     }
 
     private R2D1Collection<User> collection() {
-      return factory.create(User.class);
+      return factory.create(User.class, codec);
     }
   }
 
@@ -650,25 +655,35 @@ class ConsistencyRecoveryTest {
     }
   }
 
-  private static final class UserCodec implements DocumentCodec {
+  private static final class UserCodec implements DocumentCodec<User> {
 
     private @Nullable RuntimeException deserializeFailure;
 
     @Override
-    public StoredDocument serialize(Object document) {
-      User user = (User) document;
-      return bytes(user.id() + "\n" + user.country() + "\n" + user.rank());
+    public String id() {
+      return "test-codec-1";
     }
 
     @Override
-    public <T> T deserialize(StoredDocument document, Class<T> documentType) {
-      String value = new String(document.content(), StandardCharsets.UTF_8);
+    public String format() {
+      return "test";
+    }
+
+    @Override
+    public byte[] encode(User user) {
+      return (user.id() + "\n" + user.country() + "\n" + user.rank())
+          .getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public User decode(byte[] data) {
+      String value = new String(data, StandardCharsets.UTF_8);
       if (deserializeFailure != null && value.equals("corrupt")) {
         throw deserializeFailure;
       }
       String[] values = value.split("\\n", -1);
       String country = values[1].equals("<null>") ? null : values[1];
-      return documentType.cast(new User(values[0], country, Long.parseLong(values[2])));
+      return new User(values[0], country, Long.parseLong(values[2]));
     }
   }
 

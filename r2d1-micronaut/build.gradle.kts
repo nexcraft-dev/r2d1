@@ -10,6 +10,9 @@ plugins {
 
 description = "Micronaut 5 configuration and dependency injection integration"
 
+val micronautPlatformVersion = "5.1.5"
+val micronautCoreVersion = "5.1.15"
+
 val optionalAdapterTest = sourceSets.create("optionalAdapterTest")
 optionalAdapterTest.compileClasspath += sourceSets.main.get().output
 optionalAdapterTest.runtimeClasspath += optionalAdapterTest.output + optionalAdapterTest.compileClasspath
@@ -19,7 +22,11 @@ nativeH2Test.compileClasspath += sourceSets.main.get().output
 nativeH2Test.runtimeClasspath += nativeH2Test.output + nativeH2Test.compileClasspath
 
 micronaut {
-    version.set("5.1.5")
+    version.set(micronautPlatformVersion)
+    importMicronautPlatform.set(false)
+    ignoredAutomaticDependencies.add("io.micronaut:micronaut-inject")
+    ignoredAutomaticDependencies.add("io.micronaut:micronaut-inject-java")
+    ignoredAutomaticDependencies.add("io.micronaut:micronaut-graal")
     processing {
         incremental.set(true)
         module.set(project.name)
@@ -41,10 +48,16 @@ tasks.withType<JavaCompile>().configureEach {
 dependencies {
     api(project(":r2d1"))
     api("org.jspecify:jspecify:1.0.0")
-    api("io.micronaut:micronaut-context")
+    compileOnly("io.micronaut:micronaut-context:$micronautCoreVersion")
+    annotationProcessor("io.micronaut:micronaut-inject-java:$micronautCoreVersion")
+    annotationProcessor("io.micronaut:micronaut-graal:$micronautCoreVersion")
+    testAnnotationProcessor("io.micronaut:micronaut-inject-java:$micronautCoreVersion")
+    testAnnotationProcessor("io.micronaut:micronaut-graal:$micronautCoreVersion")
 
     compileOnly(project(":r2d1-jdbc"))
 
+    testImplementation(platform("io.micronaut.platform:micronaut-platform:$micronautPlatformVersion"))
+    testImplementation("io.micronaut:micronaut-context:$micronautCoreVersion")
     testImplementation(project(":r2d1-jdbc"))
     testImplementation("com.h2database:h2:2.5.250")
 
@@ -54,7 +67,7 @@ dependencies {
     add(optionalAdapterTest.implementationConfigurationName, project(":r2d1"))
     add(
         optionalAdapterTest.implementationConfigurationName,
-        platform("io.micronaut.platform:micronaut-platform:5.1.5"),
+        platform("io.micronaut.platform:micronaut-platform:$micronautPlatformVersion"),
     )
     add(optionalAdapterTest.implementationConfigurationName, "io.micronaut:micronaut-context")
     add(
@@ -70,7 +83,7 @@ dependencies {
     add(nativeH2Test.implementationConfigurationName, "com.h2database:h2:2.5.250")
     add(
         nativeH2Test.implementationConfigurationName,
-        platform("io.micronaut.platform:micronaut-platform:5.1.5"),
+        platform("io.micronaut.platform:micronaut-platform:$micronautPlatformVersion"),
     )
     add(nativeH2Test.implementationConfigurationName, "io.micronaut:micronaut-context")
     add(nativeH2Test.runtimeOnlyConfigurationName, "org.junit.platform:junit-platform-launcher")

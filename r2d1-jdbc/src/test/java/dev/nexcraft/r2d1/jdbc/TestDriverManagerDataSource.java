@@ -239,15 +239,17 @@ final class TestDriverManagerDataSource implements DataSource {
               try {
                 boolean ddl = false;
                 if (method.getName().startsWith("execute")) {
-                  SQLException failure = statementFailure.getAndSet(null);
-                  if (failure != null) {
-                    throw failure;
-                  }
                   String sql = preparedSql;
                   if (arguments != null
                       && arguments.length > 0
                       && arguments[0] instanceof String text) {
                     sql = text;
+                  }
+                  SQLException failure = statementFailure.get();
+                  if (failure != null
+                      && !isCodecMetadataStatement(sql)
+                      && statementFailure.compareAndSet(failure, null)) {
+                    throw failure;
                   }
                   ddl = isDdl(sql);
                   if (ddl) {
@@ -277,8 +279,10 @@ final class TestDriverManagerDataSource implements DataSource {
                 }
                 Object result = method.invoke(statement, arguments);
                 if (ddl) {
-                  SQLException failure = statementFailureAfterExecution.getAndSet(null);
-                  if (failure != null) {
+                  SQLException failure = statementFailureAfterExecution.get();
+                  if (failure != null
+                      && !isCodecMetadataStatement(preparedSql)
+                      && statementFailureAfterExecution.compareAndSet(failure, null)) {
                     throw failure;
                   }
                 }
@@ -293,6 +297,10 @@ final class TestDriverManagerDataSource implements DataSource {
                 }
               }
             });
+  }
+
+  private static boolean isCodecMetadataStatement(@Nullable String sql) {
+    return sql != null && sql.toLowerCase(Locale.ROOT).contains("_r2d1_metadata");
   }
 
   private DatabaseMetaData trackMetadata(DatabaseMetaData metadata) {

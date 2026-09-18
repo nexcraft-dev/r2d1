@@ -53,8 +53,8 @@ class PersistenceCollectionFactoryTest {
     Fixture fixture = new Fixture();
     R2D1 client = R2D1.builder().collectionFactory(fixture.factory).build();
 
-    R2D1Collection<User> first = client.collection(User.class);
-    R2D1Collection<User> second = client.collection(User.class);
+    R2D1Collection<User> first = client.collection(User.class, fixture.codec);
+    R2D1Collection<User> second = client.collection(User.class, fixture.codec);
 
     assertThat(first).isNotSameAs(second);
     assertThat(fixture.initializedTypes).containsExactly(User.class, User.class);
@@ -119,7 +119,8 @@ class PersistenceCollectionFactoryTest {
   @Test
   void getsAndDeserializesOnlyFromTheAuthoritativeStore() {
     Fixture fixture = new Fixture();
-    fixture.documents.stored.put(USER_1, fixture.codec.serialize(new User("user-1", "NZ", 7L)));
+    fixture.documents.stored.put(
+        USER_1, new StoredDocument(fixture.codec.encode(new User("user-1", "NZ", 7L))));
     fixture.codec.serialized = null;
     R2D1Collection<User> collection = fixture.collection();
 
@@ -206,9 +207,12 @@ class PersistenceCollectionFactoryTest {
         CompletableFuture.supplyAsync(() -> collection.query().limit(3).fetch());
 
     assertThat(fixture.documents.allControlledGetsStarted.await(2, TimeUnit.SECONDS)).isTrue();
-    fixture.documents.completeGet("B", fixture.codec.serialize(new User("B", "NZ", 2L)));
-    fixture.documents.completeGet("C", fixture.codec.serialize(new User("C", "NZ", 3L)));
-    fixture.documents.completeGet("A", fixture.codec.serialize(new User("A", "NZ", 1L)));
+    fixture.documents.completeGet(
+        "B", new StoredDocument(fixture.codec.encode(new User("B", "NZ", 2L))));
+    fixture.documents.completeGet(
+        "C", new StoredDocument(fixture.codec.encode(new User("C", "NZ", 3L))));
+    fixture.documents.completeGet(
+        "A", new StoredDocument(fixture.codec.encode(new User("A", "NZ", 1L))));
 
     assertThat(result.get(2, TimeUnit.SECONDS).items())
         .extracting(User::id)
@@ -219,7 +223,8 @@ class PersistenceCollectionFactoryTest {
   @Test
   void translatesQueriesAndRoundTripsTheIndexCursor() {
     Fixture fixture = new Fixture();
-    fixture.documents.stored.put(USER_1, fixture.codec.serialize(new User("user-1", "NZ", 7L)));
+    fixture.documents.stored.put(
+        USER_1, new StoredDocument(fixture.codec.encode(new User("user-1", "NZ", 7L))));
     IndexCursor cursor = new IndexCursor(USER_1, Optional.of(new IndexValue.LongValue(7L)));
     fixture.indexes.queryResult =
         CompletableFuture.completedFuture(new IndexPage(List.of(USER_1), Optional.of(cursor)));
@@ -277,10 +282,9 @@ class PersistenceCollectionFactoryTest {
         new PersistenceCollectionFactory(
             fixture.documents,
             fixture.indexes,
-            fixture.codec,
-            type -> CompletableFuture.failedFuture(failure));
+            (type, format, codec) -> CompletableFuture.failedFuture(failure));
 
-    assertThatThrownBy(() -> factory.create(User.class)).isSameAs(failure);
+    assertThatThrownBy(() -> factory.create(User.class, fixture.codec)).isSameAs(failure);
     assertThat(fixture.documents.putCalls).isZero();
   }
 
@@ -358,7 +362,8 @@ class PersistenceCollectionFactoryTest {
   @Test
   void readsInheritedAndRecordMetadata() {
     Fixture fixture = new Fixture();
-    R2D1Collection<InheritedUser> collection = fixture.factory.create(InheritedUser.class);
+    R2D1Collection<InheritedUser> collection =
+        fixture.factory.create(InheritedUser.class, new InheritedUserCodec());
 
     collection.put(new InheritedUser("user-1", "NZ"));
 
@@ -376,31 +381,27 @@ class PersistenceCollectionFactoryTest {
         .isThrownBy(
             () ->
                 new PersistenceCollectionFactory(
-                    null, fixture.indexes, fixture.codec, type -> completedVoid()))
+                    null, fixture.indexes, (type, format, codec) -> completedVoid()))
         .withMessage("documentStore");
     assertThatNullPointerException()
         .isThrownBy(
             () ->
                 new PersistenceCollectionFactory(
-                    fixture.documents, null, fixture.codec, type -> completedVoid()))
+                    fixture.documents, null, (type, format, codec) -> completedVoid()))
         .withMessage("indexStore");
     assertThatNullPointerException()
-        .isThrownBy(
-            () ->
-                new PersistenceCollectionFactory(
-                    fixture.documents, fixture.indexes, null, type -> completedVoid()))
-        .withMessage("documentCodec");
+        .isThrownBy(() -> fixture.factory.create(User.class, null))
+        .withMessage("codec");
     assertThatNullPointerException()
         .isThrownBy(
-            () ->
-                new PersistenceCollectionFactory(
-                    fixture.documents, fixture.indexes, fixture.codec, null))
+            () -> new PersistenceCollectionFactory(fixture.documents, fixture.indexes, null))
         .withMessage("collectionInitializer");
 
-    fixture.codec.returnNullFromSerialize = true;
-    assertThatNullPointerException()
-        .isThrownBy(() -> fixture.collection().put(new User("user-1", "NZ", 7L)))
-        .withMessage("documentCodec returned null");
+    fixture.codec.returnNullFromEncode = true;
+    assertThatThrownBy(() -> fixture.collection().put(new User("user-1", "NZ", 7L)))
+        .isInstanceOf(StorageException.CodecFailure.class)
+        .hasMessageContaining("document codec encode failed")
+        .hasCauseInstanceOf(NullPointerException.class);
     assertThat(fixture.documents.putCalls).isZero();
   }
 
@@ -419,15 +420,14 @@ class PersistenceCollectionFactoryTest {
         new PersistenceCollectionFactory(
             documents,
             indexes,
-            codec,
-            type -> {
+            (type, format, codecId) -> {
               events.add("initialize");
               initializedTypes.add(type);
               return completedVoid();
             });
 
     private R2D1Collection<User> collection() {
-      return factory.create(User.class);
+      return factory.create(User.class, codec);
     }
   }
 
@@ -553,30 +553,59 @@ class PersistenceCollectionFactoryTest {
     }
   }
 
-  private static final class UserCodec implements DocumentCodec {
+  private static final class UserCodec implements DocumentCodec<User> {
 
     private @Nullable Object serialized;
-    private boolean returnNullFromSerialize;
+    private boolean returnNullFromEncode;
 
     @Override
-    @SuppressWarnings("DataFlowIssue")
-    public StoredDocument serialize(Object document) {
-      serialized = document;
-      if (returnNullFromSerialize) {
-        return null;
-      }
-      if (document instanceof InheritedUser) {
-        return new StoredDocument("inherited-user".getBytes(StandardCharsets.UTF_8));
-      }
-      User user = (User) document;
-      String value = user.id() + "\n" + user.country() + "\n" + user.rank();
-      return new StoredDocument(value.getBytes(StandardCharsets.UTF_8));
+    public String id() {
+      return "test-codec-1";
     }
 
     @Override
-    public <T> T deserialize(StoredDocument document, Class<T> documentType) {
-      String[] values = new String(document.content(), StandardCharsets.UTF_8).split("\\n", -1);
-      return documentType.cast(new User(values[0], values[1], Long.valueOf(values[2])));
+    public String format() {
+      return "test";
+    }
+
+    @Override
+    @SuppressWarnings("DataFlowIssue")
+    public byte[] encode(User document) {
+      serialized = document;
+      if (returnNullFromEncode) {
+        return null;
+      }
+      String value = document.id() + "\n" + document.country() + "\n" + document.rank();
+      return value.getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public User decode(byte[] data) {
+      String[] values = new String(data, StandardCharsets.UTF_8).split("\\n", -1);
+      return new User(values[0], values[1], Long.valueOf(values[2]));
+    }
+  }
+
+  private static final class InheritedUserCodec implements DocumentCodec<InheritedUser> {
+
+    @Override
+    public String id() {
+      return "test-codec-1";
+    }
+
+    @Override
+    public String format() {
+      return "test";
+    }
+
+    @Override
+    public byte[] encode(InheritedUser document) {
+      return ("inherited-user\n" + document.country).getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public InheritedUser decode(byte[] data) {
+      throw new UnsupportedOperationException("decode is not used by this metadata test");
     }
   }
 
