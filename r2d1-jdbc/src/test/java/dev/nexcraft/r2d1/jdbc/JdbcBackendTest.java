@@ -95,7 +95,7 @@ abstract class JdbcBackendTest {
     try (JdbcExecution execution = createExecution(2, 16)) {
       JdbcIndexStore reopened = new JdbcIndexStore(reopenedDataSource, execution);
       completedValue(reopened.initialize(PersistentDocument.class));
-      assertThat(reopenedDataSource.resourceSnapshot().ddlStatements()).isZero();
+      assertThat(reopenedDataSource.resourceSnapshot().ddlStatements()).isEqualTo(1);
       IndexPage page =
           completedValue(
               reopened.query(
@@ -128,7 +128,7 @@ abstract class JdbcBackendTest {
     try (JdbcExecution execution = createExecution(2, 16)) {
       JdbcIndexStore twiceReopened = new JdbcIndexStore(twiceReopenedDataSource, execution);
       completedValue(twiceReopened.initialize(PersistentDocument.class));
-      assertThat(twiceReopenedDataSource.resourceSnapshot().ddlStatements()).isZero();
+      assertThat(twiceReopenedDataSource.resourceSnapshot().ddlStatements()).isEqualTo(1);
       assertThat(
               completedValue(
                       twiceReopened.query(
@@ -213,7 +213,7 @@ abstract class JdbcBackendTest {
     try (JdbcExecution execution = createExecution(1, 8)) {
       JdbcIndexStore store = new JdbcIndexStore(reopened, execution);
       completedValue(store.initialize(ExpandedSchemaDocument.class));
-      assertThat(reopened.resourceSnapshot().ddlStatements()).isZero();
+      assertThat(reopened.resourceSnapshot().ddlStatements()).isEqualTo(1);
       assertThat(indexColumns(reopened, "schema_entries"))
           .containsEntry("idx_schema_entries_country", List.of("country"))
           .containsEntry("idx_schema_entries_rank", List.of("rank"));

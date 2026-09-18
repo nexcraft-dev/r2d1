@@ -17,10 +17,11 @@ dependencies {
 ```
 
 The starter depends on this auto-configuration module and the standard Spring Boot starter. This
-module depends on `r2d1`. Filesystem and JDBC adapters are compile-only integration points here;
-they do not leak into the published POM or Gradle module metadata. JDBC drivers remain
-application-provided. Use this auto-configuration artifact directly when composing a custom
-starter.
+module depends on `r2d1`, while Spring Boot itself is compile-only here because the consuming
+application already provides the framework. Filesystem and JDBC adapters are also compile-only
+integration points; none of these dependencies leak into the published POM or Gradle module
+metadata. JDBC drivers remain application-provided. Use this auto-configuration artifact directly
+when composing a custom starter.
 
 The module targets Java 21. The managed JDBC `virtual-thread` mode requires Java 25 or newer and
 fails explicitly on older runtimes; it never falls back to platform threads.
@@ -123,7 +124,6 @@ replace the corresponding R2D1 default:
 - `R2D1.CollectionFactory`
 - `DocumentStore`
 - `IndexStore`
-- `DocumentCodec`
 - `PersistenceCollectionFactory.CollectionInitializer`
 - `JdbcExecution`
 

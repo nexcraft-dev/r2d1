@@ -72,13 +72,13 @@ class D1IndexStoreTest {
     assertThat(page.documentKeys())
         .containsExactly(new DocumentKey("users", "a"), new DocumentKey("users", "b"));
     assertThat(page.nextCursor()).isPresent();
-    assertThat(transport.statements().get(4).parameters())
+    assertThat(transport.statements().get(7).parameters())
         .containsExactly(
             new D1Parameter.TextParameter("user-1"), new D1Parameter.TextParameter("NZ"));
-    assertThat(transport.statements().get(5).parameters())
+    assertThat(transport.statements().get(8).parameters())
         .containsExactly(new D1Parameter.IntegerParameter(3));
-    assertThat(transport.statements().get(6).parameters()).isEmpty();
-    assertThat(transport.statements().get(6).sql()).doesNotContain("DROP");
+    assertThat(transport.statements().get(9).parameters()).isEmpty();
+    assertThat(transport.statements().get(9).sql()).doesNotContain("DROP");
     transport.assertExhausted();
   }
 
@@ -170,6 +170,15 @@ class D1IndexStoreTest {
   }
 
   private static void expectCompatibleSchema(ScriptedD1Transport transport) {
+    transport.expect(
+        "CREATE TABLE IF NOT EXISTS \"_r2d1_metadata\" (\"collection_name\" TEXT PRIMARY KEY NOT NULL, "
+            + "\"format\" TEXT NOT NULL, \"codec\" TEXT NOT NULL)");
+    transport.expect(
+        "INSERT OR IGNORE INTO \"_r2d1_metadata\" (\"collection_name\", \"format\", \"codec\") "
+            + "VALUES (?, ?, ?)");
+    transport.expect(
+        "SELECT \"format\", \"codec\" FROM \"_r2d1_metadata\" WHERE \"collection_name\" = ?",
+        List.of(Map.of("format", "json", "codec", "avaje-jsonb-3")));
     transport.expect(
         "PRAGMA table_info(\"users\")",
         List.of(

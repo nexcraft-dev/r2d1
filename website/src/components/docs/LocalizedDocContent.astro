@@ -32,7 +32,7 @@ const collectionExample = `R2D1 database =
     R2D1.builder()
         .collectionFactory(
             new PersistenceCollectionFactory(
-                documentStore, indexStore, documentCodec, indexStore::initialize))
+                documentStore, indexStore, indexStore::initialize))
         .build();
 
 R2D1Collection<User> users = database.collection(User.class);`;
@@ -60,7 +60,7 @@ FileSystemDocumentStore documents =
     new FileSystemDocumentStore(
         Path.of("/var/lib/my-app/r2d1"), filesystemExecutor);`;
 
-const filesystemLayout = `<root>/<encoded-collection>/<encoded-document-id>.json`;
+const filesystemLayout = `<root>/<encoded-collection>/<encoded-document-id>.r2d1`;
 
 const d1Example = `D1Config config = new D1Config(accountId, databaseId, apiToken);
 D1IndexStore indexes = new D1IndexStore(config);
@@ -69,7 +69,7 @@ R2D1 database =
     R2D1.builder()
         .collectionFactory(
             new PersistenceCollectionFactory(
-                documentStore, indexes, documentCodec, indexes::initialize))
+                documentStore, indexes, indexes::initialize))
         .build();`;
 
 const jdbcExample = `DataSource dataSource = applicationDataSource;
@@ -144,7 +144,7 @@ const copy: Record<LocalizedLocale, Record<string, DocCopy>> = {
       intro: "R2D1은 두 storage contract를 조정하는 framework-independent Java library입니다. DocumentStore는 완전한 문서와 논리적 존재의 권위 있는 원본이고, IndexStore는 쿼리를 위한 재구축 가능한 projection입니다.",
       sections: [
         { title: "R2D1", paragraphs: ["두 역할을 분리하면 R2 + D1, R2 + JDBC, Filesystem + D1, Filesystem + JDBC를 같은 collection API로 사용할 수 있습니다. 조합이 바뀌어도 @Document, @Id, @Index와 mutation/query 흐름은 바뀌지 않습니다."] },
-        { title: "문서와 collection", paragraphs: ["@Document가 document type의 collection 이름을 정합니다. 비어 있지 않은 String member 하나에 @Id를 붙여 식별자를 정하고, @Index가 붙은 필드만 index store에 projection됩니다.", "R2D1은 JSON library를 선택하지 않습니다. DocumentCodec이 domain object와 authoritative store가 보관하는 StoredDocument bytes 사이의 경계를 담당합니다."], code: { language: "java", value: documentExample } },
+        { title: "문서와 collection", paragraphs: ["@Document가 document type의 collection 이름을 정합니다. 비어 있지 않은 String member 하나에 @Id를 붙여 식별자를 정하고, @Index가 붙은 필드만 index store에 projection됩니다.", "R2D1은 adapter가 생성된 타입에 Avaje JSON-B codec을 기본으로 사용합니다(format=json, id=avaje-jsonb-3). 다른 형식이나 serialization 정책이 필요하면 collection별 DocumentCodec<T>를 전달할 수 있습니다."], code: { language: "java", value: documentExample } },
         { title: "DocumentStore", paragraphs: ["DocumentStore는 serialized document의 list, put, get, delete를 비동기 SPI로 제공합니다. R2와 filesystem 구현은 document store이며 query engine이 아닙니다.", "get(id)는 document store를 직접 읽습니다. index row가 남아 있어도 authoritative document가 없으면 문서는 논리적으로 존재하지 않습니다."] },
         { title: "IndexStore", paragraphs: ["IndexStore는 document key와 @Index 필드 값을 한 행의 projection으로 저장합니다. D1과 JDBC가 이 contract를 구현합니다.", "인덱스는 disposable합니다. rebuildIndex()는 authoritative document를 스캔하고 collection의 derived rows를 교체합니다. 비원자적 작업이므로 collection 쓰기를 멈춘 상태에서 실행하세요."] },
         { title: "쿼리와 cursor", paragraphs: ["R2D1Collection.query()는 immutable query builder를 반환합니다. 필터는 명시적으로 인덱싱한 필드에만 적용하며 여러 비교는 AND로 결합됩니다.", "한 개의 indexed sort, 양수 limit, 이전 페이지의 opaque cursor를 사용할 수 있습니다. cursor는 adapter가 만든 값이므로 해석하거나 수정하지 마세요."], bullets: ["지원되는 비교: eq, notEq, gt, gte, lt, lte", "지원하지 않는 기능: join, 임의 SQL, OR predicate, full-text search, 정규식, client-side filtering"] }
@@ -158,7 +158,7 @@ const copy: Record<LocalizedLocale, Record<string, DocCopy>> = {
         { title: "DocumentStore 선택", paragraphs: ["권위 있는 완전한 문서를 저장할 backend는 R2 또는 Filesystem 중 하나입니다. R2는 비동기 AWS SDK client를 사용하고, Filesystem은 애플리케이션이 제공한 executor에서 blocking I/O를 실행합니다."] },
         { title: "IndexStore 선택", paragraphs: ["필터와 정렬에 사용하는 document identifier 및 @Index projection은 D1 또는 JDBC 중 하나에 저장합니다. D1은 Java HttpClient를 통한 REST transport이고, JDBC는 애플리케이션 소유 DataSource 경계를 사용합니다."] },
         { title: "Resource 소유권", paragraphs: ["R2D1 adapter는 호출자가 제공한 DataSource, HttpClient, S3AsyncClient, Executor를 임의로 닫지 않습니다. adapter가 직접 만든 resource의 소유권만 해당 adapter 또는 execution 객체에 있습니다.", "JDBC driver, connection pool, database server, Cloudflare account와 credential은 애플리케이션과 운영 환경이 소유합니다."] },
-        { title: "네 가지 조합", paragraphs: ["R2 + D1, R2 + JDBC, Filesystem + D1, Filesystem + JDBC를 선택할 수 있습니다. 두 store와 DocumentCodec을 PersistenceCollectionFactory에 전달하면 공통 R2D1Collection이 두 backend를 조정합니다."], code: { language: "java", value: collectionExample } }
+        { title: "네 가지 조합", paragraphs: ["R2 + D1, R2 + JDBC, Filesystem + D1, Filesystem + JDBC를 선택할 수 있습니다. 두 store를 PersistenceCollectionFactory에 전달하면 공통 R2D1Collection이 두 backend를 조정합니다. 다른 형식이 필요하면 collection API에 DocumentCodec<T>를 전달합니다."], code: { language: "java", value: collectionExample } }
       ],
       related: [{ label: "시작하기 →", href: "/docs/getting-started/" }, { label: "R2 설정 →", href: "/docs/document-stores/r2/" }, { label: "JDBC 설정 →", href: "/docs/index-stores/jdbc/" }]
     },
@@ -178,7 +178,7 @@ const copy: Record<LocalizedLocale, Record<string, DocCopy>> = {
       sections: [
         { title: "의존성과 생성", paragraphs: ["root directory와 blocking I/O용 executor를 전달합니다. adapter는 executor를 만들거나 닫지 않으므로 사용이 끝난 뒤 caller가 중지해야 합니다."], code: { language: "kotlin", value: `implementation("dev.nexcraft:r2d1-filesystem:${stableVersion}")` } },
         { title: "생성 예시", code: { language: "java", value: filesystemExample } },
-        { title: "디스크 layout", paragraphs: ["collection 이름과 document identifier는 UTF-8 path segment로 encode됩니다. list는 canonical .json 파일만 document로 인식합니다."], code: { language: "text", value: filesystemLayout }, bullets: ["temporary file, orphan temporary file, symlink, unrelated file은 document가 아닙니다.", "canonical file이 없으면 get은 DocumentNotFoundException을 반환합니다.", "없는 파일을 delete하는 것은 idempotent합니다."] },
+        { title: "디스크 layout", paragraphs: ["collection 이름과 document identifier는 UTF-8 path segment로 encode됩니다. list는 canonical .r2d1 파일만 document로 인식합니다."], code: { language: "text", value: filesystemLayout }, bullets: ["temporary file, orphan temporary file, symlink, unrelated file은 document가 아닙니다.", "canonical file이 없으면 get은 DocumentNotFoundException을 반환합니다.", "없는 파일을 delete하는 것은 idempotent합니다."] },
         { title: "Atomic replacement", paragraphs: ["put은 collection directory 안의 고유 temporary file에 전체 bytes를 쓰고 닫은 다음 ATOMIC_MOVE + REPLACE_EXISTING으로 publish합니다. provider가 atomic replace를 지원하지 않으면 StorageException.Operation으로 실패하며 delete-then-move로 fallback하지 않습니다.", "process crash 뒤 orphan temporary file이 남을 수 있지만 logical visibility는 바뀌지 않습니다. startup 때 자동 제거하지 않습니다."] },
         { title: "Durability와 concurrency 한계", paragraphs: ["atomic visibility는 fsync나 power-loss durability 보장이 아닙니다. directory와 file metadata를 stable storage로 force하지 않습니다.", "동시 put에는 lost-update 방지, JVM lock, distributed lock, version history, MVCC, CAS, ETag가 제공되지 않습니다.", "DocumentStore.put 뒤 IndexStore.upsert, DocumentStore.delete 뒤 IndexStore.delete 순서를 따르며, 두 번째 단계 실패 의미는 Consistency 문서와 같습니다."] }
       ],
@@ -239,7 +239,7 @@ D1IndexStore indexes = new D1IndexStore(config);` }, paragraphs: ["D1Config.toSt
         { title: "Integration 활성화", paragraphs: ["r2d1.enabled=true가 아니면 integration은 비활성화됩니다. R2D1을 eager하게 만들기 때문에 불완전한 설정은 startup 중 실패합니다. index type은 jdbc 또는 d1입니다."], code: { language: "yaml", value: micronautYaml } },
         { title: "Cloudflare 설정", paragraphs: ["r2와 d1 설정은 framework-neutral adapter와 같은 경계를 사용합니다. secret-bearing configuration의 toString은 값을 가립니다."], code: { language: "yaml", value: cloudflareYaml } },
         { title: "Resource ownership", paragraphs: ["애플리케이션이 unique 또는 @Primary S3AsyncClient나 Java HttpClient를 제공하면 integration은 이를 borrow하고 닫지 않습니다. 그렇지 않으면 integration이 만든 adapter resource를 소유하고 닫습니다.", "r2d1.jdbc.executor가 애플리케이션 소유 Executor를 가리키면 Micronaut는 bounded admission만 감싸고 executor를 종료하지 않습니다. 외부 executor와 execution-mode를 함께 설정하지 마세요.", "integration은 DataSource, connection pool 또는 database server를 시작하거나 닫지 않습니다."] },
-        { title: "Override와 native image", paragraphs: ["애플리케이션 bean이 R2D1, CollectionFactory, DocumentStore, IndexStore, DocumentCodec와 initializer 순서로 integration bean보다 우선합니다.", "검증된 native smoke path는 H2 JDBC backend를 사용하는 Micronaut ApplicationContext입니다. native image의 document type에는 @ReflectiveAccess 같은 명시적 reflection registration이 필요할 수 있으며, R2와 D1 native runtime은 검증된 지원 경로가 아닙니다.", "이 모듈은 Micronaut Data repository, HTTP endpoint, metrics, tracing, Spring compatibility, R2DBC, retry policy, database-server lifecycle을 제공하지 않습니다."] }
+        { title: "Override와 native image", paragraphs: ["애플리케이션 bean이 R2D1, CollectionFactory, DocumentStore, IndexStore와 initializer 순서로 integration bean보다 우선합니다. custom DocumentCodec은 collection API에 전달합니다.", "검증된 native smoke path는 H2 JDBC backend를 사용하는 Micronaut ApplicationContext입니다. native image의 document type에는 @ReflectiveAccess 같은 명시적 reflection registration이 필요할 수 있으며, R2와 D1 native runtime은 검증된 지원 경로가 아닙니다.", "이 모듈은 Micronaut Data repository, HTTP endpoint, metrics, tracing, Spring compatibility, R2DBC, retry policy, database-server lifecycle을 제공하지 않습니다."] }
       ],
       related: [{ label: "Configuration →", href: "/docs/configuration/" }, { label: "JDBC IndexStore →", href: "/docs/index-stores/jdbc/" }]
     }
@@ -249,7 +249,7 @@ D1IndexStore indexes = new D1IndexStore(config);` }, paragraphs: ["D1Config.toSt
       intro: "R2D1 是一个协调两个存储 contract 的 framework-independent Java library。DocumentStore 是完整文档和逻辑存在性的权威来源，IndexStore 是用于查询的可重建 projection。",
       sections: [
         { title: "R2D1", paragraphs: ["分离这两个角色后，可以用同一个 collection API 组合 R2 + D1、R2 + JDBC、Filesystem + D1 或 Filesystem + JDBC。组合改变时，@Document、@Id、@Index 以及 mutation/query 流程不变。"] },
-        { title: "文档与集合", paragraphs: ["@Document 指定 document type 的 collection 名称。使用一个非空 String member 上的 @Id 作为标识，只有 @Index 字段会投影到 index store。", "R2D1 不选择 JSON library。DocumentCodec 负责 domain object 与 authoritative store 保存的 StoredDocument bytes 之间的边界。"], code: { language: "java", value: documentExample } },
+        { title: "文档与集合", paragraphs: ["@Document 指定 document type 的 collection 名称。使用一个非空 String member 上的 @Id 作为标识，只有 @Index 字段会投影到 index store。", "R2D1 默认对生成了 adapter 的类型使用 Avaje JSON-B codec（format=json，id=avaje-jsonb-3）。如果需要其他格式或 serialization policy，可以按 collection 传入 DocumentCodec<T>。"], code: { language: "java", value: documentExample } },
         { title: "DocumentStore", paragraphs: ["DocumentStore 通过异步 SPI 提供 serialized document 的 list、put、get、delete。R2 和 filesystem 实现是 document store，不是 query engine。", "get(id) 直接读取 document store。即使 index row 仍然存在，没有 authoritative document 时该文档也不具有逻辑存在性。"] },
         { title: "IndexStore", paragraphs: ["IndexStore 将 document key 和 @Index 字段值保存为一条 projection。D1 和 JDBC 实现这个 contract。", "索引可以丢弃并重建。rebuildIndex() 扫描 authoritative document 并替换 collection 的 derived rows。这个操作不是原子的，应在暂停 collection 写入时执行。"] },
         { title: "查询与游标", paragraphs: ["R2D1Collection.query() 返回 immutable query builder。过滤只能使用显式索引字段，多项比较使用 AND 组合。", "可以使用一个 indexed sort、正数 limit 以及上一页的不透明 cursor。cursor 由 adapter 创建，不要解析或修改它。"], bullets: ["支持的比较：eq、notEq、gt、gte、lt、lte", "不提供：join、任意 SQL、OR predicate、全文搜索、正则表达式、客户端过滤"] }
@@ -263,7 +263,7 @@ D1IndexStore indexes = new D1IndexStore(config);` }, paragraphs: ["D1Config.toSt
         { title: "选择 DocumentStore", paragraphs: ["权威完整文档可以保存到 R2 或 Filesystem。R2 使用异步 AWS SDK 客户端，Filesystem 在应用提供的 executor 上执行 blocking I/O。"] },
         { title: "选择 IndexStore", paragraphs: ["用于过滤和排序的 document identifier 以及 @Index projection 可以保存到 D1 或 JDBC。D1 使用 Java HttpClient 的 REST transport，JDBC 使用应用拥有的 DataSource 边界。"] },
         { title: "资源所有权", paragraphs: ["R2D1 adapter 不会随意关闭调用方提供的 DataSource、HttpClient、S3AsyncClient 或 Executor。只有 adapter 或 execution 对象直接创建的 resource 由它们拥有。", "JDBC driver、connection pool、database server、Cloudflare account 和 credential 由应用和运行环境拥有。"] },
-        { title: "四种组合", paragraphs: ["可以选择 R2 + D1、R2 + JDBC、Filesystem + D1、Filesystem + JDBC。将两个 store 和 DocumentCodec 传给 PersistenceCollectionFactory 后，通用 R2D1Collection 会协调它们。"], code: { language: "java", value: collectionExample } }
+        { title: "四种组合", paragraphs: ["可以选择 R2 + D1、R2 + JDBC、Filesystem + D1、Filesystem + JDBC。将两个 store 传给 PersistenceCollectionFactory 后，通用 R2D1Collection 会协调它们。需要其他格式时，在 collection API 中传入 DocumentCodec<T>。"], code: { language: "java", value: collectionExample } }
       ],
       related: [{ label: "开始使用 →", href: "/docs/getting-started/" }, { label: "R2 设置 →", href: "/docs/document-stores/r2/" }, { label: "JDBC 设置 →", href: "/docs/index-stores/jdbc/" }]
     },
@@ -283,7 +283,7 @@ D1IndexStore indexes = new D1IndexStore(config);` }, paragraphs: ["D1Config.toSt
       sections: [
         { title: "依赖与创建", paragraphs: ["传入 root directory 和用于 blocking I/O 的 executor。adapter 不会创建或关闭 executor，使用结束后由调用方停止它。"], code: { language: "kotlin", value: `implementation("dev.nexcraft:r2d1-filesystem:${stableVersion}")` } },
         { title: "创建示例", code: { language: "java", value: filesystemExample } },
-        { title: "磁盘布局", paragraphs: ["collection 名称和 document identifier 会编码为 UTF-8 path segment。list 只将 canonical .json 文件识别为 document。"], code: { language: "text", value: filesystemLayout }, bullets: ["temporary file、orphan temporary file、symlink 和 unrelated file 都不是 document。", "没有 canonical file 时，get 返回 DocumentNotFoundException。", "删除不存在的文件是 idempotent。"] },
+        { title: "磁盘布局", paragraphs: ["collection 名称和 document identifier 会编码为 UTF-8 path segment。list 只将 canonical .r2d1 文件识别为 document。"], code: { language: "text", value: filesystemLayout }, bullets: ["temporary file、orphan temporary file、symlink 和 unrelated file 都不是 document。", "没有 canonical file 时，get 返回 DocumentNotFoundException。", "删除不存在的文件是 idempotent。"] },
         { title: "Atomic replacement", paragraphs: ["put 将完整 bytes 写入 collection directory 中的唯一 temporary file，关闭后使用 ATOMIC_MOVE + REPLACE_EXISTING 发布。如果 provider 不支持 atomic replace，则以 StorageException.Operation 失败，不会退化为 delete-then-move。", "进程崩溃可能留下 orphan temporary file，但不会改变 logical visibility，启动时也不会自动清理。"] },
         { title: "Durability 与 concurrency 边界", paragraphs: ["atomic visibility 不是 fsync 或 power-loss durability 保证。adapter 不会将 directory 或 file metadata 强制写入稳定存储。", "并发 put 不提供 lost-update prevention、JVM lock、distributed lock、version history、MVCC、CAS 或 ETag。", "顺序是 DocumentStore.put 后 IndexStore.upsert、DocumentStore.delete 后 IndexStore.delete；第二阶段失败的语义见 Consistency 文档。"] }
       ],
@@ -344,7 +344,7 @@ D1IndexStore indexes = new D1IndexStore(config);` }, paragraphs: ["D1Config.toSt
         { title: "启用 integration", paragraphs: ["除非 r2d1.enabled=true，否则 integration 禁用。它会 eager 创建 R2D1，因此不完整配置会在 startup 期间失败。index type 是 jdbc 或 d1。"], code: { language: "yaml", value: micronautYaml } },
         { title: "Cloudflare 配置", paragraphs: ["r2 和 d1 配置使用与 framework-neutral adapter 相同的边界。带 secret 的 configuration object 会在 toString() 中隐藏值。"], code: { language: "yaml", value: cloudflareYaml } },
         { title: "Resource ownership", paragraphs: ["如果应用提供 unique 或 @Primary S3AsyncClient 或 Java HttpClient，integration 会借用但不会关闭它。否则 integration 拥有并关闭自己创建的 adapter resource。", "如果 r2d1.jdbc.executor 指向应用拥有的 Executor，Micronaut 只包装 bounded admission，不会关闭 executor。不要同时配置 external executor 和 execution-mode。", "integration 不会启动或关闭 DataSource、connection pool 或 database server。"] },
-        { title: "Override 与 native image", paragraphs: ["应用 bean 按 R2D1、CollectionFactory、DocumentStore、IndexStore、DocumentCodec 和 initializer 的顺序优先于 integration bean。", "已验证的 native smoke path 是使用 H2 JDBC backend 的 Micronaut ApplicationContext。native image 中使用的 document type 可能需要 @ReflectiveAccess 等显式 reflection registration；R2 和 D1 native runtime 目前不是已验证支持路径。", "此模块不提供 Micronaut Data repository、HTTP endpoint、metrics、tracing、Spring compatibility、R2DBC、retry policy 或 database-server lifecycle。"] }
+        { title: "Override 与 native image", paragraphs: ["应用 bean 按 R2D1、CollectionFactory、DocumentStore、IndexStore 和 initializer 的顺序优先于 integration bean；custom DocumentCodec 通过 collection API 传入。", "已验证的 native smoke path 是使用 H2 JDBC backend 的 Micronaut ApplicationContext。native image 中使用的 document type 可能需要 @ReflectiveAccess 等显式 reflection registration；R2 和 D1 native runtime 目前不是已验证支持路径。", "此模块不提供 Micronaut Data repository、HTTP endpoint、metrics、tracing、Spring compatibility、R2DBC、retry policy 或 database-server lifecycle。"] }
       ],
       related: [{ label: "配置 →", href: "/docs/configuration/" }, { label: "JDBC IndexStore →", href: "/docs/index-stores/jdbc/" }]
     }
@@ -354,7 +354,7 @@ D1IndexStore indexes = new D1IndexStore(config);` }, paragraphs: ["D1Config.toSt
       intro: "R2D1 は2つの storage contract を調整する framework-independent Java library です。DocumentStore は完全なドキュメントと論理的な存在の権威ソースで、IndexStore はクエリ用の再構築可能な projection です。",
       sections: [
         { title: "R2D1", paragraphs: ["この2つの役割を分けることで、R2 + D1、R2 + JDBC、Filesystem + D1、Filesystem + JDBC を同じ collection API で組み合わせられます。組み合わせが変わっても @Document、@Id、@Index と mutation/query の流れは変わりません。"] },
-        { title: "ドキュメントとコレクション", paragraphs: ["@Document が document type の collection 名を決めます。空でない String member の1つに @Id を付けて識別子にし、@Index のフィールドだけを index store に projection します。", "R2D1 は JSON library を選びません。DocumentCodec が domain object と authoritative store に保存する StoredDocument bytes の境界になります。"], code: { language: "java", value: documentExample } },
+        { title: "ドキュメントとコレクション", paragraphs: ["@Document が document type の collection 名を決めます。空でない String member の1つに @Id を付けて識別子にし、@Index のフィールドだけを index store に projection します。", "R2D1 は adapter が生成された型に Avaje JSON-B codec をデフォルトで使います（format=json、id=avaje-jsonb-3）。別の形式や serialization policy が必要な場合は、collection ごとに DocumentCodec<T> を渡せます。"], code: { language: "java", value: documentExample } },
         { title: "DocumentStore", paragraphs: ["DocumentStore は serialized document の list、put、get、delete を非同期 SPI として提供します。R2 と filesystem の実装は document store であり、query engine ではありません。", "get(id) はこの store を直接読みます。index row が残っていても authoritative document がなければ、ドキュメントは論理的には存在しません。"] },
         { title: "IndexStore", paragraphs: ["IndexStore は document key と @Index フィールド値を1つの projection として保存します。D1 と JDBC がこの contract を実装します。", "インデックスは破棄して再構築できます。rebuildIndex() は authoritative document を走査し、collection の derived rows を置き換えます。非アトミックなので collection への書き込みを止めて実行してください。"] },
         { title: "クエリとカーソル", paragraphs: ["R2D1Collection.query() は immutable query builder を返します。フィルタは明示的にインデックス化したフィールドだけに適用し、複数の比較は AND で結合します。", "1つの indexed sort、正の limit、前ページの opaque cursor を使えます。cursor は adapter が作成する値なので解釈や変更をしないでください。"], bullets: ["サポートする比較: eq、notEq、gt、gte、lt、lte", "提供しない機能: join、任意 SQL、OR predicate、全文検索、正規表現、client-side filtering"] }
@@ -368,7 +368,7 @@ D1IndexStore indexes = new D1IndexStore(config);` }, paragraphs: ["D1Config.toSt
         { title: "DocumentStore を選ぶ", paragraphs: ["権威ドキュメントの保存先は R2 または Filesystem です。R2 は非同期 AWS SDK client を使い、Filesystem はアプリケーションが提供する executor で blocking I/O を実行します。"] },
         { title: "IndexStore を選ぶ", paragraphs: ["フィルタとソートに使う document identifier と @Index projection は D1 または JDBC に保存します。D1 は Java HttpClient による REST transport、JDBC はアプリケーション所有の DataSource 境界を使います。"] },
         { title: "リソース所有権", paragraphs: ["R2D1 adapter は呼び出し側が提供した DataSource、HttpClient、S3AsyncClient、Executor を勝手に閉じません。adapter または execution が直接作成した resource だけを所有します。", "JDBC driver、connection pool、database server、Cloudflare account、credential はアプリケーションと運用環境が所有します。"] },
-        { title: "4つの組み合わせ", paragraphs: ["R2 + D1、R2 + JDBC、Filesystem + D1、Filesystem + JDBC を選べます。2つの store と DocumentCodec を PersistenceCollectionFactory に渡すと、共通 R2D1Collection が両方を調整します。"], code: { language: "java", value: collectionExample } }
+        { title: "4つの組み合わせ", paragraphs: ["R2 + D1、R2 + JDBC、Filesystem + D1、Filesystem + JDBC を選べます。2つの store を PersistenceCollectionFactory に渡すと、共通 R2D1Collection が両方を調整します。別の形式が必要な場合は collection API に DocumentCodec<T> を渡します。"], code: { language: "java", value: collectionExample } }
       ],
       related: [{ label: "はじめに →", href: "/docs/getting-started/" }, { label: "R2 の設定 →", href: "/docs/document-stores/r2/" }, { label: "JDBC の設定 →", href: "/docs/index-stores/jdbc/" }]
     },
@@ -388,7 +388,7 @@ D1IndexStore indexes = new D1IndexStore(config);` }, paragraphs: ["D1Config.toSt
       sections: [
         { title: "依存関係と生成", paragraphs: ["root directory と blocking I/O 用 executor を渡します。adapter は executor を作成・終了しないため、使い終わったら caller が停止します。"], code: { language: "kotlin", value: `implementation("dev.nexcraft:r2d1-filesystem:${stableVersion}")` } },
         { title: "生成例", code: { language: "java", value: filesystemExample } },
-        { title: "ディスク layout", paragraphs: ["collection 名と document identifier は UTF-8 path segment として encode されます。list は canonical .json ファイルだけを document として認識します。"], code: { language: "text", value: filesystemLayout }, bullets: ["temporary file、orphan temporary file、symlink、unrelated file は document ではありません。", "canonical file がない場合、get は DocumentNotFoundException になります。", "存在しないファイルの delete は idempotent です。"] },
+        { title: "ディスク layout", paragraphs: ["collection 名と document identifier は UTF-8 path segment として encode されます。list は canonical .r2d1 ファイルだけを document として認識します。"], code: { language: "text", value: filesystemLayout }, bullets: ["temporary file、orphan temporary file、symlink、unrelated file は document ではありません。", "canonical file がない場合、get は DocumentNotFoundException になります。", "存在しないファイルの delete は idempotent です。"] },
         { title: "Atomic replacement", paragraphs: ["put は collection directory 内の一意な temporary file に全 bytes を書いて閉じ、ATOMIC_MOVE + REPLACE_EXISTING で publish します。provider が atomic replace をサポートしない場合は StorageException.Operation で失敗し、delete-then-move には fallback しません。", "プロセスのクラッシュで orphan temporary file が残ることがありますが logical visibility は変わらず、起動時にも自動削除しません。"] },
         { title: "Durability と concurrency の限界", paragraphs: ["atomic visibility は fsync や power-loss durability の保証ではありません。adapter は directory と file metadata を stable storage に force しません。", "同時 put に対する lost-update prevention、JVM lock、distributed lock、version history、MVCC、CAS、ETag は提供しません。", "順序は DocumentStore.put の後に IndexStore.upsert、DocumentStore.delete の後に IndexStore.delete です。2段目の失敗は Consistency 文書の意味になります。"] }
       ],
@@ -449,7 +449,7 @@ D1IndexStore indexes = new D1IndexStore(config);` }, paragraphs: ["D1Config.toSt
         { title: "Integration を有効にする", paragraphs: ["r2d1.enabled=true でなければ integration は無効です。R2D1 を eager に作るため、不完全な設定は startup 中に失敗します。index type は jdbc または d1 です。"], code: { language: "yaml", value: micronautYaml } },
         { title: "Cloudflare 設定", paragraphs: ["r2 と d1 の設定は framework-neutral adapter と同じ境界を使います。secret を含む configuration object は toString() で値を隠します。"], code: { language: "yaml", value: cloudflareYaml } },
         { title: "Resource ownership", paragraphs: ["アプリケーションが unique または @Primary の S3AsyncClient、Java HttpClient を提供すれば integration は借用し、閉じません。なければ integration が作った adapter resource を所有して閉じます。", "r2d1.jdbc.executor がアプリケーション所有の Executor を指す場合、Micronaut は bounded admission で包むだけで終了しません。external executor と execution-mode を同時に設定しないでください。", "integration は DataSource、connection pool、database server を開始・終了しません。"] },
-        { title: "Override と native image", paragraphs: ["アプリケーション bean は R2D1、CollectionFactory、DocumentStore、IndexStore、DocumentCodec、initializer の順で integration が作る bean より優先されます。", "検証済みの native smoke path は H2 JDBC backend の Micronaut ApplicationContext です。native image の document type には @ReflectiveAccess などの明示的な reflection registration が必要になる場合があります。R2 と D1 の native runtime は現在検証済みのサポート経路ではありません。", "この module は Micronaut Data repository、HTTP endpoint、metrics、tracing、Spring compatibility、R2DBC、retry policy、database-server lifecycle を提供しません。"] }
+        { title: "Override と native image", paragraphs: ["アプリケーション bean は R2D1、CollectionFactory、DocumentStore、IndexStore、initializer の順で integration が作る bean より優先されます。custom DocumentCodec は collection API に渡します。", "検証済みの native smoke path は H2 JDBC backend の Micronaut ApplicationContext です。native image の document type には @ReflectiveAccess などの明示的な reflection registration が必要になる場合があります。R2 と D1 の native runtime は現在検証済みのサポート経路ではありません。", "この module は Micronaut Data repository、HTTP endpoint、metrics、tracing、Spring compatibility、R2DBC、retry policy、database-server lifecycle を提供しません。"] }
       ],
       related: [{ label: "設定 →", href: "/docs/configuration/" }, { label: "JDBC IndexStore →", href: "/docs/index-stores/jdbc/" }]
     }

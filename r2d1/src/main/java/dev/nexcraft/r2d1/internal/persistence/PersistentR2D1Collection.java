@@ -14,6 +14,7 @@ import dev.nexcraft.r2d1.spi.DocumentStore;
 import dev.nexcraft.r2d1.spi.IndexEntry;
 import dev.nexcraft.r2d1.spi.IndexQuery;
 import dev.nexcraft.r2d1.spi.IndexStore;
+import dev.nexcraft.r2d1.spi.StorageException;
 import dev.nexcraft.r2d1.spi.StoredDocument;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,17 +33,20 @@ final class PersistentR2D1Collection<T> implements R2D1Collection<T> {
   private final DocumentMetadata<T> metadata;
   private final DocumentStore documentStore;
   private final IndexStore indexStore;
-  private final DocumentCodec documentCodec;
+  private final DocumentCodec<T> documentCodec;
+  private final CodecDescriptor codecDescriptor;
 
   PersistentR2D1Collection(
       DocumentMetadata<T> metadata,
       DocumentStore documentStore,
       IndexStore indexStore,
-      DocumentCodec documentCodec) {
+      DocumentCodec<T> documentCodec,
+      CodecDescriptor codecDescriptor) {
     this.metadata = Objects.requireNonNull(metadata, "metadata");
     this.documentStore = Objects.requireNonNull(documentStore, "documentStore");
     this.indexStore = Objects.requireNonNull(indexStore, "indexStore");
     this.documentCodec = Objects.requireNonNull(documentCodec, "documentCodec");
+    this.codecDescriptor = Objects.requireNonNull(codecDescriptor, "codecDescriptor");
   }
 
   @Override
@@ -50,8 +54,14 @@ final class PersistentR2D1Collection<T> implements R2D1Collection<T> {
     Objects.requireNonNull(document, "document");
     IndexEntry entry = metadata.indexEntry(document);
     DocumentKey key = entry.documentKey();
-    StoredDocument storedDocument =
-        Objects.requireNonNull(documentCodec.serialize(document), "documentCodec returned null");
+    byte[] encoded;
+    try {
+      encoded =
+          Objects.requireNonNull(documentCodec.encode(document), "documentCodec returned null");
+    } catch (RuntimeException failure) {
+      throw codecFailure("encode", failure);
+    }
+    StoredDocument storedDocument = new StoredDocument(encoded);
 
     CompletionStage<@Nullable Void> pipeline =
         StageSupport.invoke(() -> documentStore.put(key, storedDocument))
@@ -288,9 +298,21 @@ final class PersistentR2D1Collection<T> implements R2D1Collection<T> {
   }
 
   private T deserialize(StoredDocument document) {
-    return Objects.requireNonNull(
-        documentCodec.deserialize(document, metadata.documentType()),
-        "documentCodec returned null");
+    try {
+      return Objects.requireNonNull(
+          documentCodec.decode(document.content()), "documentCodec returned null");
+    } catch (RuntimeException failure) {
+      throw codecFailure("decode", failure);
+    }
+  }
+
+  private StorageException.CodecFailure codecFailure(String operation, RuntimeException failure) {
+    return new StorageException.CodecFailure(
+        metadata.collection(),
+        operation,
+        codecDescriptor.format(),
+        codecDescriptor.codec(),
+        failure);
   }
 
   private record RebuildPage(List<IndexEntry> entries, Optional<DocumentCursor> nextCursor) {}

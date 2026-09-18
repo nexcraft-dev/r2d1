@@ -123,7 +123,7 @@ the operation lifecycle.
 
 Persistence operations follow these paths:
 
-- `put`: serialize the document, write the authoritative `DocumentStore`, then upsert the index row.
+- `put`: encode the document, write the authoritative `DocumentStore`, then upsert the index row.
 - `get`: read the authoritative `DocumentStore` only.
 - `query`: query the `IndexStore`, then fetch matching documents concurrently while preserving index order.
 - `delete`: delete the authoritative document, then delete the derived index row.
@@ -204,19 +204,18 @@ R2D1 does not download R2 objects for filtering in application memory.
 ## R2D1 Java API
 
 The `r2d1` artifact defines the framework-independent contracts and includes the Cloudflare R2 and
-D1 adapters shown below. Applications supply a `DocumentCodec`, keeping domain serialization
-independent of any specific JSON library.
+D1 adapters shown below. A collection uses the built-in Avaje JSON-B generated-adapter codec by
+default (`format=json`, codec id `avaje-jsonb-3`). Types used with that default must have an Avaje
+generated adapter. A collection can instead select its own thread-safe `DocumentCodec<T>`.
 
 ```java
 DocumentStore documentStore = configuredDocumentStore;
 D1IndexStore indexStore = configuredD1IndexStore;
-DocumentCodec documentCodec = applicationDocumentCodec;
 
 R2D1 db = R2D1.builder()
     .collectionFactory(new PersistenceCollectionFactory(
         documentStore,
         indexStore,
-        documentCodec,
         indexStore::initialize))
     .build();
 
@@ -226,6 +225,9 @@ User document = applicationUser;
 users.put(document);
 
 Optional<User> storedUser = users.get("user-123");
+
+// A collection-specific codec is selected explicitly when needed.
+R2D1Collection<AuditEvent> events = db.collection(AuditEvent.class, auditEventCodec);
 
 Page<User> page = users.query()
     .where("country").eq("NZ")
@@ -364,7 +366,7 @@ FileSystemDocumentStore documents =
 ```
 
 The application owns and closes `filesystemExecutor`. Each collection is one encoded directory;
-each document is one encoded `<id>.json` canonical file. PUT writes a unique temporary file in the
+each document is one encoded `<id>.r2d1` canonical file. PUT writes a unique temporary file in the
 same directory and publishes it with `ATOMIC_MOVE` plus replacement. If the provider cannot provide
 that atomic publication, the operation fails and the previous canonical file remains in place; no
 unsafe delete-then-move fallback is attempted. Temporary and orphan files are ignored by GET and

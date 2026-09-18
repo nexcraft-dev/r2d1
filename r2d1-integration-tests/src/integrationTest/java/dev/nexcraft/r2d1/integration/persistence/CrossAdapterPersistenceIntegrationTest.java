@@ -36,7 +36,8 @@ import org.junit.jupiter.api.io.TempDir;
 @Timeout(value = 5, unit = TimeUnit.MINUTES)
 class CrossAdapterPersistenceIntegrationTest {
 
-  private static final IntegrationDocumentCodec CODEC = new IntegrationDocumentCodec();
+  private static final IntegrationDocumentCodec<PersistenceDocument> CODEC =
+      new IntegrationDocumentCodec<>(PersistenceDocument.class);
 
   @TempDir Path filesystemRoot;
 
@@ -100,10 +101,9 @@ class CrossAdapterPersistenceIntegrationTest {
       PersistenceCollectionFactory.CollectionInitializer initializer) {
     R2D1Collection<PersistenceDocument> collection =
         R2D1.builder()
-            .collectionFactory(
-                new PersistenceCollectionFactory(documents, indexes, CODEC, initializer))
+            .collectionFactory(new PersistenceCollectionFactory(documents, indexes, initializer))
             .build()
-            .collection(PersistenceDocument.class);
+            .collection(PersistenceDocument.class, CODEC);
     PersistenceDocument document =
         new PersistenceDocument("cross-adapter", "NZ", 1L, "contract-payload");
 

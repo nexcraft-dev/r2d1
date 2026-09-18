@@ -75,13 +75,14 @@ class CloudflareFailureIntegrationTest {
       try {
         FailureDocument stale = new FailureDocument("missing-r2", "NZ", 10L, "stale-index-row");
         await(indexes.upsert(entry(FAILURE_COLLECTION, stale)));
+        IntegrationDocumentCodec<FailureDocument> codec =
+            new IntegrationDocumentCodec<>(FailureDocument.class);
         R2D1Collection<FailureDocument> collection =
             R2D1.builder()
                 .collectionFactory(
-                    new PersistenceCollectionFactory(
-                        documents, indexes, new IntegrationDocumentCodec(), indexes::initialize))
+                    new PersistenceCollectionFactory(documents, indexes, indexes::initialize))
                 .build()
-                .collection(FailureDocument.class);
+                .collection(FailureDocument.class, codec);
 
         Throwable failure =
             catchThrowable(() -> collection.query().where("country").eq("NZ").limit(10).fetch());

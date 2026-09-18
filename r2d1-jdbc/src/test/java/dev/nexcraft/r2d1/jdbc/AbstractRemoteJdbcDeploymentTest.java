@@ -268,9 +268,9 @@ abstract class AbstractRemoteJdbcDeploymentTest {
   @Test
   void rebuildsFromAuthoritativeDocumentsAndPublishesResultsToAnotherInstance() {
     List<Instance> stores = createInstances(2);
-    initializeSequentially(stores, RebuildDocument.class);
-    InMemoryDocumentStore documents = new InMemoryDocumentStore();
     RebuildCodec codec = new RebuildCodec();
+    initializeSequentially(stores, RebuildDocument.class, codec);
+    InMemoryDocumentStore documents = new InMemoryDocumentStore();
     documents.store(codec, new RebuildDocument("a", "NZ", 1L));
     documents.store(codec, new RebuildDocument("b", "AU", 2L));
     documents.store(codec, new RebuildDocument("c", "US", 3L));
@@ -278,8 +278,8 @@ abstract class AbstractRemoteJdbcDeploymentTest {
 
     R2D1Collection<RebuildDocument> collection =
         new PersistenceCollectionFactory(
-                documents, stores.getFirst().store(), codec, stores.getFirst().store()::initialize)
-            .create(RebuildDocument.class);
+                documents, stores.getFirst().store(), stores.getFirst().store()::initialize)
+            .create(RebuildDocument.class, codec);
     collection.rebuildIndex();
 
     assertThat(await(stores.get(1).store().query(rebuildQuery())).documentKeys())
@@ -325,6 +325,12 @@ abstract class AbstractRemoteJdbcDeploymentTest {
 
   private static void initializeSequentially(List<Instance> stores, Class<?> documentType) {
     stores.forEach(instance -> await(instance.store().initialize(documentType)));
+  }
+
+  private static <T> void initializeSequentially(
+      List<Instance> stores, Class<T> documentType, DocumentCodec<T> codec) {
+    stores.forEach(
+        instance -> await(instance.store().initialize(documentType, codec.format(), codec.id())));
   }
 
   private static void initializeConcurrently(List<Instance> stores) {
@@ -532,7 +538,9 @@ abstract class AbstractRemoteJdbcDeploymentTest {
     private final Map<DocumentKey, StoredDocument> documents = new LinkedHashMap<>();
 
     private void store(RebuildCodec codec, RebuildDocument document) {
-      documents.put(new DocumentKey("rebuild_entries", document.id()), codec.serialize(document));
+      documents.put(
+          new DocumentKey("rebuild_entries", document.id()),
+          new StoredDocument(codec.encode(document)));
     }
 
     @Override
@@ -571,21 +579,28 @@ abstract class AbstractRemoteJdbcDeploymentTest {
     }
   }
 
-  private static final class RebuildCodec implements DocumentCodec {
+  private static final class RebuildCodec implements DocumentCodec<RebuildDocument> {
 
     @Override
-    public StoredDocument serialize(Object document) {
-      RebuildDocument value = (RebuildDocument) document;
-      return new StoredDocument(
-          (value.id() + "\n" + value.country() + "\n" + value.rank())
-              .getBytes(StandardCharsets.UTF_8));
+    public String id() {
+      return "test-codec-1";
     }
 
     @Override
-    public <T> T deserialize(StoredDocument document, Class<T> documentType) {
-      String[] values = new String(document.content(), StandardCharsets.UTF_8).split("\\n", -1);
-      return documentType.cast(
-          new RebuildDocument(values[0], values[1], Long.parseLong(values[2])));
+    public String format() {
+      return "test";
+    }
+
+    @Override
+    public byte[] encode(RebuildDocument value) {
+      return (value.id() + "\n" + value.country() + "\n" + value.rank())
+          .getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public RebuildDocument decode(byte[] data) {
+      String[] values = new String(data, StandardCharsets.UTF_8).split("\\n", -1);
+      return new RebuildDocument(values[0], values[1], Long.parseLong(values[2]));
     }
   }
 }

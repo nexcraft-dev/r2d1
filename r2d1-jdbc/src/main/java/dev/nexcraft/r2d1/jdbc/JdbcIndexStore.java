@@ -3,6 +3,8 @@ package dev.nexcraft.r2d1.jdbc;
 import dev.nexcraft.r2d1.jdbc.internal.database.JdbcDatabase;
 import dev.nexcraft.r2d1.jdbc.internal.database.JdbcDialects;
 import dev.nexcraft.r2d1.jdbc.internal.database.JdbcDialects.Resolver;
+import dev.nexcraft.r2d1.jdbc.internal.metadata.JdbcCodecMetadataStore;
+import dev.nexcraft.r2d1.jdbc.internal.metadata.JdbcCodecMetadataStore.StoredCodecMetadata;
 import dev.nexcraft.r2d1.jdbc.internal.metadata.JdbcMetadata;
 import dev.nexcraft.r2d1.jdbc.internal.metadata.JdbcMetadata.CollectionMetadata;
 import dev.nexcraft.r2d1.spi.DocumentKey;
@@ -42,6 +44,7 @@ public final class JdbcIndexStore implements IndexStore {
   private final DataSource dataSource;
   private final JdbcExecution execution;
   private final Resolver dialectResolver;
+  private final JdbcCodecMetadataStore codecMetadataStore = new JdbcCodecMetadataStore();
   private final ConcurrentMap<String, Registration> registrations = new ConcurrentHashMap<>();
 
   /**
@@ -74,15 +77,44 @@ public final class JdbcIndexStore implements IndexStore {
    *     existing registration
    */
   public CompletionStage<@Nullable Void> initialize(Class<?> documentType) {
+    return initialize(documentType, "json", "avaje-jsonb-3");
+  }
+
+  /**
+   * Validates document annotations and codec metadata before preparing the collection schema.
+   *
+   * @param documentType document class annotated with {@code @Document}
+   * @param format current codec storage format
+   * @param codec current codec identity
+   * @return non-null stage that completes when metadata and schema are ready
+   * @throws NullPointerException if any argument is {@code null}
+   */
+  public CompletionStage<@Nullable Void> initialize(
+      Class<?> documentType, String format, String codec) {
+    requireText(format, "format");
+    requireText(codec, "codec");
     CollectionMetadata metadata = JdbcMetadata.inspect(documentType);
-    Registration candidate = new Registration(metadata, new CompletableFuture<>());
+    Registration candidate = new Registration(metadata, format, codec, new CompletableFuture<>());
     Registration registration = registrations.putIfAbsent(metadata.collection(), candidate);
     if (registration != null) {
       if (!registration.metadata().hasSameSchema(metadata)) {
         throw new IllegalArgumentException(
             "collection is already initialized with different metadata: " + metadata.collection());
       }
-      return registration.initialization();
+      if (registration.format().equals(format)) {
+        return registration.initialization();
+      }
+      return registration
+          .initialization()
+          .thenRun(
+              () ->
+                  requireCompatible(
+                      metadata.collection(),
+                      Objects.requireNonNull(
+                          registration.codecMetadata(),
+                          "initialized JDBC registration has no codec metadata"),
+                      format,
+                      codec));
     }
 
     CompletionStage<@Nullable Void> initialization = executeInitialization(candidate);
@@ -170,6 +202,13 @@ public final class JdbcIndexStore implements IndexStore {
               Objects.requireNonNull(
                   dialectResolver.detect(connection.getMetaData()),
                   "JDBC dialect resolver returned null");
+          StoredCodecMetadata stored =
+              codecMetadataStore.initialize(
+                  connection,
+                  registration.metadata().collection(),
+                  registration.format(),
+                  registration.codec());
+          registration.codecMetadata(stored);
           try {
             dialect.initialize(connection, registration.metadata());
           } catch (SQLException failure) {
@@ -263,15 +302,39 @@ public final class JdbcIndexStore implements IndexStore {
     return collection;
   }
 
+  private static void requireCompatible(
+      String collection, StoredCodecMetadata stored, String format, String codec) {
+    if (!stored.format().equals(format)) {
+      throw new StorageException.CodecMismatch(
+          collection, stored.format(), stored.codec(), format, codec);
+    }
+  }
+
+  private static String requireText(String value, String description) {
+    Objects.requireNonNull(value, description);
+    if (value.isBlank()) {
+      throw new IllegalArgumentException(description + " must not be blank");
+    }
+    return value;
+  }
+
   private static final class Registration {
 
     private final CollectionMetadata metadata;
+    private final String format;
+    private final String codec;
     private final CompletableFuture<@Nullable Void> initialization;
+    private volatile @Nullable StoredCodecMetadata codecMetadata;
     private volatile @Nullable JdbcDatabase dialect;
 
     private Registration(
-        CollectionMetadata metadata, CompletableFuture<@Nullable Void> initialization) {
+        CollectionMetadata metadata,
+        String format,
+        String codec,
+        CompletableFuture<@Nullable Void> initialization) {
       this.metadata = Objects.requireNonNull(metadata, "metadata");
+      this.format = Objects.requireNonNull(format, "format");
+      this.codec = Objects.requireNonNull(codec, "codec");
       this.initialization = Objects.requireNonNull(initialization, "initialization");
     }
 
@@ -281,6 +344,22 @@ public final class JdbcIndexStore implements IndexStore {
 
     private CompletableFuture<@Nullable Void> initialization() {
       return initialization;
+    }
+
+    private String format() {
+      return format;
+    }
+
+    private String codec() {
+      return codec;
+    }
+
+    private @Nullable StoredCodecMetadata codecMetadata() {
+      return codecMetadata;
+    }
+
+    private void codecMetadata(StoredCodecMetadata value) {
+      codecMetadata = Objects.requireNonNull(value, "value");
     }
 
     private @Nullable JdbcDatabase dialect() {

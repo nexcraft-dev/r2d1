@@ -102,7 +102,9 @@ Application beans take precedence over integration-created resources in this ord
 
 1. `R2D1`
 2. `R2D1.CollectionFactory`
-3. `DocumentStore`, `IndexStore`, `DocumentCodec`, and the collection initializer
+3. `DocumentStore`, `IndexStore`, and the collection initializer
+
+Custom `DocumentCodec` instances are supplied per collection through the collection API.
 
 The verified native smoke path is Micronaut `ApplicationContext` with the H2 JDBC backend. Document
 types used in a native image require explicit reflection registration, for example with

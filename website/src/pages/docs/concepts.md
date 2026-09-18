@@ -21,8 +21,11 @@ A document type declares its collection name with `@Document`. One non-blank `St
 with `@Id` supplies the document identifier. `@Index` marks fields that the index store must keep
 for lookup and ordering.
 
-The base library does not impose a serialization format. `DocumentCodec` is the boundary between a
-domain object and the `StoredDocument` bytes held by the authoritative store.
+The base library uses the Avaje JSON-B generated-adapter codec by default (`format=json`, codec id
+`avaje-jsonb-3`). Document types must be adapter-capable. A collection can receive a custom
+`DocumentCodec<T>` when an application needs a different format or serialization policy; the codec
+is the boundary between a domain object and the `StoredDocument` bytes held by the authoritative
+store.
 
 ## DocumentStore
 

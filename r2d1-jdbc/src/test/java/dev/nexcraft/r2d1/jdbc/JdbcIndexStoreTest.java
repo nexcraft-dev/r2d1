@@ -23,9 +23,12 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -338,6 +341,7 @@ class JdbcIndexStoreTest {
 
     private final String productName;
     private final List<RecordingConnection> connections = new ArrayList<>();
+    private final Map<String, List<String>> codecMetadata = new HashMap<>();
 
     private RecordingDataSource(String productName) {
       this.productName = productName;
@@ -345,7 +349,7 @@ class JdbcIndexStoreTest {
 
     @Override
     public Connection getConnection() {
-      RecordingConnection connection = new RecordingConnection(productName);
+      RecordingConnection connection = new RecordingConnection(productName, codecMetadata);
       connections.add(connection);
       return connection.proxy;
     }
@@ -391,10 +395,12 @@ class JdbcIndexStoreTest {
 
     private final Connection proxy;
     private final DatabaseMetaData metadata;
+    private final Map<String, List<String>> codecMetadata;
     private boolean closed;
 
-    private RecordingConnection(String productName) {
+    private RecordingConnection(String productName, Map<String, List<String>> codecMetadata) {
       metadata = proxy(DatabaseMetaData.class, new MetadataHandler(productName));
+      this.codecMetadata = codecMetadata;
       proxy = proxy(Connection.class, this);
     }
 
@@ -402,6 +408,10 @@ class JdbcIndexStoreTest {
     public Object invoke(Object target, Method method, @Nullable Object[] arguments) {
       return switch (method.getName()) {
         case "getMetaData" -> metadata;
+        case "prepareStatement" ->
+            proxy(
+                PreparedStatement.class,
+                new PreparedStatementHandler((String) arguments[0], codecMetadata));
         case "close" -> {
           closed = true;
           yield null;
@@ -414,6 +424,72 @@ class JdbcIndexStoreTest {
         case "equals" -> target == arguments[0];
         default -> throw new UnsupportedOperationException(method.getName());
       };
+    }
+  }
+
+  private static final class PreparedStatementHandler implements InvocationHandler {
+
+    private final String sql;
+    private final Map<String, List<String>> codecMetadata;
+    private final Map<Integer, String> parameters = new HashMap<>();
+
+    private PreparedStatementHandler(String sql, Map<String, List<String>> codecMetadata) {
+      this.sql = sql;
+      this.codecMetadata = codecMetadata;
+    }
+
+    @Override
+    public Object invoke(Object target, Method method, @Nullable Object[] arguments) {
+      return switch (method.getName()) {
+        case "setString" -> {
+          parameters.put((Integer) arguments[0], (String) arguments[1]);
+          yield null;
+        }
+        case "executeUpdate" -> {
+          if (sql.startsWith("INSERT INTO \"_r2d1_metadata\"")) {
+            codecMetadata.put(parameters.get(1), List.of(parameters.get(2), parameters.get(3)));
+          }
+          yield 1;
+        }
+        case "executeQuery" -> {
+          List<String> values = codecMetadata.get(parameters.get(1));
+          yield proxy(
+              ResultSet.class, new MetadataResultSetHandler(values == null ? List.of() : values));
+        }
+        case "close" -> null;
+        case "toString" -> sql;
+        case "hashCode" -> System.identityHashCode(target);
+        case "equals" -> target == arguments[0];
+        default -> throw new UnsupportedOperationException(method.getName());
+      };
+    }
+  }
+
+  private static final class MetadataResultSetHandler implements InvocationHandler {
+
+    private final List<String> values;
+    private boolean consumed;
+
+    private MetadataResultSetHandler(List<String> values) {
+      this.values = values;
+    }
+
+    @Override
+    public Object invoke(Object target, Method method, @Nullable Object[] arguments) {
+      return switch (method.getName()) {
+        case "next" -> !consumed && !values.isEmpty() ? consume() : false;
+        case "getString" -> values.get((Integer) arguments[0] - 1);
+        case "close" -> null;
+        case "toString" -> "RecordingResultSet";
+        case "hashCode" -> System.identityHashCode(target);
+        case "equals" -> target == arguments[0];
+        default -> throw new UnsupportedOperationException(method.getName());
+      };
+    }
+
+    private boolean consume() {
+      consumed = true;
+      return true;
     }
   }
 

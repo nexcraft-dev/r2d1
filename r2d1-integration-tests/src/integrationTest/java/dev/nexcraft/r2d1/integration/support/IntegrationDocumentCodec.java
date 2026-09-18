@@ -1,23 +1,33 @@
 package dev.nexcraft.r2d1.integration.support;
 
 import dev.nexcraft.r2d1.DocumentCodec;
-import dev.nexcraft.r2d1.integration.support.IntegrationDocuments.D1Document;
 import dev.nexcraft.r2d1.integration.support.IntegrationDocuments.FailureDocument;
 import dev.nexcraft.r2d1.integration.support.IntegrationDocuments.PersistenceDocument;
 import dev.nexcraft.r2d1.integration.support.IntegrationDocuments.RecoveryDocument;
 import dev.nexcraft.r2d1.integration.support.IntegrationDocuments.Value;
-import dev.nexcraft.r2d1.spi.StoredDocument;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
-public final class IntegrationDocumentCodec implements DocumentCodec {
+public final class IntegrationDocumentCodec<T extends Value> implements DocumentCodec<T> {
+
+  private final Class<T> documentType;
+
+  public IntegrationDocumentCodec(Class<T> documentType) {
+    this.documentType = documentType;
+  }
 
   @Override
-  public StoredDocument serialize(Object document) {
-    if (!(document instanceof Value value)) {
-      throw new IllegalArgumentException(
-          "Unsupported integration document: " + document.getClass());
-    }
+  public String id() {
+    return "integration-codec-1";
+  }
+
+  @Override
+  public String format() {
+    return "integration";
+  }
+
+  @Override
+  public byte[] encode(T value) {
     String encoded =
         String.join(
             ".",
@@ -25,12 +35,12 @@ public final class IntegrationDocumentCodec implements DocumentCodec {
             encode(value.country()),
             value.rank().toString(),
             encode(value.payload()));
-    return new StoredDocument(encoded.getBytes(StandardCharsets.UTF_8));
+    return encoded.getBytes(StandardCharsets.UTF_8);
   }
 
   @Override
-  public <T> T deserialize(StoredDocument document, Class<T> documentType) {
-    String encoded = new String(document.content(), StandardCharsets.UTF_8);
+  public T decode(byte[] data) {
+    String encoded = new String(data, StandardCharsets.UTF_8);
     String[] fields = encoded.split("\\.", -1);
     if (fields.length != 4) {
       throw new IllegalArgumentException("Invalid integration document encoding");
@@ -40,9 +50,7 @@ public final class IntegrationDocumentCodec implements DocumentCodec {
     Long rank = Long.valueOf(fields[2]);
     String payload = decode(fields[3]);
     Object value;
-    if (documentType == D1Document.class) {
-      value = new D1Document(id, country, rank, payload);
-    } else if (documentType == PersistenceDocument.class) {
+    if (documentType == PersistenceDocument.class) {
       value = new PersistenceDocument(id, country, rank, payload);
     } else if (documentType == RecoveryDocument.class) {
       value = new RecoveryDocument(id, country, rank, payload);

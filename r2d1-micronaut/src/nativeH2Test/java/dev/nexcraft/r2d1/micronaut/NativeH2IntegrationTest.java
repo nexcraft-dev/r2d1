@@ -39,11 +39,12 @@ class NativeH2IntegrationTest {
     try (ApplicationContext context =
         ApplicationContext.builder()
             .properties(Map.of("r2d1.enabled", true, "r2d1.index.type", "jdbc"))
-            .singletons(new MemoryDocumentStore(), new NativeUserCodec())
+            .singletons(new MemoryDocumentStore())
             .beanDefinitions(
                 RuntimeBeanDefinition.builder(DataSource.class, () -> dataSource).build())
             .start()) {
-      R2D1Collection<NativeUser> users = context.getBean(R2D1.class).collection(NativeUser.class);
+      R2D1Collection<NativeUser> users =
+          context.getBean(R2D1.class).collection(NativeUser.class, new NativeUserCodec());
       NativeUser user = new NativeUser("native-1", "NZ", "Aroha");
 
       users.put(user);
@@ -59,19 +60,28 @@ class NativeH2IntegrationTest {
   @ReflectiveAccess
   record NativeUser(@Id String id, @Index String country, String name) {}
 
-  static final class NativeUserCodec implements DocumentCodec {
+  static final class NativeUserCodec implements DocumentCodec<NativeUser> {
 
     @Override
-    public StoredDocument serialize(Object document) {
-      NativeUser user = (NativeUser) document;
-      String value = user.id() + "\n" + user.country() + "\n" + user.name();
-      return new StoredDocument(value.getBytes(StandardCharsets.UTF_8));
+    public String id() {
+      return "native-test-codec";
     }
 
     @Override
-    public <T> T deserialize(StoredDocument document, Class<T> documentType) {
-      String[] values = new String(document.content(), StandardCharsets.UTF_8).split("\n", -1);
-      return documentType.cast(new NativeUser(values[0], values[1], values[2]));
+    public String format() {
+      return "native-test";
+    }
+
+    @Override
+    public byte[] encode(NativeUser user) {
+      String value = user.id() + "\n" + user.country() + "\n" + user.name();
+      return value.getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public NativeUser decode(byte[] data) {
+      String[] values = new String(data, StandardCharsets.UTF_8).split("\n", -1);
+      return new NativeUser(values[0], values[1], values[2]);
     }
   }
 

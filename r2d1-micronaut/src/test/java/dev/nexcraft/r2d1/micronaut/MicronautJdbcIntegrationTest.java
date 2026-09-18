@@ -105,7 +105,9 @@ class MicronautJdbcIntegrationTest {
             properties,
             namedBean(DataSource.class, "first", first),
             namedBean(DataSource.class, "second", second))) {
-      context.getBean(R2D1.class).collection(TestDocumentSupport.User.class);
+      context
+          .getBean(R2D1.class)
+          .collection(TestDocumentSupport.User.class, new TestDocumentSupport.UserCodec());
       assertThat(hasUsersTable(first)).isFalse();
       assertThat(hasUsersTable(second)).isTrue();
     }
@@ -142,7 +144,9 @@ class MicronautJdbcIntegrationTest {
   @Test
   void selectsAPrimaryDataSourceWhenSeveralExist() throws Exception {
     try (ApplicationContext context = jdbcContext(Map.of("test.primary-datasources", true))) {
-      context.getBean(R2D1.class).collection(TestDocumentSupport.User.class);
+      context
+          .getBean(R2D1.class)
+          .collection(TestDocumentSupport.User.class, new TestDocumentSupport.UserCodec());
       DataSource primary = context.getBean(DataSource.class, Qualifiers.byName("primary"));
       DataSource secondary = context.getBean(DataSource.class, Qualifiers.byName("secondary"));
       assertThat(hasUsersTable(primary)).isTrue();
@@ -253,9 +257,7 @@ class MicronautJdbcIntegrationTest {
             () ->
                 ApplicationContext.builder()
                     .properties(Map.of("r2d1.enabled", true))
-                    .singletons(
-                        new TestDocumentSupport.MemoryDocumentStore(),
-                        new TestDocumentSupport.UserCodec())
+                    .singletons(new TestDocumentSupport.MemoryDocumentStore())
                     .start())
         .hasMessageContaining("r2d1.index.type must be jdbc or d1");
   }
@@ -266,9 +268,7 @@ class MicronautJdbcIntegrationTest {
             () ->
                 ApplicationContext.builder()
                     .properties(Map.of("r2d1.enabled", true, "r2d1.index.type", "automatic"))
-                    .singletons(
-                        new TestDocumentSupport.MemoryDocumentStore(),
-                        new TestDocumentSupport.UserCodec())
+                    .singletons(new TestDocumentSupport.MemoryDocumentStore())
                     .start())
         .hasMessageContaining("r2d1.index.type must be jdbc or d1")
         .hasMessageContaining("automatic");
@@ -282,8 +282,7 @@ class MicronautJdbcIntegrationTest {
     properties.putAll(additionalProperties);
     return ApplicationContext.builder()
         .properties(properties)
-        .singletons(
-            new TestDocumentSupport.MemoryDocumentStore(), new TestDocumentSupport.UserCodec())
+        .singletons(new TestDocumentSupport.MemoryDocumentStore())
         .beanDefinitions(runtimeDefinitions(beans))
         .start();
   }
@@ -331,7 +330,7 @@ class MicronautJdbcIntegrationTest {
 
   private static void assertPublicOperations(R2D1 r2d1) {
     R2D1Collection<TestDocumentSupport.User> users =
-        r2d1.collection(TestDocumentSupport.User.class);
+        r2d1.collection(TestDocumentSupport.User.class, new TestDocumentSupport.UserCodec());
     TestDocumentSupport.User user = new TestDocumentSupport.User("user-1", "NZ", "Aroha");
 
     users.put(user);
