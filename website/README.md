@@ -2,13 +2,6 @@
 
 The R2D1 website is a static Astro site. It is intentionally separate from the Java/Gradle build.
 
-## Release metadata
-
-`src/data/release.json` is the single website version source. Keep `latestStableVersion` on the most
-recent independently verified Maven Central release, and use `nextReleaseVersion` for integrations
-that are documented before publication. Stable dependency examples are replaced with the stable
-value during the Astro build.
-
 ## Local development
 
 ```shell
@@ -31,7 +24,7 @@ development or static generation.
 ## Localized routes
 
 English is the default route set. The same home, overview, getting-started, backend, common API,
-operations, integration, upcoming Spring Boot integration, and 404 pages are generated under `/ko/` (Korean), `/zh/` (Simplified
+operations, integration, and 404 pages are generated under `/ko/` (Korean), `/zh/` (Simplified
 Chinese), and `/ja/` (Japanese). The header language switcher keeps the current page when a
 translation exists. Each generated page includes a locale-specific canonical URL and `hreflang`
 alternates.

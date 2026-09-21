@@ -6,8 +6,7 @@ description: Public artifacts, storage combinations, resource ownership, and run
 
 ## Public modules
 
-The latest stable release exposes four artifacts. The Spring Boot integration is an upcoming pair of
-artifacts targeted for the next release and is not yet available from Maven Central:
+The repository's publication configuration exposes four artifacts:
 
 | Module | Coordinate | Provides |
 | --- | --- | --- |
@@ -15,17 +14,15 @@ artifacts targeted for the next release and is not yet available from Maven Cent
 | `R2D1-FILESYSTEM` | `dev.nexcraft:r2d1-filesystem` | Filesystem `DocumentStore` |
 | `R2D1-JDBC` | `dev.nexcraft:r2d1-jdbc` | H2, HSQLDB, and SQLite `IndexStore` support |
 | `R2D1-MICRONAUT` | `dev.nexcraft:r2d1-micronaut` | Micronaut 5 configuration and bean integration |
-| `R2D1-SPRING-BOOT-AUTOCONFIGURE` | `dev.nexcraft:r2d1-spring-boot-autoconfigure` | Upcoming Spring Boot 4 auto-configuration |
-| `R2D1-SPRING-BOOT-STARTER` | `dev.nexcraft:r2d1-spring-boot-starter` | Upcoming Spring Boot 4 convenience starter |
 
-The following stable dependencies are rendered with the website's current stable release version:
+Use a released version in place of `<version>`:
 
 ```kotlin
 dependencies {
-    implementation("dev.nexcraft:r2d1:{{latestStableVersion}}")
-    implementation("dev.nexcraft:r2d1-filesystem:{{latestStableVersion}}")
-    implementation("dev.nexcraft:r2d1-jdbc:{{latestStableVersion}}")
-    implementation("dev.nexcraft:r2d1-micronaut:{{latestStableVersion}}")
+    implementation("dev.nexcraft:r2d1:<version>")
+    implementation("dev.nexcraft:r2d1-filesystem:<version>")
+    implementation("dev.nexcraft:r2d1-jdbc:<version>")
+    implementation("dev.nexcraft:r2d1-micronaut:<version>")
 }
 ```
 

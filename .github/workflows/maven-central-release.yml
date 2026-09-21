@@ -1,20 +1,22 @@
 name: Maven Central Release
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
 
 permissions:
   contents: write
 
 concurrency:
   group: maven-central-release
-  cancel-in-progress: false
+  queue: max
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    outputs:
-      release_tag: ${{ steps.resolve.outputs.release_tag }}
     env:
       ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
       ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
@@ -22,10 +24,9 @@ jobs:
       ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
 
     steps:
-      - name: Check out the selected main commit
+      - name: Check out release tag
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Set up Java 21 and 25
@@ -39,63 +40,53 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Resolve the next minor version
-        id: resolve
+      - name: Resolve release version
         shell: bash
-        env:
-          WORKFLOW_REF: ${{ github.ref }}
-          RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           semver_regex='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
 
-          if [[ "$WORKFLOW_REF" != "refs/heads/main" ]]; then
-            echo "Maven Central releases must be started from main"
-            exit 1
-          fi
-          if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40,64}$ ]]; then
-            echo "The selected main commit SHA is missing or invalid"
-            exit 1
-          fi
-
-          git fetch --force --tags origin
-
-          release_tag=""
-          while IFS= read -r candidate; do
-            if [[ "$candidate" =~ $semver_regex ]]; then
-              release_tag="$candidate"
-              break
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            if [[ ! "$GITHUB_REF_NAME" =~ $semver_regex ]]; then
+              echo "Release tags must match v<major>.<minor>.<patch>"
+              exit 1
             fi
-          done < <(git tag --points-at "$RELEASE_SHA" --sort=-version:refname)
-
-          if [[ -z "$release_tag" ]]; then
-            latest_tag=""
+            release_tag="$GITHUB_REF_NAME"
+            create_tag=false
+          else
+            release_tag=""
             while IFS= read -r candidate; do
               if [[ "$candidate" =~ $semver_regex ]]; then
-                latest_tag="$candidate"
+                release_tag="$candidate"
                 break
               fi
-            done < <(git tag --list 'v*' --sort=-version:refname)
+            done < <(git tag --points-at "$GITHUB_SHA" --sort=-version:refname)
 
-            if [[ -z "$latest_tag" ]]; then
-              release_tag="v1.0.0"
+            if [[ -n "$release_tag" ]]; then
+              create_tag=false
             else
-              IFS=. read -r major minor patch <<< "${latest_tag#v}"
-              release_tag="v${major}.$((10#$minor + 1)).0"
+              latest_tag=""
+              while IFS= read -r candidate; do
+                if [[ "$candidate" =~ $semver_regex ]]; then
+                  latest_tag="$candidate"
+                  break
+                fi
+              done < <(git tag --list 'v*' --sort=-version:refname)
+
+              if [[ -z "$latest_tag" ]]; then
+                release_tag="v1.0.0"
+              else
+                IFS=. read -r major minor patch <<< "${latest_tag#v}"
+                release_tag="v${major}.$((10#$minor + 1)).0"
+              fi
+              create_tag=true
             fi
           fi
 
-          release_version="${release_tag#v}"
-          if [[ ! "$release_tag" =~ $semver_regex ]]; then
-            echo "Resolved release tag is not a valid semantic version: $release_tag"
-            exit 1
-          fi
-
-          echo "VERSION=$release_version" >> "$GITHUB_ENV"
+          echo "VERSION=${release_tag#v}" >> "$GITHUB_ENV"
           echo "RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
-          echo "RELEASE_SHA=$RELEASE_SHA" >> "$GITHUB_ENV"
-          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
-          echo "Resolved $release_tag for main commit $RELEASE_SHA"
+          echo "CREATE_TAG=$create_tag" >> "$GITHUB_ENV"
+          echo "Resolved release $release_tag (create tag: $create_tag)"
 
       - name: Run verification build
         run: ./gradlew -Pr2d1.version="$VERSION" clean check
@@ -103,69 +94,28 @@ jobs:
       - name: Validate publishing configuration
         run: ./gradlew -Pr2d1.version="$VERSION" validateMavenCentralConfiguration
 
-      - name: Publish all six artifacts locally and verify signatures
-        shell: bash
+      - name: Publish locally and validate release artifacts
         run: |
-          set -euo pipefail
           ./gradlew -Pr2d1.version="$VERSION" publishToMavenLocal
-          for module in r2d1 r2d1-filesystem r2d1-jdbc r2d1-micronaut r2d1-spring-boot-autoconfigure r2d1-spring-boot-starter; do
+          for module in r2d1 r2d1-jdbc r2d1-micronaut; do
             repository="$HOME/.m2/repository/dev/nexcraft/$module/$VERSION"
             test -f "$repository/$module-$VERSION.jar"
-            test -f "$repository/$module-$VERSION-module.json"
             test -f "$repository/$module-$VERSION-sources.jar"
             test -f "$repository/$module-$VERSION-javadoc.jar"
             test -f "$repository/$module-$VERSION.pom"
             test -f "$repository/$module-$VERSION.jar.asc"
-            test -f "$repository/$module-$VERSION-module.json.asc"
             test -f "$repository/$module-$VERSION-sources.jar.asc"
             test -f "$repository/$module-$VERSION-javadoc.jar.asc"
             test -f "$repository/$module-$VERSION.pom.asc"
           done
 
-      - name: Create or verify the release tag
-        shell: bash
+      - name: Create release tag
+        if: env.CREATE_TAG == 'true'
         run: |
-          set -euo pipefail
-          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
-            existing_tag_sha="$(git rev-parse "${RELEASE_TAG}^{commit}")"
-          else
-            existing_tag_sha=""
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$RELEASE_TAG" "$GITHUB_SHA" -m "Release $RELEASE_TAG"
+          git push origin "refs/tags/$RELEASE_TAG"
 
-          if [[ -n "$existing_tag_sha" ]]; then
-            if [[ "$existing_tag_sha" != "$RELEASE_SHA" ]]; then
-              echo "Refusing to replace $RELEASE_TAG: it points to $existing_tag_sha, not $RELEASE_SHA"
-              exit 1
-            fi
-            echo "$RELEASE_TAG already points to the selected main commit"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag -a "$RELEASE_TAG" "$RELEASE_SHA" -m "Release $RELEASE_TAG"
-            git push origin "refs/tags/$RELEASE_TAG"
-          fi
-
-      - name: Publish the validated batch to Maven Central
+      - name: Publish and automatically release on Maven Central
         run: ./gradlew -Pr2d1.version="$VERSION" publishToMavenCentral
-
-  github-release:
-    needs: publish
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Create the GitHub Release for the published tag
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ needs.publish.outputs.release_tag }}
-        run: |
-          set -euo pipefail
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "GitHub Release $RELEASE_TAG already exists"
-          else
-            gh release create "$RELEASE_TAG" \
-              --verify-tag \
-              --generate-notes \
-              --title "R2D1 $RELEASE_TAG"
-          fi
