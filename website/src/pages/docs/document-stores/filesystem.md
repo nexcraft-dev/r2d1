@@ -10,7 +10,7 @@ filesystem operations dispatched to an executor supplied by the application.
 ## Dependency and construction
 
 ```kotlin
-implementation("dev.nexcraft:r2d1-filesystem:<version>")
+implementation("dev.nexcraft:r2d1-filesystem:{{latestStableVersion}}")
 ```
 
 The constructor accepts a root directory and an executor for blocking I/O:

@@ -23,7 +23,7 @@ application supplies the driver selected by its `DataSource`.
 ## Construct the store
 
 ```kotlin
-implementation("dev.nexcraft:r2d1-jdbc:<version>")
+implementation("dev.nexcraft:r2d1-jdbc:{{latestStableVersion}}")
 ```
 
 Create a bounded execution resource for blocking JDBC work and pass the application-owned
