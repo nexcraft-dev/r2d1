@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
-import dev.nexcraft.r2d1.spi.AdmissionRejectedException;
 import dev.nexcraft.r2d1.spi.StorageException;
 import java.time.Duration;
 import java.util.concurrent.CompletionException;
@@ -53,8 +52,9 @@ class JdbcExecutionTest {
       assertThat(pendingStarted).isFalse();
       Throwable rejected = completedFailure(execution.execute(() -> "rejected"));
       assertThat(rejected)
-          .isInstanceOf(AdmissionRejectedException.class)
-          .hasMessage("Admission capacity and pending queue are full");
+          .isInstanceOf(StorageException.Unavailable.class)
+          .hasMessage("JDBC execution capacity is exhausted")
+          .hasCauseInstanceOf(RejectedExecutionException.class);
 
       releaseRunning.countDown();
       assertThat(completedValue(running)).isEqualTo("running");
@@ -125,8 +125,9 @@ class JdbcExecutionTest {
 
       Throwable rejected = completedFailure(execution.execute(() -> "rejected"));
       assertThat(rejected)
-          .isInstanceOf(AdmissionRejectedException.class)
-          .hasMessage("Admission capacity and pending queue are full");
+          .isInstanceOf(StorageException.Unavailable.class)
+          .hasMessage("JDBC execution capacity is exhausted")
+          .hasCauseInstanceOf(RejectedExecutionException.class);
       assertThat(pendingStarted).isFalse();
 
       releaseRunning.countDown();
@@ -185,38 +186,6 @@ class JdbcExecutionTest {
     assertThat(pendingStarted).isFalse();
     releaseRunning.countDown();
     assertThat(completedValue(running)).isEqualTo("finished");
-  }
-
-  @Test
-  void cancellationDoesNotReleaseAdmissionWhileTheJdbcCallableIsStillRunning() {
-    ExecutorService executor = Executors.newSingleThreadExecutor();
-    CountDownLatch runningStarted = new CountDownLatch(1);
-    CountDownLatch releaseRunning = new CountDownLatch(1);
-    try {
-      JdbcExecution execution = JdbcExecution.using(executor, 1, 0);
-      CompletionStage<String> running =
-          execution.execute(
-              () -> {
-                runningStarted.countDown();
-                await(releaseRunning);
-                return "finished";
-              });
-      await(runningStarted);
-
-      assertThat(running.toCompletableFuture().cancel(true)).isTrue();
-      assertThat(completedFailure(execution.execute(() -> "rejected")))
-          .isInstanceOf(AdmissionRejectedException.class);
-
-      releaseRunning.countDown();
-      assertThat(running.toCompletableFuture()).isCancelled();
-      assertThat(completedValue(execution.execute(() -> "after completion")))
-          .isEqualTo("after completion");
-      execution.close();
-      assertThat(executor.isShutdown()).isFalse();
-    } finally {
-      releaseRunning.countDown();
-      executor.shutdownNow();
-    }
   }
 
   @Test

@@ -1,16 +1,12 @@
 package dev.nexcraft.r2d1.d1;
 
-import dev.nexcraft.r2d1.AdmissionController;
-import dev.nexcraft.r2d1.BackpressureConfig;
 import dev.nexcraft.r2d1.d1.internal.metadata.D1CollectionMetadata;
 import dev.nexcraft.r2d1.d1.internal.metadata.D1Metadata;
 import dev.nexcraft.r2d1.d1.internal.schema.D1SchemaManager;
 import dev.nexcraft.r2d1.d1.internal.sql.D1Result;
 import dev.nexcraft.r2d1.d1.internal.sql.D1SqlCompiler;
 import dev.nexcraft.r2d1.d1.internal.sql.D1Statement;
-import dev.nexcraft.r2d1.d1.internal.transport.AdmittedD1Transport;
 import dev.nexcraft.r2d1.d1.internal.transport.D1Transport;
-import dev.nexcraft.r2d1.spi.AdmissionRejectedException;
 import dev.nexcraft.r2d1.spi.DocumentKey;
 import dev.nexcraft.r2d1.spi.IndexEntry;
 import dev.nexcraft.r2d1.spi.IndexPage;
@@ -44,7 +40,6 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
 
   private final D1Transport transport;
   private final D1SchemaManager schemaManager;
-  private final AdmissionController admission;
   private final D1SqlCompiler sqlCompiler = new D1SqlCompiler();
   private final ConcurrentMap<String, Registration> registrations = new ConcurrentHashMap<>();
   private final boolean ownsTransport;
@@ -57,18 +52,7 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
    * @throws NullPointerException if {@code config} is {@code null}
    */
   public D1IndexStore(D1Config config) {
-    this(config, BackpressureConfig.DEFAULT);
-  }
-
-  /**
-   * Creates a D1 index store with independent active and pending D1 request limits.
-   *
-   * @param config Cloudflare D1 REST API connection settings
-   * @param backpressureConfig active and pending D1 request limits
-   * @throws NullPointerException if either argument is {@code null}
-   */
-  public D1IndexStore(D1Config config, BackpressureConfig backpressureConfig) {
-    this(D1Transport.rest(Objects.requireNonNull(config, "config")), true, backpressureConfig);
+    this(D1Transport.rest(Objects.requireNonNull(config, "config")), true);
   }
 
   /**
@@ -81,42 +65,19 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
    * @throws NullPointerException if either argument is {@code null}
    */
   public D1IndexStore(D1Config config, HttpClient client) {
-    this(config, client, BackpressureConfig.DEFAULT);
-  }
-
-  /**
-   * Creates a D1 index store over a caller-owned Java HTTP client.
-   *
-   * <p>The store owns its D1 transport wrapper but never closes the supplied client.
-   *
-   * @param config Cloudflare D1 REST API connection settings
-   * @param client caller-owned Java HTTP client
-   * @param backpressureConfig active and pending D1 request limits
-   * @throws NullPointerException if any argument is {@code null}
-   */
-  public D1IndexStore(D1Config config, HttpClient client, BackpressureConfig backpressureConfig) {
     this(
         D1Transport.rest(
             Objects.requireNonNull(config, "config"), Objects.requireNonNull(client, "client")),
-        true,
-        backpressureConfig);
+        true);
   }
 
   D1IndexStore(D1Transport transport) {
-    this(transport, BackpressureConfig.DEFAULT);
+    this(transport, false);
   }
 
-  D1IndexStore(D1Transport transport, BackpressureConfig backpressureConfig) {
-    this(transport, false, backpressureConfig);
-  }
-
-  private D1IndexStore(
-      D1Transport transport, boolean ownsTransport, BackpressureConfig backpressureConfig) {
-    this.admission =
-        new AdmissionController(Objects.requireNonNull(backpressureConfig, "backpressureConfig"));
-    this.transport =
-        new AdmittedD1Transport(Objects.requireNonNull(transport, "transport"), admission);
-    this.schemaManager = new D1SchemaManager(this.transport);
+  private D1IndexStore(D1Transport transport, boolean ownsTransport) {
+    this.transport = Objects.requireNonNull(transport, "transport");
+    this.schemaManager = new D1SchemaManager(transport);
     this.ownsTransport = ownsTransport;
   }
 
@@ -152,11 +113,16 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
             if (failure == null) {
               candidate.initialization().complete(null);
             } else {
-              candidate.initialization().completeExceptionally(initializationFailure(failure));
+              candidate.initialization().completeExceptionally(failure);
             }
           });
     } catch (RuntimeException failure) {
-      candidate.initialization().completeExceptionally(initializationFailure(failure));
+      candidate
+          .initialization()
+          .completeExceptionally(
+              failure instanceof StorageException
+                  ? failure
+                  : new StorageException.Operation("D1 schema initialization failed", failure));
     }
     return candidate.initialization();
   }
@@ -219,7 +185,6 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
 
   @Override
   public void close() {
-    admission.close();
     if (ownsTransport && closed.compareAndSet(false, true)) {
       transport.close();
     }
@@ -240,17 +205,6 @@ public final class D1IndexStore implements IndexStore, AutoCloseable {
   private static <T extends @Nullable Object> CompletionStage<T> notInitialized(String collection) {
     return CompletableFuture.failedFuture(
         new StorageException.Operation("D1 collection is not initialized: " + collection));
-  }
-
-  private static Throwable initializationFailure(Throwable failure) {
-    Throwable cause = failure;
-    while (cause instanceof java.util.concurrent.CompletionException && cause.getCause() != null) {
-      cause = cause.getCause();
-    }
-    if (cause instanceof StorageException || cause instanceof AdmissionRejectedException) {
-      return cause;
-    }
-    return new StorageException.Operation("D1 schema initialization failed", failure);
   }
 
   private static String requireCollection(String collection) {

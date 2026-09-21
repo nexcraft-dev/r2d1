@@ -1,10 +1,8 @@
 package dev.nexcraft.r2d1.micronaut.internal;
 
-import dev.nexcraft.r2d1.BackpressureConfig;
 import dev.nexcraft.r2d1.PersistenceCollectionFactory;
 import dev.nexcraft.r2d1.d1.D1Config;
 import dev.nexcraft.r2d1.d1.D1IndexStore;
-import dev.nexcraft.r2d1.micronaut.R2D1Configuration;
 import dev.nexcraft.r2d1.micronaut.R2D1D1Configuration;
 import dev.nexcraft.r2d1.spi.IndexStore;
 import io.micronaut.context.BeanProvider;
@@ -25,21 +23,14 @@ final class D1Factory {
   @Singleton
   @Requires(missingBeans = IndexStore.class)
   D1IndexStore d1IndexStore(
-      R2D1D1Configuration configuration,
-      R2D1Configuration globalConfiguration,
-      BeanProvider<HttpClient> httpClients) {
+      R2D1D1Configuration configuration, BeanProvider<HttpClient> httpClients) {
     D1Config config =
         new D1Config(
             BeanSelection.requireText(configuration.accountId(), "r2d1.d1.account-id"),
             BeanSelection.requireText(configuration.databaseId(), "r2d1.d1.database-id"),
             BeanSelection.requireText(configuration.apiToken(), "r2d1.d1.api-token"));
     HttpClient httpClient = BeanSelection.optional(httpClients, "java.net.http.HttpClient");
-    BackpressureConfig backpressure =
-        BackpressureConfigurationSupport.resolve(
-            configuration.backpressure(), globalConfiguration.backpressure());
-    return httpClient == null
-        ? new D1IndexStore(config, backpressure)
-        : new D1IndexStore(config, httpClient, backpressure);
+    return httpClient == null ? new D1IndexStore(config) : new D1IndexStore(config, httpClient);
   }
 
   @Singleton
