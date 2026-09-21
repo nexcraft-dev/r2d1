@@ -10,7 +10,7 @@ resources. It does not add Micronaut APIs to the base `r2d1` artifact.
 ## Dependency and runtime
 
 ```kotlin
-implementation("dev.nexcraft:r2d1-micronaut:<version>")
+implementation("dev.nexcraft:r2d1-micronaut:{{latestStableVersion}}")
 ```
 
 Micronaut 5 and this integration currently require Java 25. The core and JDBC artifacts remain

@@ -37,7 +37,7 @@ The core artifact supplies the common API and Cloudflare R2/D1 adapters:
 
 ```kotlin
 dependencies {
-    implementation("dev.nexcraft:r2d1:<version>")
+    implementation("dev.nexcraft:r2d1:{{latestStableVersion}}")
 }
 ```
 
@@ -45,9 +45,9 @@ Add only the integration modules used by the application:
 
 ```kotlin
 dependencies {
-    implementation("dev.nexcraft:r2d1-filesystem:<version>")
-    implementation("dev.nexcraft:r2d1-jdbc:<version>")
-    implementation("dev.nexcraft:r2d1-micronaut:<version>")
+    implementation("dev.nexcraft:r2d1-filesystem:{{latestStableVersion}}")
+    implementation("dev.nexcraft:r2d1-jdbc:{{latestStableVersion}}")
+    implementation("dev.nexcraft:r2d1-micronaut:{{latestStableVersion}}")
 }
 ```
 
