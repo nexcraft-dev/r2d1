@@ -31,7 +31,7 @@ development or static generation.
 ## Localized routes
 
 English is the default route set. The same home, overview, getting-started, backend, common API,
-operations, integration, upcoming Spring Boot integration, and 404 pages are generated under `/ko/` (Korean), `/zh/` (Simplified
+operations, integration, Spring Boot integration, and 404 pages are generated under `/ko/` (Korean), `/zh/` (Simplified
 Chinese), and `/ja/` (Japanese). The header language switcher keeps the current page when a
 translation exists. Each generated page includes a locale-specific canonical URL and `hreflang`
 alternates.

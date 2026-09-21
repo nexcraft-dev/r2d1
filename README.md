@@ -5,6 +5,13 @@
 <h1 align="center">R2D1</h1>
 
 <p align="center">
+  <a href="https://github.com/nexcraft-dev/r2d1/actions/workflows/ci.yml"><img src="https://github.com/nexcraft-dev/r2d1/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/nexcraft-dev/r2d1/actions/workflows/maven-central-release.yml"><img src="https://github.com/nexcraft-dev/r2d1/actions/workflows/maven-central-release.yml/badge.svg" alt="Maven Central Release"></a>
+  <a href="https://github.com/nexcraft-dev/r2d1/actions/workflows/website.yml"><img src="https://github.com/nexcraft-dev/r2d1/actions/workflows/website.yml/badge.svg" alt="Website"></a>
+  <a href="https://central.sonatype.com/artifact/dev.nexcraft/r2d1"><img src="https://img.shields.io/maven-central/v/dev.nexcraft/r2d1?label=Maven%20Central" alt="Maven Central version"></a>
+</p>
+
+<p align="center">
   A Java document store using Cloudflare R2 for storage and D1 for indexing,
   filtering, sorting, and pagination.
 </p>
@@ -24,28 +31,28 @@ R2D1 exposes a limited query model. It is not a SQL database or ORM.
 
 ## Dependencies
 
-The latest stable Maven Central surface contains four published artifacts. The base `r2d1` artifact
-contains the Core API and the Cloudflare R2 and D1 implementations. Filesystem, JDBC, and Micronaut
-are additional published integrations. Spring Boot is the upcoming integration for `1.7.0`, split
-into a published auto-configuration module and a convenience starter, and is not yet in the latest
-stable release:
+The latest stable Maven Central surface contains six published artifacts. The base `r2d1` artifact
+contains the Core API and the Cloudflare R2 and D1 implementations. Filesystem, JDBC, Micronaut, and
+Spring Boot are additional published integrations. Spring Boot 4 is split into a published
+auto-configuration module and a convenience starter in `1.7.0`:
 
 ```kotlin
 dependencies {
-    implementation("dev.nexcraft:r2d1:<version>")
-    implementation("dev.nexcraft:r2d1-filesystem:<version>")
-    implementation("dev.nexcraft:r2d1-jdbc:<version>")
-    implementation("dev.nexcraft:r2d1-micronaut:<version>")
+    implementation("dev.nexcraft:r2d1:1.7.0")
+    implementation("dev.nexcraft:r2d1-filesystem:1.7.0")
+    implementation("dev.nexcraft:r2d1-jdbc:1.7.0")
+    implementation("dev.nexcraft:r2d1-micronaut:1.7.0")
+    implementation("dev.nexcraft:r2d1-spring-boot-starter:1.7.0")
 }
 ```
 
-The upcoming Spring Boot integration will use the starter:
+For normal Spring Boot applications, use the starter:
 
 ```kotlin
 implementation("dev.nexcraft:r2d1-spring-boot-starter:1.7.0")
 ```
 
-It is not available from Maven Central until the explicit `v1.7.0` release completes.
+The `1.7.0` artifacts are available from Maven Central.
 
 The equivalent Maven coordinates are:
 
@@ -70,11 +77,20 @@ The equivalent Maven coordinates are:
   <artifactId>r2d1-micronaut</artifactId>
   <version>${r2d1.version}</version>
 </dependency>
+<dependency>
+  <groupId>dev.nexcraft</groupId>
+  <artifactId>r2d1-spring-boot-starter</artifactId>
+  <version>${r2d1.version}</version>
+</dependency>
+<dependency>
+  <groupId>dev.nexcraft</groupId>
+  <artifactId>r2d1-spring-boot-autoconfigure</artifactId>
+  <version>${r2d1.version}</version>
+</dependency>
 ```
 
-The upcoming Spring Boot coordinates are `dev.nexcraft:r2d1-spring-boot-starter:1.7.0` for normal
-applications and `dev.nexcraft:r2d1-spring-boot-autoconfigure:1.7.0` for custom starter composition;
-neither is yet a stable Maven Central dependency.
+The Spring Boot coordinates are `dev.nexcraft:r2d1-spring-boot-starter:1.7.0` for normal applications
+and `dev.nexcraft:r2d1-spring-boot-autoconfigure:1.7.0` for custom starter composition.
 
 Declare only the integrations used by an application. JDBC drivers remain application-provided
 and are not bundled by `r2d1-jdbc`.
@@ -314,10 +330,10 @@ r2d1-micronaut
     Micronaut 5 configuration and dependency injection integration
 
 r2d1-spring-boot-autoconfigure
-    Upcoming Spring Boot 4 auto-configuration for the same framework-neutral API
+    Spring Boot 4 auto-configuration for the same framework-neutral API
 
 r2d1-spring-boot-starter
-    Upcoming Spring Boot 4 convenience starter that depends on the auto-configuration module
+    Spring Boot 4 convenience starter that depends on the auto-configuration module
 
 r2d1-integration-tests
     Opt-in live tests against dedicated Cloudflare R2 and D1 resources
@@ -329,10 +345,10 @@ Integration tests are grouped by purpose: Cloudflare resource scenarios use
 `dev.nexcraft.r2d1.integration.support`.
 
 Framework-specific integrations remain separate from the base library. The optional Micronaut 5
-module publishes `dev.nexcraft:r2d1-micronaut`, and the upcoming Spring Boot integration will
-publish `dev.nexcraft:r2d1-spring-boot-autoconfigure` and
-`dev.nexcraft:r2d1-spring-boot-starter`. Both create the top-level `R2D1` facade from application
-beans and selected adapters without changing the public API or SPI.
+module publishes `dev.nexcraft:r2d1-micronaut`, and the Spring Boot integration publishes
+`dev.nexcraft:r2d1-spring-boot-autoconfigure` and `dev.nexcraft:r2d1-spring-boot-starter`. Both
+create the top-level `R2D1` facade from application beans and selected adapters without changing the
+public API or SPI.
 
 Implementation details are grouped below the supported public packages. Base persistence
 orchestration uses `dev.nexcraft.r2d1.internal.persistence`; the built-in D1 adapter separates metadata,
@@ -404,8 +420,8 @@ See the [Micronaut 5 module guide](r2d1-micronaut/README.md) for dependencies, t
 configuration contract, override rules, lifecycle ownership, and native-image requirements.
 
 See the [Spring Boot auto-configuration guide](r2d1-spring-boot-autoconfigure/README.md) and
-[starter guide](r2d1-spring-boot-starter/README.md) for the upcoming `1.7.0` integration,
-configuration contract, override rules, lifecycle ownership, and optional adapter boundaries.
+[starter guide](r2d1-spring-boot-starter/README.md) for the `1.7.0` integration, configuration
+contract, override rules, lifecycle ownership, and optional adapter boundaries.
 
 The `Maven Central Release` GitHub Actions workflow is started manually from `main`. It derives the
 next minor version from the latest valid release tag, verifies the selected commit and all six
@@ -416,14 +432,14 @@ published artifacts, creates the matching tag, and publishes the validated batch
 R2D1 is under active development. The core API, R2, D1, filesystem, persistence orchestration, and
 the H2, HSQLDB, and SQLite JDBC adapters are available but remain unstable. Explicit index recovery
 through `rebuildIndex()` is available, but automatic reconciliation and background repair are not.
-Other JDBC databases are not yet supported. The Spring Boot integration is targeted for `1.7.0` and
-is not part of the latest stable release. Module internals may change before the first release.
+Other JDBC databases are not yet supported. The Spring Boot integration is part of the latest stable
+`1.7.0` release. Module internals may change between releases.
 
 ## Requirements
 
 - Java 21+
 - Java 25+ for `r2d1-micronaut`; `r2d1` and `r2d1-jdbc` remain Java 21 compatible
-- Java 21+ and Spring Boot 4.0.6 for the upcoming `r2d1-spring-boot-starter` integration
+- Java 21+ and Spring Boot 4.0.6 for the `r2d1-spring-boot-starter` integration
 - Adapter-specific infrastructure:
   - Cloudflare account and R2 bucket for the built-in R2 adapter
   - Cloudflare account and D1 database for the built-in D1 adapter

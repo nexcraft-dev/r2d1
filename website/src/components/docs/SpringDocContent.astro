@@ -1,19 +1,19 @@
 ---
 import release from "../../data/release.json";
 
-const { latestStableVersion, nextReleaseVersion } = release;
+const { latestStableVersion } = release;
 const dependency = `dependencies {
-    implementation("dev.nexcraft:r2d1-spring-boot-starter:${nextReleaseVersion}")
+    implementation("dev.nexcraft:r2d1-spring-boot-starter:${latestStableVersion}")
 }`;
 ---
 
-<p><strong>Upcoming in {nextReleaseVersion}.</strong> The Spring Boot integration is not part of the latest stable release ({latestStableVersion}) and is not yet available from Maven Central.</p>
+<p><strong>Available in {latestStableVersion}.</strong> The Spring Boot integration is published to Maven Central as two artifacts: the starter and its separately published auto-configuration module.</p>
 
-<h2>Dependency target</h2>
-<p>When the release is published, add the <code>r2d1-spring-boot-starter</code> artifact to a Spring Boot 4.0.6 application running on Java 21 or later:</p>
+<h2>Dependency</h2>
+<p>Add the <code>r2d1-spring-boot-starter</code> artifact to a Spring Boot 4.0.6 application running on Java 21 or later:</p>
 <pre><code class="language-kotlin">{dependency}</code></pre>
 
-<p>The starter will depend on the separately published <code>r2d1-spring-boot-autoconfigure</code> module. Use the starter for normal applications; use the auto-configuration module directly when composing a custom starter.</p>
+<p>The starter depends on the separately published <code>r2d1-spring-boot-autoconfigure</code> module. Use the starter for normal applications; use the auto-configuration module directly when composing a custom starter.</p>
 
 <h2>What it configures</h2>
 <p>Set <code>r2d1.enabled=true</code> to activate the integration. The configuration supports R2 or filesystem document storage and D1 or JDBC indexing, while preserving the framework-neutral R2D1 collection API.</p>
