@@ -1,6 +1,5 @@
 package dev.nexcraft.r2d1.spring.internal;
 
-import dev.nexcraft.r2d1.BackpressureConfig;
 import dev.nexcraft.r2d1.PersistenceCollectionFactory;
 import dev.nexcraft.r2d1.jdbc.JdbcExecution;
 import dev.nexcraft.r2d1.jdbc.JdbcExecutionConfig;
@@ -9,7 +8,6 @@ import dev.nexcraft.r2d1.jdbc.JdbcIndexStore;
 import dev.nexcraft.r2d1.spi.IndexStore;
 import dev.nexcraft.r2d1.spring.R2D1JdbcExecutionMode;
 import dev.nexcraft.r2d1.spring.R2D1JdbcProperties;
-import dev.nexcraft.r2d1.spring.R2D1Properties;
 import java.util.concurrent.Executor;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.ListableBeanFactory;
@@ -31,15 +29,8 @@ public class JdbcConfiguration {
   @ConditionalOnMissingBean(JdbcExecution.class)
   JdbcExecution jdbcExecution(
       R2D1JdbcProperties properties,
-      R2D1Properties globalProperties,
       ListableBeanFactory beanFactory,
       ObjectProvider<Executor> executors) {
-    BackpressureConfig backpressure =
-        BackpressureConfigurationSupport.resolveJdbc(
-            properties.backpressure(),
-            properties.legacyMaxConcurrency(),
-            properties.legacyMaxPending(),
-            globalProperties.backpressure());
     if (properties.executor() != null) {
       if (properties.executionMode() != null) {
         throw new IllegalStateException(
@@ -53,8 +44,7 @@ public class JdbcConfiguration {
               properties.executor(),
               "Executor",
               "r2d1.jdbc.executor");
-      return JdbcExecution.using(
-          executor, backpressure.maxConcurrency(), backpressure.maxPending());
+      return JdbcExecution.using(executor, properties.maxConcurrency(), properties.maxPending());
     }
 
     JdbcExecutionMode mode =
@@ -62,7 +52,7 @@ public class JdbcConfiguration {
             ? JdbcExecutionMode.VIRTUAL_THREAD
             : JdbcExecutionMode.PLATFORM_THREAD;
     return JdbcExecution.create(
-        new JdbcExecutionConfig(mode, backpressure.maxConcurrency(), backpressure.maxPending()));
+        new JdbcExecutionConfig(mode, properties.maxConcurrency(), properties.maxPending()));
   }
 
   @Bean

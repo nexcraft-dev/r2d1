@@ -4,8 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
-import dev.nexcraft.r2d1.BackpressureConfig;
-import dev.nexcraft.r2d1.spi.AdmissionRejectedException;
 import dev.nexcraft.r2d1.spi.DocumentCursor;
 import dev.nexcraft.r2d1.spi.DocumentKey;
 import dev.nexcraft.r2d1.spi.DocumentNotFoundException;
@@ -13,34 +11,24 @@ import dev.nexcraft.r2d1.spi.DocumentPage;
 import dev.nexcraft.r2d1.spi.StorageException;
 import dev.nexcraft.r2d1.spi.StoredDocument;
 import java.io.ByteArrayOutputStream;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.core.exception.SdkClientException;
-import software.amazon.awssdk.services.s3.S3AsyncClient;
-import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
-import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
-import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
 
@@ -281,43 +269,6 @@ class R2DocumentStoreTest {
   }
 
   @Test
-  void admitsEachR2OperationAndReturnsDistinctCapacityRejections() {
-    ControlledS3AsyncClient recordingClient = new ControlledS3AsyncClient();
-    R2DocumentStore store =
-        new R2DocumentStore(recordingClient.client(), BUCKET, new BackpressureConfig(1, 1));
-    CompletionStage<@Nullable Void> put = store.put(KEY, new StoredDocument(new byte[] {1}));
-    CompletionStage<@Nullable Void> delete = store.delete(KEY);
-    CompletionStage<StoredDocument> rejectedGet = store.get(KEY);
-    CompletionStage<DocumentPage> rejectedList = store.list("users", null, 10);
-
-    assertThat(recordingClient.putCalls).hasValue(1);
-    assertThat(recordingClient.deleteCalls).hasValue(0);
-    assertThat(recordingClient.getCalls).hasValue(0);
-    assertThat(recordingClient.listCalls).hasValue(0);
-    assertThat(completedFailure(rejectedGet))
-        .isInstanceOf(AdmissionRejectedException.class)
-        .isNotInstanceOf(StorageException.class);
-    assertThat(completedFailure(rejectedList))
-        .isInstanceOf(AdmissionRejectedException.class)
-        .isNotInstanceOf(StorageException.class);
-
-    recordingClient.putResult.complete(PutObjectResponse.builder().build());
-    assertThat(recordingClient.deleteCalls).hasValue(1);
-    recordingClient.deleteResult.complete(DeleteObjectResponse.builder().build());
-
-    assertThat(put.toCompletableFuture()).isCompletedWithValue(null);
-    assertThat(delete.toCompletableFuture()).isCompletedWithValue(null);
-
-    CompletionStage<StoredDocument> get = store.get(KEY);
-    CompletionStage<DocumentPage> list = store.list("users", null, 10);
-    assertThat(get.toCompletableFuture()).isCompletedWithValue(new StoredDocument(new byte[0]));
-    assertThat(list.toCompletableFuture())
-        .isCompletedWithValue(new DocumentPage(List.of(), Optional.empty()));
-    assertThat(recordingClient.getCalls).hasValue(1);
-    assertThat(recordingClient.listCalls).hasValue(1);
-  }
-
-  @Test
   @SuppressWarnings("DataFlowIssue")
   void rejectsNullInputsSynchronously() {
     R2DocumentStore store = new R2DocumentStore(new RecordingS3AsyncClient().client(), BUCKET);
@@ -412,61 +363,6 @@ class R2DocumentStoreTest {
     assertThat(failure.get()).isNull();
     assertThat(completed).isTrue();
     return output.toByteArray();
-  }
-
-  private static final class ControlledS3AsyncClient implements InvocationHandler {
-
-    private final S3AsyncClient client;
-    private final CompletableFuture<PutObjectResponse> putResult = new CompletableFuture<>();
-    private final CompletableFuture<DeleteObjectResponse> deleteResult = new CompletableFuture<>();
-    private final CompletableFuture<ResponseBytes<GetObjectResponse>> getResult =
-        CompletableFuture.completedFuture(
-            ResponseBytes.fromByteArray(GetObjectResponse.builder().build(), new byte[0]));
-    private final CompletableFuture<ListObjectsV2Response> listResult =
-        CompletableFuture.completedFuture(ListObjectsV2Response.builder().build());
-    private final AtomicInteger putCalls = new AtomicInteger();
-    private final AtomicInteger deleteCalls = new AtomicInteger();
-    private final AtomicInteger getCalls = new AtomicInteger();
-    private final AtomicInteger listCalls = new AtomicInteger();
-
-    private ControlledS3AsyncClient() {
-      client =
-          (S3AsyncClient)
-              Proxy.newProxyInstance(
-                  S3AsyncClient.class.getClassLoader(), new Class<?>[] {S3AsyncClient.class}, this);
-    }
-
-    private S3AsyncClient client() {
-      return client;
-    }
-
-    @Override
-    public @Nullable Object invoke(Object proxy, Method method, Object @Nullable [] arguments) {
-      return switch (method.getName()) {
-        case "putObject" -> {
-          putCalls.incrementAndGet();
-          yield putResult;
-        }
-        case "deleteObject" -> {
-          deleteCalls.incrementAndGet();
-          yield deleteResult;
-        }
-        case "getObject" -> {
-          getCalls.incrementAndGet();
-          yield getResult;
-        }
-        case "listObjectsV2" -> {
-          listCalls.incrementAndGet();
-          yield listResult;
-        }
-        case "close" -> null;
-        case "toString" -> "ControlledS3AsyncClient";
-        case "hashCode" -> System.identityHashCode(proxy);
-        case "equals" -> proxy == Objects.requireNonNull(arguments)[0];
-        default ->
-            throw new UnsupportedOperationException("Unexpected S3AsyncClient method: " + method);
-      };
-    }
   }
 
   private static Throwable completedFailure(CompletionStage<?> stage) {

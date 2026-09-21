@@ -1,7 +1,5 @@
 package dev.nexcraft.r2d1.micronaut.internal;
 
-import dev.nexcraft.r2d1.BackpressureConfig;
-import dev.nexcraft.r2d1.micronaut.R2D1Configuration;
 import dev.nexcraft.r2d1.micronaut.R2D1R2Configuration;
 import dev.nexcraft.r2d1.r2.R2Config;
 import dev.nexcraft.r2d1.r2.R2DocumentStore;
@@ -12,8 +10,6 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 import java.net.URI;
-import java.util.logging.Logger;
-import org.jspecify.annotations.Nullable;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 
 /** Creates the optional Cloudflare R2 document component. */
@@ -22,30 +18,16 @@ import software.amazon.awssdk.services.s3.S3AsyncClient;
 @Requires(classes = R2DocumentStore.class)
 final class R2Factory {
 
-  private static final Logger LOGGER = Logger.getLogger(R2Factory.class.getName());
-
   @Bean(preDestroy = "close")
   @Singleton
   @Requires(missingBeans = DocumentStore.class)
   R2DocumentStore r2DocumentStore(
-      R2D1R2Configuration configuration,
-      R2D1Configuration globalConfiguration,
-      BeanProvider<S3AsyncClient> clients) {
+      R2D1R2Configuration configuration, BeanProvider<S3AsyncClient> clients) {
     String bucketName =
         BeanSelection.requireText(configuration.bucketName(), "r2d1.r2.bucket-name");
-    BackpressureConfig backpressure =
-        BackpressureConfigurationSupport.resolve(
-            configuration.backpressure(), globalConfiguration.backpressure());
-    @Nullable Integer clientMaxConcurrency =
-        configuration.client() == null ? null : configuration.client().maxConcurrency();
     S3AsyncClient client = BeanSelection.optional(clients, "S3AsyncClient");
     if (client != null) {
-      if (clientMaxConcurrency != null) {
-        LOGGER.warning(
-            "r2d1.r2.client.max-concurrency is not applied to a caller-owned S3AsyncClient; "
-                + "configure that client directly");
-      }
-      return new R2DocumentStore(client, bucketName, backpressure);
+      return new R2DocumentStore(client, bucketName);
     }
 
     URI endpoint = configuration.endpoint();
@@ -60,6 +42,6 @@ final class R2Factory {
             BeanSelection.requireText(configuration.secretAccessKey(), "r2d1.r2.secret-access-key"),
             bucketName,
             configuration.region());
-    return new R2DocumentStore(config, backpressure, clientMaxConcurrency);
+    return new R2DocumentStore(config);
   }
 }

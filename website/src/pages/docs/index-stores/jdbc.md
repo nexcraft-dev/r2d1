@@ -61,17 +61,6 @@ JdbcExecution execution = JdbcExecution.create(config);
 These limits do not select a database topology, change the number of physical connections, or
 replace a connection pool.
 
-The default framework admission budget is 8 active and 32 pending operations. Spring Boot and
-Micronaut inherit the global `r2d1.backpressure.*` values and accept JDBC-specific
-`r2d1.jdbc.backpressure.*` overrides. Each field inherits independently. The legacy flat keys
-`r2d1.jdbc.max-concurrency` and `r2d1.jdbc.max-pending` remain explicit aliases; an unset flat key
-does not override the global setting with the old 4/64 framework binding defaults.
-
-When all active and pending slots are occupied, another JDBC operation fails immediately with
-`AdmissionRejectedException`. Cancelling the public result does not release a permit while the
-blocking JDBC callable is still running. Admission does not increase a DataSource's physical
-connection capacity or alter the selected executor's thread mode.
-
 ## Schema and values
 
 Each collection maps to one table with a `document_id` primary key and one required column per

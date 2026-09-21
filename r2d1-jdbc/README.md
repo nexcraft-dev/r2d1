@@ -35,16 +35,7 @@ from the Java runtime or JDBC driver, and there is no `AUTO` mode.
 
 Virtual threads do not remove database concurrency limits. `maxConcurrency` continues to bound
 active JDBC operations and `maxPending` continues to bound admitted work waiting to run. Capacity
-is acquired before JDBC work is submitted. Once both limits are full, a submission completes
-exceptionally with `AdmissionRejectedException`; admission never blocks the submitting thread.
-Canceling a returned stage does not free capacity while its JDBC callable is still running. These
-limits apply per `JdbcExecution` and do not resize or measure the `DataSource` connection pool.
-
-Framework-created JDBC adapters use the effective global default of 8 active and 32 pending
-operations, with adapter-specific overrides. Direct `JdbcExecution` creation continues to use the
-limits supplied through `JdbcExecutionConfig` or `JdbcExecution.using(...)`. See the
-[configuration guide](https://r2d1.nexcraft.dev/docs/configuration/) for framework property
-inheritance and the legacy flat JDBC aliases.
+overflow is reported as an exceptionally completed `CompletionStage`, just as in platform mode.
 
 `JdbcExecution.create(config)` owns its executor and must be closed by its creator. The existing
 `JdbcExecution.using(executor, maxConcurrency, maxPending)` API remains caller-owned and is not a

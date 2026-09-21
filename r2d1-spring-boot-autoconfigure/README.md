@@ -85,25 +85,9 @@ r2d1:
   jdbc:
     datasource: applicationDataSource
     executor: jdbcExecutor
-    backpressure:
-      max-concurrency: 4
-      max-pending: 64
+    max-concurrency: 4
+    max-pending: 64
 ```
-
-Each integration-created R2, D1, JDBC, and Filesystem adapter has an independent admission budget. The default is 8
-active and 32 pending operations. Set `r2d1.backpressure.max-concurrency` and
-`r2d1.backpressure.max-pending` for global fallbacks, or use the matching adapter's nested
-`backpressure` properties. Unset adapter fields inherit independently. The legacy flat JDBC keys
-`r2d1.jdbc.max-concurrency` and `r2d1.jdbc.max-pending` remain explicit aliases; nested JDBC values
-take precedence over those aliases, which take precedence over the global values.
-
-For an integration-owned R2 client, `r2d1.r2.client.max-concurrency` overrides the default derived
-from the effective R2 admission limit. A lower explicit value is honored with a warning. This
-setting does not modify an application-owned `S3AsyncClient`. When the active and pending budget is
-full, further operations fail with `AdmissionRejectedException`; this is a concurrency limit, not
-a Cloudflare requests-per-second limit. See the
-[configuration guide](https://r2d1.nexcraft.dev/docs/configuration/) for cancellation and query or
-rebuild fan-out behavior.
 
 When `executor` is absent, the default execution mode is `platform-thread`. Set
 `execution-mode: virtual-thread` explicitly on Java 25 or newer when the application wants the

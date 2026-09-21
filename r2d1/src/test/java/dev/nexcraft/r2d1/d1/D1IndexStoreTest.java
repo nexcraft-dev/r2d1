@@ -4,14 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
-import dev.nexcraft.r2d1.BackpressureConfig;
 import dev.nexcraft.r2d1.annotation.Document;
 import dev.nexcraft.r2d1.annotation.Index;
 import dev.nexcraft.r2d1.d1.internal.sql.D1Parameter;
 import dev.nexcraft.r2d1.d1.internal.sql.D1Result;
 import dev.nexcraft.r2d1.d1.internal.transport.D1Transport;
 import dev.nexcraft.r2d1.d1.internal.transport.ScriptedD1Transport;
-import dev.nexcraft.r2d1.spi.AdmissionRejectedException;
 import dev.nexcraft.r2d1.spi.DocumentKey;
 import dev.nexcraft.r2d1.spi.IndexEntry;
 import dev.nexcraft.r2d1.spi.IndexPage;
@@ -132,33 +130,6 @@ class D1IndexStoreTest {
   }
 
   @Test
-  void admitsSchemaInitializationAndPreservesD1AdmissionRejection() {
-    AtomicInteger calls = new AtomicInteger();
-    CompletableFuture<D1Result> firstRequest = new CompletableFuture<>();
-    StorageException failure = new StorageException.Unavailable("D1 unavailable");
-    D1Transport transport =
-        statement -> {
-          if (calls.incrementAndGet() == 1) {
-            return firstRequest;
-          }
-          return CompletableFuture.failedFuture(failure);
-        };
-    D1IndexStore store = new D1IndexStore(transport, new BackpressureConfig(1, 0));
-
-    CompletionStage<@Nullable Void> first = store.initialize(User.class);
-    CompletionStage<@Nullable Void> rejected = store.initialize(Admin.class);
-
-    assertThat(calls).hasValue(1);
-    assertThat(completedFailure(rejected)).isInstanceOf(AdmissionRejectedException.class);
-    firstRequest.completeExceptionally(failure);
-    assertThat(completedFailure(first)).isSameAs(failure);
-
-    CompletionStage<@Nullable Void> afterRelease = store.initialize(Order.class);
-    assertThat(calls).hasValue(2);
-    assertThat(completedFailure(afterRelease)).isSameAs(failure);
-  }
-
-  @Test
   void rejectsDifferentMetadataForTheSameCollection() {
     CompletableFuture<D1Result> pending = new CompletableFuture<>();
     D1IndexStore store = new D1IndexStore(statement -> pending);
@@ -212,15 +183,5 @@ class D1IndexStoreTest {
   @Document("users")
   private static final class IncompatibleUser {
     @Index private Long createdAt;
-  }
-
-  @Document("admins")
-  private static final class Admin {
-    @Index private String role;
-  }
-
-  @Document("orders")
-  private static final class Order {
-    @Index private String status;
   }
 }

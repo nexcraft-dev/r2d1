@@ -1,10 +1,8 @@
 package dev.nexcraft.r2d1.spring.internal;
 
-import dev.nexcraft.r2d1.BackpressureConfig;
 import dev.nexcraft.r2d1.filesystem.FileSystemDocumentStore;
 import dev.nexcraft.r2d1.spi.DocumentStore;
 import dev.nexcraft.r2d1.spring.R2D1FilesystemProperties;
-import dev.nexcraft.r2d1.spring.R2D1Properties;
 import java.nio.file.Path;
 import java.util.concurrent.Executor;
 import org.springframework.beans.factory.ListableBeanFactory;
@@ -25,7 +23,6 @@ public class FilesystemConfiguration {
   @ConditionalOnMissingBean(DocumentStore.class)
   FileSystemDocumentStore fileSystemDocumentStore(
       R2D1FilesystemProperties properties,
-      R2D1Properties globalProperties,
       ListableBeanFactory beanFactory,
       ObjectProvider<Executor> executors) {
     Path rootDirectory =
@@ -39,9 +36,6 @@ public class FilesystemConfiguration {
             properties.executor(),
             "Executor",
             "r2d1.filesystem.executor");
-    BackpressureConfig backpressure =
-        BackpressureConfigurationSupport.resolve(
-            properties.backpressure(), globalProperties.backpressure());
-    return new FileSystemDocumentStore(rootDirectory, executor, backpressure);
+    return new FileSystemDocumentStore(rootDirectory, executor);
   }
 }
