@@ -2,10 +2,13 @@ package dev.nexcraft.r2d1.filesystem;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.nexcraft.r2d1.BackpressureConfig;
+import dev.nexcraft.r2d1.spi.AdmissionRejectedException;
 import dev.nexcraft.r2d1.spi.DocumentCursor;
 import dev.nexcraft.r2d1.spi.DocumentKey;
 import dev.nexcraft.r2d1.spi.DocumentNotFoundException;
 import dev.nexcraft.r2d1.spi.DocumentPage;
+import dev.nexcraft.r2d1.spi.StorageException;
 import dev.nexcraft.r2d1.spi.StoredDocument;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -22,8 +26,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.jspecify.annotations.NullMarked;
@@ -61,6 +67,72 @@ class FileSystemDocumentStoreTest {
 
     assertThat(await(store.get(KEY))).isEqualTo(bytes("second"));
     assertThat(fileNames(root.resolve("users"))).containsExactly("user-1.json");
+  }
+
+  @Test
+  void boundsActiveAndPendingFilesystemOperations() {
+    ManualExecutor controlledExecutor = new ManualExecutor();
+    FileSystemDocumentStore store =
+        new FileSystemDocumentStore(root, controlledExecutor, new BackpressureConfig(1, 1));
+
+    CompletableFuture<?> active = store.put(KEY, bytes("active")).toCompletableFuture();
+    CompletableFuture<StoredDocument> pending = store.get(KEY).toCompletableFuture();
+    Throwable rejected = failure(store.delete(KEY));
+
+    assertThat(controlledExecutor.pendingTasks()).isEqualTo(1);
+    assertThat(rejected).isInstanceOf(AdmissionRejectedException.class);
+
+    controlledExecutor.runNext();
+    assertThat(active).isCompleted();
+    assertThat(pending).isNotCompleted();
+    assertThat(controlledExecutor.pendingTasks()).isEqualTo(1);
+
+    controlledExecutor.runNext();
+    assertThat(pending).isCompleted();
+    assertThat(await(pending)).isEqualTo(bytes("active"));
+  }
+
+  @Test
+  void cancellationDoesNotReleaseAdmissionUntilFilesystemWorkTerminates() {
+    ManualExecutor controlledExecutor = new ManualExecutor();
+    FileSystemDocumentStore store =
+        new FileSystemDocumentStore(root, controlledExecutor, new BackpressureConfig(1, 0));
+    CompletableFuture<?> cancelled = store.put(KEY, bytes("written")).toCompletableFuture();
+
+    assertThat(cancelled.cancel(true)).isTrue();
+    assertThat(failure(store.get(KEY))).isInstanceOf(AdmissionRejectedException.class);
+    assertThat(controlledExecutor.pendingTasks()).isEqualTo(1);
+
+    controlledExecutor.runNext();
+    CompletableFuture<StoredDocument> admitted = store.get(KEY).toCompletableFuture();
+    assertThat(controlledExecutor.pendingTasks()).isEqualTo(1);
+    controlledExecutor.runNext();
+
+    assertThat(await(admitted)).isEqualTo(bytes("written"));
+  }
+
+  @Test
+  void mapsExecutorRejectionToStorageUnavailable() {
+    Executor rejectingExecutor =
+        command -> {
+          throw new RejectedExecutionException("executor is full");
+        };
+    FileSystemDocumentStore store =
+        new FileSystemDocumentStore(root, rejectingExecutor, new BackpressureConfig(1, 0));
+
+    Throwable failure = failure(store.put(KEY, bytes("unwritten")));
+
+    assertThat(failure).isInstanceOf(StorageException.Unavailable.class);
+    assertThat(failure.getCause()).isInstanceOf(RejectedExecutionException.class);
+  }
+
+  @Test
+  void keepsTheCallerOwnedExecutorOpen() {
+    FileSystemDocumentStore store = store();
+
+    await(store.put(KEY, bytes("borrowed")));
+
+    assertThat(executor.isShutdown()).isFalse();
   }
 
   @Test
@@ -325,6 +397,28 @@ class FileSystemDocumentStoreTest {
       throw new AssertionError("stage unexpectedly succeeded");
     } catch (CompletionException failure) {
       return failure.getCause();
+    }
+  }
+
+  private static final class ManualExecutor implements Executor {
+
+    private final ArrayDeque<Runnable> tasks = new ArrayDeque<>();
+
+    @Override
+    public synchronized void execute(Runnable command) {
+      tasks.add(command);
+    }
+
+    private synchronized int pendingTasks() {
+      return tasks.size();
+    }
+
+    private void runNext() {
+      Runnable task;
+      synchronized (this) {
+        task = tasks.remove();
+      }
+      task.run();
     }
   }
 }

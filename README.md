@@ -113,6 +113,14 @@ adapter creates an R2D1-managed worker pool. The optional JDBC and filesystem ad
 blocking work through caller-owned execution resources; JDBC uses its bounded `JdbcExecution`, and
 `FileSystemDocumentStore` accepts a caller-owned executor.
 
+R2, D1, and Filesystem default constructors, plus framework-created adapters, apply independent
+non-blocking admission budgets that default to 8 active and 32 pending downstream operations. A
+directly created JDBC `JdbcExecution` uses its supplied limits. Full budgets reject new work with
+`AdmissionRejectedException`; they do not resize caller-owned executors or clients, and they do not
+limit requests per second. Adapter fan-out during queries and index rebuilds can exceed a budget. See the
+[configuration guide](https://r2d1.nexcraft.dev/docs/configuration/) for framework overrides and
+the operation lifecycle.
+
 Persistence operations follow these paths:
 
 - `put`: serialize the document, write the authoritative `DocumentStore`, then upsert the index row.
@@ -367,7 +375,10 @@ The filesystem adapter does not provide version history, lost-update prevention,
 or replication. Concurrent complete PUTs have last-publication-wins behavior according to the
 underlying filesystem's atomic-move ordering. It follows the same authoritative DocumentStore and
 rebuildable IndexStore contract as R2, so it can be combined with D1 or JDBC without a
-filesystem-specific consistency rule.
+filesystem-specific consistency rule. Its default admission budget is 8 active and 32 pending
+operations; the optional `BackpressureConfig` constructor overload sets per-store limits. The
+[filesystem guide](https://r2d1.nexcraft.dev/docs/document-stores/filesystem/) describes rejection
+and executor ownership.
 
 ## D1 Schema Initialization
 
@@ -396,6 +407,13 @@ the endpoint and owns credentials, TLS, pooling, and server lifecycle; JDBC exec
 independent of deployment topology. The module detects the database from JDBC metadata, keeps
 database-specific behavior behind an internal dialect boundary, and does not bundle a JDBC driver.
 The JDBC index remains a rebuildable projection rather than an authoritative document store.
+
+JDBC and D1 each use an independent admission budget. Framework integrations default each budget to
+8 active and 32 pending operations and support per-adapter overrides. Direct JDBC execution takes
+its limits from `JdbcExecutionConfig`. See the
+[configuration guide](https://r2d1.nexcraft.dev/docs/configuration/),
+[Micronaut guide](r2d1-micronaut/README.md), and [Spring Boot guide](r2d1-spring-boot-autoconfigure/README.md)
+for property inheritance and the retained flat JDBC aliases.
 
 See the [JDBC module guide](r2d1-jdbc/README.md) for supported databases, Gradle and Maven
 dependencies, database configuration, lifecycle ownership, schema behavior, and query semantics.
