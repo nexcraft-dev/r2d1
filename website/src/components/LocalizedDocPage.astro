@@ -2,7 +2,6 @@
 import DocsLayout from "../layouts/DocsLayout.astro";
 import LocalizedDocContent from "./docs/LocalizedDocContent.astro";
 import GettingStartedContent from "./docs/GettingStartedContent.astro";
-import SpringDocContent from "./docs/SpringDocContent.astro";
 import type { LocalizedLocale } from "../i18n/config";
 
 interface Props {
@@ -51,10 +50,6 @@ const meta = {
     micronaut: {
       title: "Micronaut 5",
       description: "선택적인 Micronaut 5 통합과 애플리케이션 소유 resource를 구성합니다."
-    },
-    spring: {
-      title: "Spring Boot 4",
-      description: "Upcoming Spring Boot 4 integration targeted for the next release; not yet available from Maven Central."
     }
   },
   zh: {
@@ -97,10 +92,6 @@ const meta = {
     micronaut: {
       title: "Micronaut 5",
       description: "配置可选的 Micronaut 5 集成以及由应用拥有的资源。"
-    },
-    spring: {
-      title: "Spring Boot 4",
-      description: "Upcoming Spring Boot 4 integration targeted for the next release; not yet available from Maven Central."
     }
   },
   ja: {
@@ -143,10 +134,6 @@ const meta = {
     micronaut: {
       title: "Micronaut 5",
       description: "オプションの Micronaut 5 統合とアプリケーション所有リソースを設定します。"
-    },
-    spring: {
-      title: "Spring Boot 4",
-      description: "Upcoming Spring Boot 4 integration targeted for the next release; not yet available from Maven Central."
     }
   }
 } as const;
@@ -162,8 +149,6 @@ if (!page) {
 <DocsLayout title={page.title} description={page.description} locale={locale}>
   {slug === "getting-started" ? (
     <GettingStartedContent locale={locale} />
-  ) : slug === "spring" ? (
-    <SpringDocContent />
   ) : (
     <LocalizedDocContent locale={locale} slug={slug} />
   )}

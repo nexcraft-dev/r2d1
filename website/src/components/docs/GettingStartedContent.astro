@@ -1,21 +1,18 @@
 ---
 import { localePath, type LocalizedLocale } from "../../i18n/config";
-import release from "../../data/release.json";
 
 interface Props {
   locale: LocalizedLocale;
 }
 
-const stableVersion = release.latestStableVersion;
-
 const coreDependency = `dependencies {
-    implementation("dev.nexcraft:r2d1:${stableVersion}")
+    implementation("dev.nexcraft:r2d1:<version>")
 }`;
 
 const optionalDependencies = `dependencies {
-    implementation("dev.nexcraft:r2d1-filesystem:${stableVersion}")
-    implementation("dev.nexcraft:r2d1-jdbc:${stableVersion}")
-    implementation("dev.nexcraft:r2d1-micronaut:${stableVersion}")
+    implementation("dev.nexcraft:r2d1-filesystem:<version>")
+    implementation("dev.nexcraft:r2d1-jdbc:<version>")
+    implementation("dev.nexcraft:r2d1-micronaut:<version>")
 }`;
 
 const documentExample = `import dev.nexcraft.r2d1.annotation.Document;
