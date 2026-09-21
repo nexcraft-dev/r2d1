@@ -108,11 +108,14 @@ if (!home.includes(`Latest stable: ${release.latestStableVersion}`)) {
 }
 
 if (!home.includes("R2D1-SPRING-BOOT-STARTER") || !home.includes("dev.nexcraft:r2d1-spring-boot-starter")) {
-  throw new Error("Home page is missing the upcoming Spring integration");
+  throw new Error("Home page is missing the published Spring integration");
 }
 
-if (!docsOverview.includes("R2D1-SPRING-BOOT-STARTER") || !docsOverview.includes("upcoming")) {
-  throw new Error("Documentation overview is missing the upcoming Spring integration");
+if (
+  !docsOverview.includes("R2D1-SPRING-BOOT-STARTER") ||
+  !docsOverview.includes(`Spring Boot 4 starter ${release.latestStableVersion}`)
+) {
+  throw new Error("Documentation overview is missing the published Spring integration");
 }
 
 if (!gettingStarted.includes(`dev.nexcraft:r2d1:${release.latestStableVersion}`)) {
@@ -120,10 +123,10 @@ if (!gettingStarted.includes(`dev.nexcraft:r2d1:${release.latestStableVersion}`)
 }
 
 if (
-  !spring.includes(`Upcoming in ${release.nextReleaseVersion}`) ||
-  !spring.includes("not yet available from Maven Central")
+  !spring.includes(`Available in ${release.latestStableVersion}`) ||
+  !spring.includes("published to Maven Central")
 ) {
-  throw new Error("Spring documentation is missing its upcoming-release boundary");
+  throw new Error("Spring documentation is missing its published-release status");
 }
 
 for (const requiredLabel of [

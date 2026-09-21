@@ -37,7 +37,7 @@ interface OverviewCopy {
   boundaryDescription: string;
 }
 
-const nextReleaseVersion = release.nextReleaseVersion;
+const latestStableVersion = release.latestStableVersion;
 
 const copy: Record<Locale, OverviewCopy> = {
   en: {
@@ -69,13 +69,13 @@ const copy: Record<Locale, OverviewCopy> = {
       { title: "Consistency and Recovery", description: "Handle partial failures and rebuild the derived index from authoritative documents.", link: "Read Consistency →", href: "/docs/consistency/" }
     ],
     modulesEyebrow: "MODULES & INTEGRATIONS",
-    modulesTitle: "Published modules and upcoming integrations.",
+    modulesTitle: "Published modules and integrations.",
     modules: [
       { label: "CORE + CLOUDFLARE", name: "R2D1", coordinate: "dev.nexcraft:r2d1", description: "Common API plus R2 and D1 adapters.", link: "Configuration →", href: "/docs/configuration/" },
       { label: "INDEX STORE", name: "R2D1-JDBC", coordinate: "dev.nexcraft:r2d1-jdbc", description: "H2, HSQLDB, and local SQLite index support.", link: "JDBC setup →", href: "/docs/index-stores/jdbc/" },
       { label: "DOCUMENT STORE", name: "R2D1-FILESYSTEM", coordinate: "dev.nexcraft:r2d1-filesystem", description: "Canonical local document files.", link: "Filesystem setup →", href: "/docs/document-stores/filesystem/" },
       { label: "FRAMEWORK INTEGRATION", name: "R2D1-MICRONAUT", coordinate: "dev.nexcraft:r2d1-micronaut", description: "Micronaut 5 bean and resource integration.", link: "Micronaut setup →", href: "/docs/micronaut/" },
-      { label: "UPCOMING INTEGRATION", name: "R2D1-SPRING-BOOT-STARTER", coordinate: "dev.nexcraft:r2d1-spring-boot-starter", description: `Spring Boot 4 starter planned for ${nextReleaseVersion}; auto-configuration will be published separately, and neither is yet on Maven Central.`, link: "Spring Boot preview →", href: "/docs/spring/" }
+      { label: "FRAMEWORK INTEGRATION", name: "R2D1-SPRING-BOOT-STARTER", coordinate: "dev.nexcraft:r2d1-spring-boot-starter", description: `Spring Boot 4 starter ${latestStableVersion} with separately published auto-configuration on Maven Central.`, link: "Spring Boot setup →", href: "/docs/spring/" }
     ],
     boundaryEyebrow: "DOCUMENTATION BOUNDARY",
     boundaryTitle: "Examples follow the current code.",
@@ -110,13 +110,13 @@ const copy: Record<Locale, OverviewCopy> = {
       { title: "일관성과 복구", description: "부분 실패를 처리하고 권위 있는 문서에서 파생 인덱스를 재구축합니다.", link: "일관성 읽기 →", href: "/docs/consistency/" }
     ],
     modulesEyebrow: "MODULES & INTEGRATIONS",
-    modulesTitle: "공개 모듈과 예정된 통합.",
+    modulesTitle: "공개 모듈과 통합.",
     modules: [
       { label: "CORE + CLOUDFLARE", name: "R2D1", coordinate: "dev.nexcraft:r2d1", description: "공통 API와 R2 및 D1 adapter입니다.", link: "구성 →", href: "/docs/configuration/" },
       { label: "INDEX STORE", name: "R2D1-JDBC", coordinate: "dev.nexcraft:r2d1-jdbc", description: "H2, HSQLDB, 로컬 SQLite 인덱스 지원입니다.", link: "JDBC 설정 →", href: "/docs/index-stores/jdbc/" },
       { label: "DOCUMENT STORE", name: "R2D1-FILESYSTEM", coordinate: "dev.nexcraft:r2d1-filesystem", description: "canonical 로컬 문서 파일입니다.", link: "Filesystem 설정 →", href: "/docs/document-stores/filesystem/" },
       { label: "FRAMEWORK INTEGRATION", name: "R2D1-MICRONAUT", coordinate: "dev.nexcraft:r2d1-micronaut", description: "Micronaut 5 bean 및 resource 통합입니다.", link: "Micronaut 설정 →", href: "/docs/micronaut/" },
-      { label: "UPCOMING INTEGRATION", name: "R2D1-SPRING-BOOT-STARTER", coordinate: "dev.nexcraft:r2d1-spring-boot-starter", description: `Spring Boot 4 통합은 ${nextReleaseVersion}를 목표로 하며 아직 Maven Central에 없습니다.`, link: "Spring Boot 미리보기 →", href: "/docs/spring/" }
+      { label: "FRAMEWORK INTEGRATION", name: "R2D1-SPRING-BOOT-STARTER", coordinate: "dev.nexcraft:r2d1-spring-boot-starter", description: `Maven Central에 게시된 ${latestStableVersion} Spring Boot 4 starter와 별도 auto-configuration입니다.`, link: "Spring Boot 설정 →", href: "/docs/spring/" }
     ],
     boundaryEyebrow: "문서 범위",
     boundaryTitle: "예제는 현재 코드에 맞습니다.",
@@ -151,13 +151,13 @@ const copy: Record<Locale, OverviewCopy> = {
       { title: "一致性与恢复", description: "处理部分失败，并从权威文档重建派生索引。", link: "阅读一致性 →", href: "/docs/consistency/" }
     ],
     modulesEyebrow: "MODULES & INTEGRATIONS",
-    modulesTitle: "已发布模块与即将推出的集成。",
+    modulesTitle: "已发布模块与集成。",
     modules: [
       { label: "CORE + CLOUDFLARE", name: "R2D1", coordinate: "dev.nexcraft:r2d1", description: "通用 API 以及 R2、D1 适配器。", link: "配置 →", href: "/docs/configuration/" },
       { label: "INDEX STORE", name: "R2D1-JDBC", coordinate: "dev.nexcraft:r2d1-jdbc", description: "H2、HSQLDB 和本地 SQLite 索引支持。", link: "JDBC 设置 →", href: "/docs/index-stores/jdbc/" },
       { label: "DOCUMENT STORE", name: "R2D1-FILESYSTEM", coordinate: "dev.nexcraft:r2d1-filesystem", description: "规范的本地文档文件。", link: "Filesystem 设置 →", href: "/docs/document-stores/filesystem/" },
       { label: "FRAMEWORK INTEGRATION", name: "R2D1-MICRONAUT", coordinate: "dev.nexcraft:r2d1-micronaut", description: "Micronaut 5 bean 和资源集成。", link: "Micronaut 设置 →", href: "/docs/micronaut/" },
-      { label: "UPCOMING INTEGRATION", name: "R2D1-SPRING-BOOT-STARTER", coordinate: "dev.nexcraft:r2d1-spring-boot-starter", description: `Spring Boot 4 集成面向 ${nextReleaseVersion}，尚未发布到 Maven Central。`, link: "Spring Boot 预览 →", href: "/docs/spring/" }
+      { label: "FRAMEWORK INTEGRATION", name: "R2D1-SPRING-BOOT-STARTER", coordinate: "dev.nexcraft:r2d1-spring-boot-starter", description: `已发布到 Maven Central 的 ${latestStableVersion} Spring Boot 4 starter 及独立 auto-configuration。`, link: "Spring Boot 设置 →", href: "/docs/spring/" }
     ],
     boundaryEyebrow: "文档范围",
     boundaryTitle: "示例与当前代码保持一致。",
@@ -192,13 +192,13 @@ const copy: Record<Locale, OverviewCopy> = {
       { title: "整合性と復旧", description: "部分的な失敗を処理し、権威ドキュメントから派生インデックスを再構築します。", link: "整合性を読む →", href: "/docs/consistency/" }
     ],
     modulesEyebrow: "MODULES & INTEGRATIONS",
-    modulesTitle: "公開モジュールと近日公開の統合。",
+    modulesTitle: "公開モジュールと統合。",
     modules: [
       { label: "CORE + CLOUDFLARE", name: "R2D1", coordinate: "dev.nexcraft:r2d1", description: "共通 API と R2、D1 アダプター。", link: "設定 →", href: "/docs/configuration/" },
       { label: "INDEX STORE", name: "R2D1-JDBC", coordinate: "dev.nexcraft:r2d1-jdbc", description: "H2、HSQLDB、ローカル SQLite インデックスのサポート。", link: "JDBC の設定 →", href: "/docs/index-stores/jdbc/" },
       { label: "DOCUMENT STORE", name: "R2D1-FILESYSTEM", coordinate: "dev.nexcraft:r2d1-filesystem", description: "正規のローカルドキュメントファイル。", link: "Filesystem の設定 →", href: "/docs/document-stores/filesystem/" },
       { label: "FRAMEWORK INTEGRATION", name: "R2D1-MICRONAUT", coordinate: "dev.nexcraft:r2d1-micronaut", description: "Micronaut 5 の bean とリソース統合。", link: "Micronaut の設定 →", href: "/docs/micronaut/" },
-      { label: "UPCOMING INTEGRATION", name: "R2D1-SPRING-BOOT-STARTER", coordinate: "dev.nexcraft:r2d1-spring-boot-starter", description: `Spring Boot 4 統合は ${nextReleaseVersion} 向けで、まだ Maven Central にはありません。`, link: "Spring Boot プレビュー →", href: "/docs/spring/" }
+      { label: "FRAMEWORK INTEGRATION", name: "R2D1-SPRING-BOOT-STARTER", coordinate: "dev.nexcraft:r2d1-spring-boot-starter", description: `Maven Central に公開された ${latestStableVersion} Spring Boot 4 starter と独立した auto-configuration。`, link: "Spring Boot の設定 →", href: "/docs/spring/" }
     ],
     boundaryEyebrow: "ドキュメントの範囲",
     boundaryTitle: "例は現在のコードに合わせています。",
