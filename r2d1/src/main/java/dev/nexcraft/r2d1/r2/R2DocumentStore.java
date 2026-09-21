@@ -1,5 +1,7 @@
 package dev.nexcraft.r2d1.r2;
 
+import dev.nexcraft.r2d1.AdmissionController;
+import dev.nexcraft.r2d1.BackpressureConfig;
 import dev.nexcraft.r2d1.spi.DocumentCursor;
 import dev.nexcraft.r2d1.spi.DocumentKey;
 import dev.nexcraft.r2d1.spi.DocumentNotFoundException;
@@ -54,6 +56,7 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
   private final S3AsyncClient client;
   private final String bucketName;
   private final boolean ownsClient;
+  private final AdmissionController admission;
   private final AtomicBoolean clientClosed = new AtomicBoolean();
 
   /**
@@ -63,10 +66,41 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
    * @throws NullPointerException if {@code config} is {@code null}
    */
   public R2DocumentStore(R2Config config) {
-    this(
-        R2ClientFactory.create(Objects.requireNonNull(config, "config")),
-        config.bucketName(),
-        true);
+    this(config, BackpressureConfig.DEFAULT);
+  }
+
+  /**
+   * Creates an R2 document store with an R2 admission budget and a matching owned S3 client.
+   *
+   * @param config R2 endpoint, credentials, bucket, and region configuration
+   * @param backpressureConfig active and pending R2 request limits
+   * @throws NullPointerException if either argument is {@code null}
+   */
+  public R2DocumentStore(R2Config config, BackpressureConfig backpressureConfig) {
+    this(config, backpressureConfig, null);
+  }
+
+  /**
+   * Creates an R2 document store with an R2 admission budget and a matching owned S3 client.
+   *
+   * <p>A {@code null} client maxConcurrency derives the S3 client capacity from the admission
+   * limit. An explicit value is honored, with a warning when it is lower than the admission limit.
+   *
+   * @param config R2 endpoint, credentials, bucket, and region configuration
+   * @param backpressureConfig active and pending R2 request limits
+   * @param clientMaxConcurrency explicit AWS SDK Netty maxConcurrency, or {@code null} to derive it
+   * @throws NullPointerException if {@code config} or {@code backpressureConfig} is {@code null}
+   * @throws IllegalArgumentException if the explicit client maxConcurrency is not positive
+   */
+  public R2DocumentStore(
+      R2Config config,
+      BackpressureConfig backpressureConfig,
+      @Nullable Integer clientMaxConcurrency) {
+    this(createOwnedResources(config, backpressureConfig, clientMaxConcurrency));
+  }
+
+  private R2DocumentStore(OwnedResources resources) {
+    this(resources.client(), resources.bucketName(), true, resources.admission());
   }
 
   /**
@@ -83,10 +117,33 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
     this(client, bucketName, false);
   }
 
+  /**
+   * Creates an R2 document store that borrows an existing asynchronous S3 client.
+   *
+   * <p>The admission budget is independent of the borrowed client's own capacity. Closing this
+   * store does not close the supplied client.
+   *
+   * @param client caller-owned S3-compatible asynchronous client
+   * @param bucketName R2 bucket that stores documents
+   * @param backpressureConfig active and pending R2 request limits
+   * @throws NullPointerException if an argument is {@code null}
+   * @throws IllegalArgumentException if {@code bucketName} is blank
+   */
+  public R2DocumentStore(
+      S3AsyncClient client, String bucketName, BackpressureConfig backpressureConfig) {
+    this(client, bucketName, false, new AdmissionController(backpressureConfig));
+  }
+
   R2DocumentStore(S3AsyncClient client, String bucketName, boolean ownsClient) {
+    this(client, bucketName, ownsClient, new AdmissionController(BackpressureConfig.DEFAULT));
+  }
+
+  private R2DocumentStore(
+      S3AsyncClient client, String bucketName, boolean ownsClient, AdmissionController admission) {
     this.client = Objects.requireNonNull(client, "client");
     this.bucketName = requireBucketName(bucketName);
     this.ownsClient = ownsClient;
+    this.admission = Objects.requireNonNull(admission, "admission");
   }
 
   @Override
@@ -157,6 +214,7 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
 
   @Override
   public void close() {
+    admission.close();
     if (ownsClient && clientClosed.compareAndSet(false, true)) {
       client.close();
     }
@@ -168,6 +226,12 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
   }
 
   private <T> CompletionStage<T> executeValue(
+      Supplier<CompletionStage<T>> invocation,
+      Function<Throwable, RuntimeException> failureMapper) {
+    return admission.submit(() -> executeValueAdmitted(invocation, failureMapper));
+  }
+
+  private <T> CompletionStage<T> executeValueAdmitted(
       Supplier<CompletionStage<T>> invocation,
       Function<Throwable, RuntimeException> failureMapper) {
     try {
@@ -189,6 +253,11 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
   }
 
   private CompletionStage<@Nullable Void> executeVoid(
+      DocumentKey key, Operation operation, Supplier<? extends CompletionStage<?>> invocation) {
+    return admission.submit(() -> executeVoidAdmitted(key, operation, invocation));
+  }
+
+  private CompletionStage<@Nullable Void> executeVoidAdmitted(
       DocumentKey key, Operation operation, Supplier<? extends CompletionStage<?>> invocation) {
     try {
       CompletionStage<?> stage =
@@ -276,6 +345,28 @@ public final class R2DocumentStore implements DocumentStore, AutoCloseable {
     }
     return value;
   }
+
+  private static OwnedResources createOwnedResources(
+      R2Config config,
+      BackpressureConfig backpressureConfig,
+      @Nullable Integer clientMaxConcurrency) {
+    R2Config validatedConfig = Objects.requireNonNull(config, "config");
+    BackpressureConfig validatedBackpressure =
+        Objects.requireNonNull(backpressureConfig, "backpressureConfig");
+    AdmissionController admission = new AdmissionController(validatedBackpressure);
+    try {
+      return new OwnedResources(
+          R2ClientFactory.create(validatedConfig, validatedBackpressure, clientMaxConcurrency),
+          validatedConfig.bucketName(),
+          admission);
+    } catch (RuntimeException | Error failure) {
+      admission.close();
+      throw failure;
+    }
+  }
+
+  private record OwnedResources(
+      S3AsyncClient client, String bucketName, AdmissionController admission) {}
 
   private enum Operation {
     PUT("put"),

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dev.nexcraft.r2d1.annotation.Document;
 import dev.nexcraft.r2d1.annotation.Id;
 import dev.nexcraft.r2d1.annotation.Index;
+import dev.nexcraft.r2d1.spi.AdmissionRejectedException;
 import dev.nexcraft.r2d1.spi.DocumentCursor;
 import dev.nexcraft.r2d1.spi.DocumentKey;
 import dev.nexcraft.r2d1.spi.DocumentNotFoundException;
@@ -29,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -178,6 +180,101 @@ class ConsistencyRecoveryTest {
   }
 
   @Test
+  void queryFanOutHonorsIndependentD1AndR2Budgets() throws Exception {
+    List<String> events = new ArrayList<>();
+    FakeDocumentStore documentDelegate = new FakeDocumentStore(events);
+    FakeIndexStore indexDelegate = new FakeIndexStore(events);
+    List<DocumentKey> keys = List.of(key("A"), key("B"), key("C"), key("D"));
+    UserCodec codec = new UserCodec();
+    keys.forEach(
+        documentKey ->
+            documentDelegate.stored.put(
+                documentKey, codec.serialize(new User(documentKey.id(), "NZ", 1L))));
+    documentDelegate.controlGets(keys);
+    keys.forEach(
+        documentKey ->
+            documentDelegate.stored.put(
+                documentKey, codec.serialize(new User(documentKey.id(), "NZ", 1L))));
+    CompletableFuture<IndexPage> controlledQuery = new CompletableFuture<>();
+    indexDelegate.controlQuery(controlledQuery);
+    AdmissionController r2Admission = new AdmissionController(new BackpressureConfig(2, 1));
+    AdmissionController d1Admission = new AdmissionController(new BackpressureConfig(1, 1));
+    AdmittedDocumentStore documents = new AdmittedDocumentStore(documentDelegate, r2Admission);
+    AdmittedIndexStore indexes = new AdmittedIndexStore(indexDelegate, d1Admission);
+    PersistenceCollectionFactory factory =
+        new PersistenceCollectionFactory(
+            documents, indexes, new UserCodec(), ignored -> completedVoid());
+    R2D1Collection<User> collection = factory.create(User.class);
+    CompletableFuture<Void> query =
+        CompletableFuture.runAsync(() -> collection.query().limit(4).fetch());
+
+    assertThat(indexDelegate.queryStarted.await(2, TimeUnit.SECONDS)).isTrue();
+    CompletionStage<@Nullable Void> queuedD1Operation = indexes.delete(key("queued"));
+    assertThat(indexDelegate.deleteCalls).isZero();
+
+    controlledQuery.complete(new IndexPage(keys, Optional.empty()));
+
+    assertThat(indexDelegate.deleteCalls).isOne();
+    assertThat(queuedD1Operation.toCompletableFuture()).isCompletedWithValue(null);
+    assertThat(documentDelegate.getKeys).containsExactly(key("A"), key("B"));
+    documentDelegate.completeGet(
+        key("A"), Objects.requireNonNull(documentDelegate.stored.get(key("A"))));
+    assertThat(documentDelegate.getKeys).containsExactly(key("A"), key("B"), key("C"));
+    documentDelegate.completeGet(
+        key("B"), Objects.requireNonNull(documentDelegate.stored.get(key("B"))));
+    documentDelegate.completeGet(
+        key("C"), Objects.requireNonNull(documentDelegate.stored.get(key("C"))));
+
+    assertThatThrownBy(query::join).hasCauseInstanceOf(AdmissionRejectedException.class);
+    assertThat(documentDelegate.getKeys).containsExactly(key("A"), key("B"), key("C"));
+    r2Admission.close();
+    d1Admission.close();
+  }
+
+  @Test
+  void rejectsOversizedRebuildFirstPageBeforeClearingD1() throws Exception {
+    List<String> events = new ArrayList<>();
+    FakeDocumentStore documentDelegate = new FakeDocumentStore(events);
+    FakeIndexStore indexes = new FakeIndexStore(events);
+    List<DocumentKey> keys = new ArrayList<>();
+    for (int index = 0; index < 100; index++) {
+      DocumentKey documentKey = key("rebuild-" + index);
+      keys.add(documentKey);
+    }
+    documentDelegate.controlGets(keys);
+    UserCodec codec = new UserCodec();
+    for (int index = 0; index < keys.size(); index++) {
+      DocumentKey documentKey = keys.get(index);
+      documentDelegate.stored.put(
+          documentKey, codec.serialize(new User(documentKey.id(), "NZ", (long) index)));
+    }
+    AdmissionController r2Admission = new AdmissionController(BackpressureConfig.DEFAULT);
+    AdmittedDocumentStore documents = new AdmittedDocumentStore(documentDelegate, r2Admission);
+    documents.expectGetSubmissions(100);
+    PersistenceCollectionFactory factory =
+        new PersistenceCollectionFactory(
+            documents, indexes, new UserCodec(), ignored -> completedVoid());
+    R2D1Collection<User> collection = factory.create(User.class);
+    CompletableFuture<Void> rebuild = CompletableFuture.runAsync(collection::rebuildIndex);
+
+    assertThat(documents.awaitGetSubmissions(2, TimeUnit.SECONDS)).isTrue();
+    assertThat(documents.getSubmissions).hasValue(100);
+    assertThat(documentDelegate.getKeys).hasSize(8);
+    assertThat(indexes.clearCalls).isZero();
+
+    for (int index = 0; index < 40; index++) {
+      documentDelegate.completeGet(
+          keys.get(index), Objects.requireNonNull(documentDelegate.stored.get(keys.get(index))));
+      assertThat(documentDelegate.getKeys.size() - index - 1).isLessThanOrEqualTo(8);
+    }
+
+    assertThatThrownBy(rebuild::join).hasCauseInstanceOf(AdmissionRejectedException.class);
+    assertThat(documentDelegate.getKeys).hasSize(40);
+    assertThat(indexes.clearCalls).isZero();
+    r2Admission.close();
+  }
+
+  @Test
   void preservesTheIndexWhenTheFirstListFails() {
     Fixture fixture = new Fixture();
     fixture.indexes.rows.put(key("existing"), entry(new User("existing", "NZ", 1L)));
@@ -321,6 +418,85 @@ class ConsistencyRecoveryTest {
     }
   }
 
+  private static final class AdmittedDocumentStore implements DocumentStore {
+
+    private final DocumentStore delegate;
+    private final AdmissionController admission;
+    private final AtomicInteger getSubmissions = new AtomicInteger();
+    private @Nullable CountDownLatch getSubmissionsCompleted;
+
+    private AdmittedDocumentStore(DocumentStore delegate, AdmissionController admission) {
+      this.delegate = delegate;
+      this.admission = admission;
+    }
+
+    private void expectGetSubmissions(int count) {
+      getSubmissionsCompleted = new CountDownLatch(count);
+    }
+
+    private boolean awaitGetSubmissions(long timeout, TimeUnit unit) throws InterruptedException {
+      return Objects.requireNonNull(getSubmissionsCompleted, "get submissions are not observed")
+          .await(timeout, unit);
+    }
+
+    @Override
+    public CompletionStage<DocumentPage> list(
+        String collection, @Nullable DocumentCursor cursor, int limit) {
+      return admission.submit(() -> delegate.list(collection, cursor, limit));
+    }
+
+    @Override
+    public CompletionStage<@Nullable Void> put(DocumentKey key, StoredDocument document) {
+      return admission.submit(() -> delegate.put(key, document));
+    }
+
+    @Override
+    public CompletionStage<StoredDocument> get(DocumentKey key) {
+      getSubmissions.incrementAndGet();
+      CountDownLatch latch = getSubmissionsCompleted;
+      if (latch != null) {
+        latch.countDown();
+      }
+      return admission.submit(() -> delegate.get(key));
+    }
+
+    @Override
+    public CompletionStage<@Nullable Void> delete(DocumentKey key) {
+      return admission.submit(() -> delegate.delete(key));
+    }
+  }
+
+  private static final class AdmittedIndexStore implements IndexStore {
+
+    private final IndexStore delegate;
+    private final AdmissionController admission;
+
+    private AdmittedIndexStore(IndexStore delegate, AdmissionController admission) {
+      this.delegate = delegate;
+      this.admission = admission;
+    }
+
+    @Override
+    public CompletionStage<@Nullable Void> clear(String collection) {
+      return admission.submit(() -> delegate.clear(collection));
+    }
+
+    @Override
+    public CompletionStage<@Nullable Void> upsert(IndexEntry entry) {
+      return admission.submit(() -> delegate.upsert(entry));
+    }
+
+    @Override
+    public CompletionStage<IndexPage> query(IndexQuery query) {
+      return admission.submit(() -> delegate.query(query));
+    }
+
+    @Override
+    public CompletionStage<@Nullable Void> delete(DocumentKey key) {
+      return admission.submit(() -> delegate.delete(key));
+    }
+  }
+
   private static final class FakeDocumentStore implements DocumentStore {
 
     private final List<String> events;
@@ -410,12 +586,20 @@ class ConsistencyRecoveryTest {
     private final List<String> events;
     private final Map<DocumentKey, IndexEntry> rows = new LinkedHashMap<>();
     private final Map<DocumentKey, RuntimeException> upsertFailures = new LinkedHashMap<>();
+    private @Nullable CompletableFuture<IndexPage> controlledQueryResult;
+    private CountDownLatch queryStarted = new CountDownLatch(0);
     private @Nullable RuntimeException clearFailure;
     private @Nullable RuntimeException deleteFailure;
     private int clearCalls;
+    private int deleteCalls;
 
     private FakeIndexStore(List<String> events) {
       this.events = events;
+    }
+
+    private void controlQuery(CompletableFuture<IndexPage> result) {
+      controlledQueryResult = result;
+      queryStarted = new CountDownLatch(1);
     }
 
     @Override
@@ -442,6 +626,11 @@ class ConsistencyRecoveryTest {
 
     @Override
     public CompletionStage<IndexPage> query(IndexQuery query) {
+      CompletableFuture<IndexPage> controlled = controlledQueryResult;
+      if (controlled != null) {
+        queryStarted.countDown();
+        return controlled;
+      }
       List<DocumentKey> keys =
           rows.keySet().stream()
               .filter(key -> key.collection().equals(query.collection()))
@@ -452,6 +641,7 @@ class ConsistencyRecoveryTest {
 
     @Override
     public CompletionStage<@Nullable Void> delete(DocumentKey key) {
+      deleteCalls++;
       if (deleteFailure != null) {
         return CompletableFuture.failedFuture(deleteFailure);
       }

@@ -23,3 +23,7 @@
 website/node_modules/
 website/dist/
 website/.astro/
+
+# Generated planning and walkthrough artifacts
+/docs/plan/
+/docs/walkthrough/

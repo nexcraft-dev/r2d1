@@ -10,12 +10,13 @@ filesystem operations dispatched to an executor supplied by the application.
 ## Dependency and construction
 
 ```kotlin
-implementation("dev.nexcraft:r2d1-filesystem:<version>")
+implementation("dev.nexcraft:r2d1-filesystem:{{latestStableVersion}}")
 ```
 
 The constructor accepts a root directory and an executor for blocking I/O:
 
 ```java
+import dev.nexcraft.r2d1.BackpressureConfig;
 import dev.nexcraft.r2d1.filesystem.FileSystemDocumentStore;
 import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
@@ -23,11 +24,19 @@ import java.util.concurrent.Executors;
 
 ExecutorService filesystemExecutor = Executors.newFixedThreadPool(4);
 FileSystemDocumentStore documents =
-    new FileSystemDocumentStore(Path.of("/var/lib/my-app/r2d1"), filesystemExecutor);
+    new FileSystemDocumentStore(
+        Path.of("/var/lib/my-app/r2d1"), filesystemExecutor, new BackpressureConfig(4, 8));
 ```
 
-The adapter does not create, close, or globally share the executor. Stop admitting work and close
-the executor after the store is no longer used.
+The default per-store admission budget is 8 active and 32 pending operations. Pass a
+`BackpressureConfig` to set a different budget, or use Spring Boot's
+`r2d1.filesystem.backpressure.*` properties. The adapter admits each filesystem operation before
+submitting it to the executor. It does not create, resize, close, or globally share the executor.
+Stop admitting work and close the executor after the store is no longer used.
+
+When all active and pending slots are occupied, an operation fails immediately with
+`AdmissionRejectedException`. Cancelling the returned stage does not free a slot while its
+filesystem operation is still running. The executor's own capacity remains a separate limit.
 
 ## On-disk layout
 

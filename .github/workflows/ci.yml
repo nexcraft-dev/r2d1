@@ -50,5 +50,5 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Check JDBC and Micronaut on Java 25
-        run: ./gradlew -Pr2d1.javaToolchainVersion=25 :r2d1-jdbc:check :r2d1-micronaut:check
+      - name: Check JDBC, Micronaut, and Spring on Java 25
+        run: ./gradlew -Pr2d1.javaToolchainVersion=25 :r2d1-jdbc:check :r2d1-micronaut:check :r2d1-spring-boot-autoconfigure:check :r2d1-spring-boot-starter:check

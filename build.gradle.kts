@@ -37,7 +37,7 @@ val javaToolchainVersion =
     providers.gradleProperty("r2d1.javaToolchainVersion").map(String::toInt).orElse(21)
 
 val r2d1Version =
-    providers.gradleProperty("r2d1.version").orElse("0.1.0-SNAPSHOT")
+    providers.gradleProperty("r2d1.version").orElse("1.7.0-SNAPSHOT")
 
 val publicPublicationProjects =
     linkedMapOf(
@@ -45,6 +45,8 @@ val publicPublicationProjects =
         ":r2d1-filesystem" to "r2d1-filesystem",
         ":r2d1-jdbc" to "r2d1-jdbc",
         ":r2d1-micronaut" to "r2d1-micronaut",
+        ":r2d1-spring-boot-autoconfigure" to "r2d1-spring-boot-autoconfigure",
+        ":r2d1-spring-boot-starter" to "r2d1-spring-boot-starter",
     )
 
 val publicationNames =
@@ -53,6 +55,8 @@ val publicationNames =
         "r2d1-filesystem" to "R2D1 Filesystem DocumentStore",
         "r2d1-jdbc" to "R2D1 JDBC IndexStore",
         "r2d1-micronaut" to "R2D1 Micronaut 5 Integration",
+        "r2d1-spring-boot-autoconfigure" to "R2D1 Spring Boot Autoconfigure",
+        "r2d1-spring-boot-starter" to "R2D1 Spring Boot Starter",
     )
 
 val verificationRepositoryDirectory =
@@ -309,7 +313,7 @@ val prepareVerificationRepository =
 val publishPublicationsToVerificationRepository =
     tasks.register("publishPublicationsToVerificationRepository") {
         group = "verification"
-        description = "Publishes the four public artifacts to a temporary file Maven repository."
+        description = "Publishes the six public artifacts to a temporary file Maven repository."
         dependsOn(prepareVerificationRepository)
         dependsOn(
             publicPublicationProjects.keys.map { projectPath ->
@@ -363,6 +367,14 @@ val verifyPublishedConsumer =
                             "dev/nexcraft/r2d1/micronaut/R2D1Configuration.class",
                             "dev/nexcraft/r2d1/micronaut/internal/R2Factory.class",
                         ),
+                    "r2d1-spring-boot-autoconfigure" to
+                        listOf(
+                            "dev/nexcraft/r2d1/spring/R2D1AutoConfiguration.class",
+                            "dev/nexcraft/r2d1/spring/R2D1Properties.class",
+                            "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports",
+                            "META-INF/spring-configuration-metadata.json",
+                        ),
+                    "r2d1-spring-boot-starter" to emptyList(),
                 )
             val classOwners = mutableMapOf<String, String>()
 
@@ -419,6 +431,49 @@ val verifyPublishedConsumer =
                     }
                     check(!module.contains("r2d1-jdbc")) {
                         "r2d1-micronaut Gradle Module Metadata leaks its compileOnly JDBC adapter"
+                    }
+                }
+                if (artifactId == "r2d1-spring-boot-autoconfigure") {
+                    check(pom.contains("<artifactId>r2d1</artifactId>")) {
+                        "r2d1-spring-boot-autoconfigure POM does not reference dev.nexcraft:r2d1"
+                    }
+                    check(module.contains("r2d1")) {
+                        "r2d1-spring-boot-autoconfigure Gradle Module Metadata does not reference dev.nexcraft:r2d1"
+                    }
+                    check(!pom.contains("<artifactId>r2d1-filesystem</artifactId>")) {
+                        "r2d1-spring-boot-autoconfigure POM leaks its compileOnly filesystem adapter"
+                    }
+                    check(!pom.contains("<artifactId>r2d1-jdbc</artifactId>")) {
+                        "r2d1-spring-boot-autoconfigure POM leaks its compileOnly JDBC adapter"
+                    }
+                    check(!module.contains("r2d1-filesystem")) {
+                        "r2d1-spring-boot-autoconfigure Gradle Module Metadata leaks its compileOnly filesystem adapter"
+                    }
+                    check(!module.contains("r2d1-jdbc")) {
+                        "r2d1-spring-boot-autoconfigure Gradle Module Metadata leaks its compileOnly JDBC adapter"
+                    }
+                }
+                if (artifactId == "r2d1-spring-boot-starter") {
+                    check(pom.contains("<artifactId>r2d1-spring-boot-autoconfigure</artifactId>")) {
+                        "r2d1-spring-boot-starter POM does not reference its auto-configuration module"
+                    }
+                    check(module.contains("r2d1-spring-boot-autoconfigure")) {
+                        "r2d1-spring-boot-starter Gradle Module Metadata does not reference its auto-configuration module"
+                    }
+                    check(pom.contains("<artifactId>spring-boot-starter</artifactId>")) {
+                        "r2d1-spring-boot-starter POM does not reference spring-boot-starter"
+                    }
+                    check(!pom.contains("<artifactId>r2d1-filesystem</artifactId>")) {
+                        "r2d1-spring-boot-starter POM leaks the filesystem adapter"
+                    }
+                    check(!pom.contains("<artifactId>r2d1-jdbc</artifactId>")) {
+                        "r2d1-spring-boot-starter POM leaks the JDBC adapter"
+                    }
+                    check(!module.contains("r2d1-filesystem")) {
+                        "r2d1-spring-boot-starter Gradle Module Metadata leaks the filesystem adapter"
+                    }
+                    check(!module.contains("r2d1-jdbc")) {
+                        "r2d1-spring-boot-starter Gradle Module Metadata leaks the JDBC adapter"
                     }
                 }
 
@@ -485,9 +540,38 @@ val verifyPublishedConsumer =
                     }
 
                     rootProject.name = "r2d1-published-consumer"
-                    include("core", "filesystem", "jdbc", "micronaut", "combined")
+                    include(
+                        "core",
+                        "filesystem",
+                        "jdbc",
+                        "micronaut",
+                        "spring-autoconfigure",
+                        "spring-starter",
+                        "combined",
+                    )
                     """.trimIndent()
                 )
+
+                val springConsumerSource =
+                    """
+                    package consumer;
+
+                    import dev.nexcraft.r2d1.spring.R2D1AutoConfiguration;
+                    import dev.nexcraft.r2d1.spring.R2D1Properties;
+
+                    public final class Main {
+                      public static void main(String[] args) {
+                        require(R2D1AutoConfiguration.class);
+                        require(R2D1Properties.class);
+                      }
+
+                      private static void require(Class<?> type) {
+                        if (type.getName().isBlank()) {
+                          throw new AssertionError(type.getName());
+                        }
+                      }
+                    }
+                    """.trimIndent()
 
                 val sourceByVariant =
                     mapOf(
@@ -581,6 +665,8 @@ val verifyPublishedConsumer =
                               }
                             }
                             """.trimIndent(),
+                        "spring-autoconfigure" to springConsumerSource,
+                        "spring-starter" to springConsumerSource,
                         "combined" to
                             """
                             package consumer;
@@ -591,6 +677,7 @@ val verifyPublishedConsumer =
                             import dev.nexcraft.r2d1.jdbc.JdbcIndexStore;
                             import dev.nexcraft.r2d1.micronaut.R2D1Configuration;
                             import dev.nexcraft.r2d1.r2.R2DocumentStore;
+                            import dev.nexcraft.r2d1.spring.R2D1AutoConfiguration;
 
                             public final class Main {
                               public static void main(String[] args) {
@@ -600,6 +687,7 @@ val verifyPublishedConsumer =
                                 require(FileSystemDocumentStore.class);
                                 require(JdbcIndexStore.class);
                                 require(R2D1Configuration.class);
+                                require(R2D1AutoConfiguration.class);
                               }
 
                               private static void require(Class<?> type) {
@@ -616,12 +704,16 @@ val verifyPublishedConsumer =
                         "filesystem" to listOf("dev.nexcraft:r2d1-filesystem:$version"),
                         "jdbc" to listOf("dev.nexcraft:r2d1-jdbc:$version"),
                         "micronaut" to listOf("dev.nexcraft:r2d1-micronaut:$version"),
+                        "spring-autoconfigure" to
+                            listOf("dev.nexcraft:r2d1-spring-boot-autoconfigure:$version"),
+                        "spring-starter" to listOf("dev.nexcraft:r2d1-spring-boot-starter:$version"),
                         "combined" to
                             listOf(
                                 "dev.nexcraft:r2d1:$version",
                                 "dev.nexcraft:r2d1-filesystem:$version",
                                 "dev.nexcraft:r2d1-jdbc:$version",
                                 "dev.nexcraft:r2d1-micronaut:$version",
+                                "dev.nexcraft:r2d1-spring-boot-starter:$version",
                             ),
                     )
 
@@ -668,6 +760,8 @@ val verifyPublishedConsumer =
                             ":core:verifyRuntime",
                             ":jdbc:verifyRuntime",
                             ":micronaut:verifyRuntime",
+                            ":spring-autoconfigure:verifyRuntime",
+                            ":spring-starter:verifyRuntime",
                             ":combined:verifyRuntime",
                         )
                         .directory(root)

@@ -1,5 +1,7 @@
 package dev.nexcraft.r2d1.filesystem;
 
+import dev.nexcraft.r2d1.AdmissionController;
+import dev.nexcraft.r2d1.BackpressureConfig;
 import dev.nexcraft.r2d1.spi.DocumentCursor;
 import dev.nexcraft.r2d1.spi.DocumentKey;
 import dev.nexcraft.r2d1.spi.DocumentNotFoundException;
@@ -55,6 +57,7 @@ public final class FileSystemDocumentStore implements DocumentStore {
 
   private final Path rootDirectory;
   private final Executor ioExecutor;
+  private final AdmissionController admissionController;
   private final TemporaryDocumentWriter documentWriter;
   private final AtomicDocumentPublisher documentPublisher;
 
@@ -67,11 +70,27 @@ public final class FileSystemDocumentStore implements DocumentStore {
    * @throws NullPointerException if either argument is {@code null}
    */
   public FileSystemDocumentStore(Path rootDirectory, Executor ioExecutor) {
+    this(rootDirectory, ioExecutor, BackpressureConfig.DEFAULT);
+  }
+
+  /**
+   * Creates a filesystem document store using the caller-owned blocking-I/O executor and the
+   * supplied admission limits.
+   *
+   * @param rootDirectory directory containing collection directories; it is created on the first
+   *     write when absent
+   * @param ioExecutor executor used for every blocking filesystem operation
+   * @param backpressureConfig active and pending operation limits for this store
+   * @throws NullPointerException if any argument is {@code null}
+   */
+  public FileSystemDocumentStore(
+      Path rootDirectory, Executor ioExecutor, BackpressureConfig backpressureConfig) {
     this(
         rootDirectory,
         ioExecutor,
         FileSystemDocumentStore::writeDocument,
-        FileSystemDocumentStore::moveAtomically);
+        FileSystemDocumentStore::moveAtomically,
+        backpressureConfig);
   }
 
   FileSystemDocumentStore(
@@ -79,9 +98,20 @@ public final class FileSystemDocumentStore implements DocumentStore {
       Executor ioExecutor,
       TemporaryDocumentWriter documentWriter,
       AtomicDocumentPublisher documentPublisher) {
+    this(rootDirectory, ioExecutor, documentWriter, documentPublisher, BackpressureConfig.DEFAULT);
+  }
+
+  FileSystemDocumentStore(
+      Path rootDirectory,
+      Executor ioExecutor,
+      TemporaryDocumentWriter documentWriter,
+      AtomicDocumentPublisher documentPublisher,
+      BackpressureConfig backpressureConfig) {
     this.rootDirectory =
         Objects.requireNonNull(rootDirectory, "rootDirectory").toAbsolutePath().normalize();
     this.ioExecutor = Objects.requireNonNull(ioExecutor, "ioExecutor");
+    this.admissionController =
+        new AdmissionController(Objects.requireNonNull(backpressureConfig, "backpressureConfig"));
     this.documentWriter = Objects.requireNonNull(documentWriter, "documentWriter");
     this.documentPublisher = Objects.requireNonNull(documentPublisher, "documentPublisher");
   }
@@ -234,20 +264,23 @@ public final class FileSystemDocumentStore implements DocumentStore {
 
   private <T> CompletionStage<T> submit(
       String operation, @Nullable DocumentKey key, IoOperation<T> ioOperation) {
-    CompletableFuture<T> result = new CompletableFuture<>();
-    try {
-      ioExecutor.execute(
-          () -> {
-            try {
-              result.complete(ioOperation.run());
-            } catch (IOException | RuntimeException failure) {
-              result.completeExceptionally(mapFailure(operation, key, failure));
-            }
-          });
-    } catch (RuntimeException failure) {
-      result.completeExceptionally(mapFailure(operation, key, failure));
-    }
-    return result;
+    return admissionController.submit(
+        () -> {
+          CompletableFuture<T> result = new CompletableFuture<>();
+          try {
+            ioExecutor.execute(
+                () -> {
+                  try {
+                    result.complete(ioOperation.run());
+                  } catch (IOException | RuntimeException failure) {
+                    result.completeExceptionally(mapFailure(operation, key, failure));
+                  }
+                });
+          } catch (RuntimeException failure) {
+            result.completeExceptionally(mapFailure(operation, key, failure));
+          }
+          return result;
+        });
   }
 
   private static RuntimeException mapFailure(
