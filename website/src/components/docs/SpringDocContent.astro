@@ -1,26 +1,145 @@
 ---
 import release from "../../data/release.json";
+import type { Locale } from "../../i18n/config";
+
+interface Props {
+  locale?: Locale;
+}
+
+const copy: Record<Locale, {
+  availableBefore: string;
+  availableAfter: string;
+  published: string;
+  dependencyTitle: string;
+  dependencyBefore: string;
+  dependencyAfter: string;
+  starterBefore: string;
+  starterAfter: string;
+  configTitle: string;
+  configBefore: string;
+  configAfter: string;
+  jdbc: string;
+  resourcesTitle: string;
+  resourcesBefore: string;
+  resourcesJoin: string;
+  resourcesMiddle: string;
+  resourcesAfter: string;
+  scopeTitle: string;
+  scopeAfterSpringData: string;
+  scopeAfterR2dbc: string;
+}> = {
+  en: {
+    availableBefore: "Available in ",
+    availableAfter: ".",
+    published: "The Spring Boot integration is published to Maven Central as two artifacts: the starter and its separately published auto-configuration module.",
+    dependencyTitle: "Dependency",
+    dependencyBefore: "Add the ",
+    dependencyAfter: " artifact to a Spring Boot 4.0.6 application running on Java 21 or later:",
+    starterBefore: "The starter depends on the separately published ",
+    starterAfter: " module. Use the starter for normal applications; use the auto-configuration module directly when composing a custom starter.",
+    configTitle: "What it configures",
+    configBefore: "Set ",
+    configAfter: " to activate the integration. The configuration supports R2 or filesystem document storage and D1 or JDBC indexing, while preserving the framework-neutral R2D1 collection API.",
+    jdbc: "JDBC uses platform-thread execution by default. Select virtual-thread execution explicitly only on a Java 25 runtime; the integration does not provide a fallback for older runtimes.",
+    resourcesTitle: "Resource ownership",
+    resourcesBefore: "Existing application ",
+    resourcesJoin: "and",
+    resourcesMiddle: " beans are reused when selected by name or as the unique or ",
+    resourcesAfter: " bean. Application-owned resources are not closed by the integration. Resources created by the integration are closed with its managed beans.",
+    scopeTitle: "Scope",
+    scopeAfterSpringData: " repositories, transactions, AOP, controllers, retry and compensation policies, ",
+    scopeAfterR2dbc: ", server lifecycle, and connection-pool management are outside these modules. Native-image hints are not included until a concrete Spring AOT requirement is verified."
+  },
+  ko: {
+    availableBefore: "",
+    availableAfter: "에서 사용할 수 있습니다.",
+    published: "Spring Boot 통합은 starter와 별도로 게시된 auto-configuration 모듈, 두 artifact로 Maven Central에 게시되어 있습니다.",
+    dependencyTitle: "의존성",
+    dependencyBefore: "Java 21 이상에서 실행되는 Spring Boot 4.0.6 애플리케이션에 ",
+    dependencyAfter: " artifact를 추가합니다:",
+    starterBefore: "starter는 별도로 게시된 ",
+    starterAfter: " 모듈에 의존합니다. 일반 애플리케이션에는 starter를 사용하고, custom starter를 구성할 때는 auto-configuration 모듈을 직접 사용하세요.",
+    configTitle: "구성하는 항목",
+    configBefore: "통합을 활성화하려면 ",
+    configAfter: "을 설정하세요. 이 구성은 R2 또는 filesystem 문서 저장소와 D1 또는 JDBC 인덱싱을 지원하면서 framework-neutral R2D1 collection API를 유지합니다.",
+    jdbc: "JDBC는 기본적으로 platform-thread 실행을 사용합니다. Java 25 runtime에서만 virtual-thread 실행을 명시적으로 선택하세요. 통합은 이전 runtime에 대한 fallback을 제공하지 않습니다.",
+    resourcesTitle: "리소스 소유권",
+    resourcesBefore: "애플리케이션의 ",
+    resourcesJoin: "와",
+    resourcesMiddle: " bean은 이름으로 선택되거나 유일한 bean 또는 ",
+    resourcesAfter: " bean인 경우 재사용됩니다. 애플리케이션 소유 resource는 통합이 닫지 않습니다. 통합이 생성한 resource는 관리 bean과 함께 닫힙니다.",
+    scopeTitle: "범위",
+    scopeAfterSpringData: " repository, transaction, AOP, controller, retry 및 compensation policy, ",
+    scopeAfterR2dbc: ", server lifecycle, connection-pool management는 이 모듈의 범위 밖입니다. 구체적인 Spring AOT 요구사항이 검증되기 전까지 native-image hint는 포함하지 않습니다."
+  },
+  zh: {
+    availableBefore: "可在 ",
+    availableAfter: " 中使用。",
+    published: "Spring Boot 集成以 starter 和单独发布的 auto-configuration 模块这两个 artifact 发布在 Maven Central。",
+    dependencyTitle: "依赖",
+    dependencyBefore: "将 ",
+    dependencyAfter: " artifact 添加到运行 Java 21 或更高版本的 Spring Boot 4.0.6 应用程序中：",
+    starterBefore: "starter 依赖于单独发布的 ",
+    starterAfter: " 模块。普通应用程序请使用 starter；组合自定义 starter 时，可以直接使用 auto-configuration 模块。",
+    configTitle: "配置内容",
+    configBefore: "设置 ",
+    configAfter: " 即可启用集成。该配置支持 R2 或 filesystem 文档存储，以及 D1 或 JDBC 索引，同时保留与框架无关的 R2D1 集合 API。",
+    jdbc: "JDBC 默认使用平台线程执行。仅在 Java 25 运行时上显式选择虚拟线程执行；该集成不会为更早的运行时提供回退。",
+    resourcesTitle: "资源所有权",
+    resourcesBefore: "应用程序已有的 ",
+    resourcesJoin: "以及",
+    resourcesMiddle: " bean 会在按名称选中、作为唯一 bean 或 ",
+    resourcesAfter: " bean 时被复用。集成不会关闭应用程序拥有的资源。集成创建的资源会随其托管 bean 一起关闭。",
+    scopeTitle: "范围",
+    scopeAfterSpringData: " repository、事务、AOP、controller、重试和补偿策略、",
+    scopeAfterR2dbc: "、服务器生命周期以及连接池管理不在这些模块的范围内。在验证具体的 Spring AOT 需求之前，不包含 native-image hints。"
+  },
+  ja: {
+    availableBefore: "",
+    availableAfter: "で利用できます。",
+    published: "Spring Boot 統合は starter と個別に公開された auto-configuration モジュールの2つの artifact として Maven Central に公開されています。",
+    dependencyTitle: "依存関係",
+    dependencyBefore: "Java 21 以降で動作する Spring Boot 4.0.6 アプリケーションに ",
+    dependencyAfter: " artifact を追加します：",
+    starterBefore: "starter は個別に公開された ",
+    starterAfter: " モジュールに依存します。通常のアプリケーションには starter を使用し、カスタム starter を構成する場合は auto-configuration モジュールを直接使用します。",
+    configTitle: "構成内容",
+    configBefore: "統合を有効にするには ",
+    configAfter: " を設定します。この構成は R2 または filesystem のドキュメントストレージと D1 または JDBC のインデックスをサポートし、フレームワークに依存しない R2D1 コレクション API を維持します。",
+    jdbc: "JDBC はデフォルトでプラットフォームスレッド実行を使用します。仮想スレッド実行を明示的に選択できるのは Java 25 ランタイムだけです。この統合は、それより古いランタイム向けのフォールバックを提供しません。",
+    resourcesTitle: "リソースの所有権",
+    resourcesBefore: "アプリケーション既存の ",
+    resourcesJoin: "および",
+    resourcesMiddle: " bean は、名前で選択された場合、または単一の bean もしくは ",
+    resourcesAfter: " bean の場合に再利用されます。アプリケーションが所有するリソースは統合によって閉じられません。統合が作成したリソースは管理対象 bean とともに閉じられます。",
+    scopeTitle: "範囲",
+    scopeAfterSpringData: " repository、トランザクション、AOP、controller、リトライと補償ポリシー、",
+    scopeAfterR2dbc: "、サーバーのライフサイクル、接続プール管理はこれらのモジュールの範囲外です。具体的な Spring AOT 要件が検証されるまで native-image hints は含まれません。"
+  }
+};
 
 const { latestStableVersion } = release;
+const { locale = "en" } = Astro.props;
+const c = copy[locale];
 const dependency = `dependencies {
     implementation("dev.nexcraft:r2d1-spring-boot-starter:${latestStableVersion}")
 }`;
 ---
 
-<p><strong>Available in {latestStableVersion}.</strong> The Spring Boot integration is published to Maven Central as two artifacts: the starter and its separately published auto-configuration module.</p>
+<p><strong>{c.availableBefore}{latestStableVersion}{c.availableAfter}</strong> {c.published}</p>
 
-<h2>Dependency</h2>
-<p>Add the <code>r2d1-spring-boot-starter</code> artifact to a Spring Boot 4.0.6 application running on Java 21 or later:</p>
+<h2>{c.dependencyTitle}</h2>
+<p>{c.dependencyBefore}<code>r2d1-spring-boot-starter</code>{c.dependencyAfter}</p>
 <pre><code class="language-kotlin">{dependency}</code></pre>
 
-<p>The starter depends on the separately published <code>r2d1-spring-boot-autoconfigure</code> module. Use the starter for normal applications; use the auto-configuration module directly when composing a custom starter.</p>
+<p>{c.starterBefore}<code>r2d1-spring-boot-autoconfigure</code>{c.starterAfter}</p>
 
-<h2>What it configures</h2>
-<p>Set <code>r2d1.enabled=true</code> to activate the integration. The configuration supports R2 or filesystem document storage and D1 or JDBC indexing, while preserving the framework-neutral R2D1 collection API.</p>
-<p>JDBC uses platform-thread execution by default. Select virtual-thread execution explicitly only on a Java 25 runtime; the integration does not provide a fallback for older runtimes.</p>
+<h2>{c.configTitle}</h2>
+<p>{c.configBefore}<code>r2d1.enabled=true</code>{c.configAfter}</p>
+<p>{c.jdbc}</p>
 
-<h2>Resource ownership</h2>
-<p>Existing application <code>DataSource</code>, <code>Executor</code>, <code>S3AsyncClient</code>, and <code>HttpClient</code> beans are reused when selected by name or as the unique or <code>@Primary</code> bean. Application-owned resources are not closed by the integration. Resources created by the integration are closed with its managed beans.</p>
+<h2>{c.resourcesTitle}</h2>
+<p>{c.resourcesBefore}<code>DataSource</code>, <code>Executor</code>, <code>S3AsyncClient</code>, {c.resourcesJoin} <code>HttpClient</code>{c.resourcesMiddle}<code>@Primary</code>{c.resourcesAfter}</p>
 
-<h2>Scope</h2>
-<p>Spring Data repositories, transactions, AOP, controllers, retry and compensation policies, R2DBC, server lifecycle, and connection-pool management are outside these modules. Native-image hints are not included until a concrete Spring AOT requirement is verified.</p>
+<h2>{c.scopeTitle}</h2>
+<p><code>Spring Data</code>{c.scopeAfterSpringData}<code>R2DBC</code>{c.scopeAfterR2dbc}</p>
