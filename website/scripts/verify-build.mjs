@@ -69,6 +69,15 @@ for (const [locale, htmlLang] of [["ko", "ko"], ["zh", "zh-CN"], ["ja", "ja"]]) 
     join(rootPath, locale, "docs", "getting-started", "index.html"),
     "utf8"
   );
+  const localizedSpring = readFileSync(
+    join(rootPath, locale, "docs", "spring", "index.html"),
+    "utf8"
+  );
+  const localizedSpringHeading = {
+    ko: "의존성",
+    zh: "依赖",
+    ja: "依存関係"
+  }[locale];
 
   if (!localizedHome.includes(`<html lang="${htmlLang}"`)) {
     throw new Error(`Localized home page has the wrong lang attribute: ${locale}`);
@@ -84,6 +93,10 @@ for (const [locale, htmlLang] of [["ko", "ko"], ["zh", "zh-CN"], ["ja", "ja"]]) 
 
   if (!localizedGettingStarted.includes('class="language-java"')) {
     throw new Error(`Localized Getting Started is missing Java syntax highlighting: ${locale}`);
+  }
+
+  if (!localizedSpring.includes(`<h2>${localizedSpringHeading}</h2>`)) {
+    throw new Error(`Localized Spring documentation is missing translated content: ${locale}`);
   }
 }
 

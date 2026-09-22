@@ -54,7 +54,7 @@ const meta = {
     },
     spring: {
       title: "Spring Boot 4",
-      description: "Spring Boot 4 integration for R2D1, available from Maven Central."
+      description: "Maven Central에서 사용할 수 있는 Spring Boot 4와 R2D1의 통합입니다."
     }
   },
   zh: {
@@ -100,7 +100,7 @@ const meta = {
     },
     spring: {
       title: "Spring Boot 4",
-      description: "Spring Boot 4 integration for R2D1, available from Maven Central."
+      description: "可从 Maven Central 获取 Spring Boot 4 与 R2D1 的集成。"
     }
   },
   ja: {
@@ -146,7 +146,7 @@ const meta = {
     },
     spring: {
       title: "Spring Boot 4",
-      description: "Spring Boot 4 integration for R2D1, available from Maven Central."
+      description: "Maven Central で利用できる Spring Boot 4 と R2D1 の統合です。"
     }
   }
 } as const;
@@ -163,7 +163,7 @@ if (!page) {
   {slug === "getting-started" ? (
     <GettingStartedContent locale={locale} />
   ) : slug === "spring" ? (
-    <SpringDocContent />
+    <SpringDocContent locale={locale} />
   ) : (
     <LocalizedDocContent locale={locale} slug={slug} />
   )}
