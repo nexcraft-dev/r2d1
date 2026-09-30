@@ -33,7 +33,7 @@ R2D1 exposes a limited query model. It is not a SQL database or ORM.
 
 The latest stable Maven Central surface contains six published artifacts. The base `r2d1` artifact
 contains the Core API and the Cloudflare R2 and D1 implementations. Filesystem, JDBC, Micronaut, and
-Spring Boot are additional published integrations. Spring Boot 4 is split into a published
+Spring Boot and Quarkus are additional published integrations. Spring Boot 4 is split into a published
 auto-configuration module and a convenience starter in `1.7.0`:
 
 ```kotlin
@@ -515,3 +515,17 @@ R2D1 is developed under **NexCraft**.
 
 - GitHub Organization: `nexcraft-dev`
 - Website: `nexcraft.dev`
+
+## Quarkus extension
+
+The optional `dev.nexcraft:r2d1-quarkus` extension integrates the same API with
+Quarkus 3.39.5. Applications add the runtime artifact; Quarkus resolves its matching
+`r2d1-quarkus-deployment` artifact during augmentation. Enable it with
+`quarkus.r2d1.enabled=true`, provide a CDI `DocumentCodec`, and choose explicit
+document/index backends or application store overrides. Filesystem/JDBC adapters
+and JDBC drivers remain optional dependencies.
+
+See the [Quarkus extension guide](r2d1-quarkus/README.md) for configuration phases,
+resource ownership, named datasources/executors, and the JVM/native verification
+boundary. The test application is not published. The new coordinates are not a
+claim of a completed Maven Central release or Quarkus catalog registration.

@@ -1,14 +1,23 @@
 # R2D1 Release
 
 R2D1 publishes its reusable Java libraries to Maven Central through the Sonatype Central Portal.
-The release workflow publishes these four artifacts with the same version:
+The release workflow publishes these eight artifacts with the same version:
 
 - `dev.nexcraft:r2d1`
 - `dev.nexcraft:r2d1-filesystem`
 - `dev.nexcraft:r2d1-jdbc`
 - `dev.nexcraft:r2d1-micronaut`
+- `dev.nexcraft:r2d1-spring-boot-autoconfigure`
+- `dev.nexcraft:r2d1-spring-boot-starter`
+- `dev.nexcraft:r2d1-quarkus`
+- `dev.nexcraft:r2d1-quarkus-deployment`
 
-The repository root and `r2d1-integration-tests` are not published artifacts.
+The repository root, `r2d1-integration-tests`, and `r2d1-quarkus-integration-tests`
+are not published artifacts. Quarkus applications use the runtime coordinate only;
+its generated descriptor resolves the matching deployment coordinate during build.
+`verifyPublishedConsumer` validates both metadata/POM consumption paths, packaged
+JVM storage behavior, optional dependency isolation, and absence of deployment
+classes from the final application runtime.
 The legacy `r2d1-core`, `r2d1-d1`, and `r2d1-r2` coordinates from earlier releases remain
 untouched; new releases do not delete or overwrite them.
 
@@ -70,7 +79,7 @@ Before the first release, review the generated POMs and artifacts locally:
 ./gradlew -Pr2d1.version=1.0.0 publishToMavenLocal
 ```
 
-Inspect the four Maven Local directories under `~/.m2/repository/dev/nexcraft/` and confirm each
+Inspect the eight Maven Local directories under `~/.m2/repository/dev/nexcraft/` and confirm each
 contains the main JAR, sources JAR, javadoc JAR, POM, and expected module dependencies.
 The release workflow additionally requires detached ASCII-armored signatures for all four files
 before it starts the Maven Central upload.

@@ -31,9 +31,6 @@ jobs:
       - name: Build
         run: ./gradlew build
 
-      - name: Check
-        run: ./gradlew check
-
   jdbc-java-25:
     runs-on: ubuntu-latest
 
@@ -50,5 +47,5 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Check JDBC, Micronaut, and Spring on Java 25
-        run: ./gradlew -Pr2d1.javaToolchainVersion=25 :r2d1-jdbc:check :r2d1-micronaut:check :r2d1-spring-boot-autoconfigure:check :r2d1-spring-boot-starter:check
+      - name: Check JDBC, Micronaut, Spring, and Quarkus on Java 25
+        run: ./gradlew -Pr2d1.javaToolchainVersion=25 :r2d1-jdbc:check :r2d1-micronaut:check :r2d1-spring-boot-autoconfigure:check :r2d1-spring-boot-starter:check :r2d1-quarkus:check :r2d1-quarkus-deployment:check

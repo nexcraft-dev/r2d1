@@ -2,6 +2,7 @@
 import DocsLayout from "../layouts/DocsLayout.astro";
 import LocalizedDocContent from "./docs/LocalizedDocContent.astro";
 import GettingStartedContent from "./docs/GettingStartedContent.astro";
+import QuarkusDocContent from "./docs/QuarkusDocContent.astro";
 import SpringDocContent from "./docs/SpringDocContent.astro";
 import type { LocalizedLocale } from "../i18n/config";
 
@@ -52,6 +53,10 @@ const meta = {
       title: "Micronaut 5",
       description: "선택적인 Micronaut 5 통합과 애플리케이션 소유 resource를 구성합니다."
     },
+    quarkus: {
+      title: "Quarkus",
+      description: "R2D1 1.8.0에 포함되는 Quarkus 통합의 설정, CDI 리소스와 네이티브 검증 범위입니다."
+    },
     spring: {
       title: "Spring Boot 4",
       description: "Maven Central에서 사용할 수 있는 Spring Boot 4와 R2D1의 통합입니다."
@@ -97,6 +102,10 @@ const meta = {
     micronaut: {
       title: "Micronaut 5",
       description: "配置可选的 Micronaut 5 集成以及由应用拥有的资源。"
+    },
+    quarkus: {
+      title: "Quarkus",
+      description: "R2D1 1.8.0 Quarkus 集成的配置、CDI 资源与 native 验证范围。"
     },
     spring: {
       title: "Spring Boot 4",
@@ -144,6 +153,10 @@ const meta = {
       title: "Micronaut 5",
       description: "オプションの Micronaut 5 統合とアプリケーション所有リソースを設定します。"
     },
+    quarkus: {
+      title: "Quarkus",
+      description: "R2D1 1.8.0 Quarkus 統合の設定、CDI リソース、ネイティブ検証範囲。"
+    },
     spring: {
       title: "Spring Boot 4",
       description: "Maven Central で利用できる Spring Boot 4 と R2D1 の統合です。"
@@ -162,6 +175,8 @@ if (!page) {
 <DocsLayout title={page.title} description={page.description} locale={locale}>
   {slug === "getting-started" ? (
     <GettingStartedContent locale={locale} />
+  ) : slug === "quarkus" ? (
+    <QuarkusDocContent locale={locale} />
   ) : slug === "spring" ? (
     <SpringDocContent locale={locale} />
   ) : (

@@ -1,0 +1,128 @@
+---
+import type { Locale } from "../../i18n/config";
+import release from "../../data/release.json";
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = "en" } = Astro.props;
+const copy = {
+  en: {
+    status: "Included in R2D1 1.8.0",
+    intro: "The optional R2D1 extension adds Quarkus CDI configuration around the same collection API. The tested baseline is Quarkus 3.39.5 and Java 21+. Managed JDBC virtual threads require Java 25+.",
+    dependencies: "Dependency requirements",
+    dependencyText: `Required for every Quarkus integration: dev.nexcraft:r2d1-quarkus:${release.latestStableVersion}. It brings core dev.nexcraft:r2d1 transitively, so do not declare core separately. Quarkus resolves r2d1-quarkus-deployment automatically from the extension descriptor.`,
+    platformDependency: "Quarkus applications use the Quarkus platform/BOM to align framework versions. If your Gradle plugin or application already imports the Quarkus platform, do not add another BOM dependency.",
+    runtime: "Backend choice: core R2 + D1 uses adapters included through r2d1. Filesystem or JDBC adapters are needed only when those backends are selected.",
+    backendDependenciesTitle: "Filesystem + JDBC + H2 dependencies",
+    backendDependencies: "Required only for the filesystem + JDBC + H2 configuration shown below: both R2D1 adapter artifacts, the H2 JDBC driver, and Agroal for the Quarkus-managed datasource. Other database or caller-owned datasource setups use their matching driver/pool. The Quarkus platform supplies versions for Quarkus extensions.",
+    activation: "Enable and configure",
+    codec: "Integration is disabled by default. Supply an application CDI DocumentCodec; there is no default JSON codec. Inject R2D1 through a constructor and use the common collection API. The filesystem example also needs an application-owned Executor named documents and the selected Quarkus datasource.",
+    resources: "Application beans and resource ownership",
+    ownership: "Application facade, factory and storage beans can replace the default producers. A custom IndexStore needs its matching CollectionInitializer. Exact CDI names or Quarkus datasource names select caller resources. Clients, executors and datasources supplied by the application remain borrowed; the extension closes resources it creates on shutdown or failed startup.",
+    execution: "JDBC uses bounded platform-thread execution by default. Set quarkus.r2d1.jdbc.execution-mode=virtual-thread explicitly on Java 25+. A named caller executor cannot be combined with an explicit execution mode. Collection schema initialization is lazy.",
+    native: "Native image verification",
+    nativeText: "Filesystem/H2 CRUD and indexed queries passed in JVM, packaged JVM and a native process on GraalVM CE 25.0.2 / macOS arm64. Register document types for reflection explicitly. The smoke application includes AWS CRT 0.48.4 for native checksum class signatures. Linux CI execution, live Cloudflare calls and R2/D1 native transports remain unverified; local adapter source hot reload is also unverified.",
+    reference: "R2D1 source repository",
+    official: "Official Quarkus extension guide"
+  },
+  ko: {
+    status: "R2D1 1.8.0에 포함",
+    intro: "선택적인 R2D1 확장은 동일한 컬렉션 API를 Quarkus CDI 설정에 연결합니다. 검증 기준은 Quarkus 3.39.5와 Java 21+이며, 관리형 JDBC 가상 스레드는 Java 25+가 필요합니다.",
+    dependencies: "의존성별 필요 여부",
+    dependencyText: `모든 Quarkus 연동에 필수: dev.nexcraft:r2d1-quarkus:${release.latestStableVersion}. 이 artifact가 core dev.nexcraft:r2d1을 전이 의존성으로 포함하므로 core를 따로 선언하지 않습니다. Quarkus가 확장 descriptor를 통해 r2d1-quarkus-deployment를 자동으로 해결합니다.`,
+    platformDependency: "Quarkus 애플리케이션은 framework 버전을 맞추기 위해 Quarkus platform/BOM을 사용합니다. Gradle plugin이나 애플리케이션이 이미 platform을 가져오면 BOM을 중복 추가하지 마세요.",
+    runtime: "backend 선택: 기본 R2 + D1 조합은 r2d1에 포함된 adapter를 사용합니다. Filesystem 또는 JDBC adapter는 해당 backend를 선택할 때만 필요합니다.",
+    backendDependenciesTitle: "Filesystem + JDBC + H2 선택 의존성",
+    backendDependencies: "아래 filesystem + JDBC + H2 구성에만 필수: R2D1 adapter 두 개, H2 JDBC 드라이버, Quarkus 관리 datasource용 Agroal입니다. 다른 DB나 애플리케이션 소유 datasource에는 해당 드라이버와 연결 풀을 사용합니다. Quarkus 확장 버전은 Quarkus platform이 관리합니다.",
+    activation: "활성화와 설정",
+    codec: "통합은 기본적으로 비활성화됩니다. 애플리케이션 CDI DocumentCodec을 제공해야 하며 기본 JSON codec은 없습니다. 생성자로 R2D1을 주입해 공통 컬렉션 API를 사용하세요. 아래 예제에는 documents라는 애플리케이션 소유 Executor와 선택한 Quarkus datasource도 필요합니다.",
+    resources: "애플리케이션 빈과 리소스 소유권",
+    ownership: "애플리케이션 facade, factory, 저장소 빈으로 기본 producer를 대체할 수 있습니다. 사용자 정의 IndexStore에는 해당 저장소의 CollectionInitializer가 필요합니다. 정확한 CDI 이름 또는 Quarkus datasource 이름으로 리소스를 선택합니다. 애플리케이션이 제공한 client, executor, datasource는 빌려 사용하며, 확장이 생성한 리소스는 종료나 시작 실패 시 정리합니다.",
+    execution: "JDBC는 기본적으로 제한된 플랫폼 스레드 실행을 사용합니다. Java 25+에서 quarkus.r2d1.jdbc.execution-mode=virtual-thread를 명시해 가상 스레드를 선택하세요. 이름 지정 executor와 명시적 실행 모드는 함께 설정할 수 없습니다. 컬렉션 schema 초기화는 지연 실행됩니다.",
+    native: "네이티브 이미지 검증",
+    nativeText: "Filesystem/H2 CRUD와 인덱스 쿼리는 JVM, 패키징된 JVM, GraalVM CE 25.0.2 / macOS arm64 네이티브 프로세스에서 통과했습니다. 문서 타입의 reflection 등록을 명시하세요. Smoke 애플리케이션에는 네이티브 checksum 타입 해결을 위한 AWS CRT 0.48.4가 포함됩니다. Linux CI 실행, 실제 Cloudflare 호출, R2/D1 네이티브 전송, 로컬 어댑터 소스 hot reload는 아직 검증되지 않았습니다.",
+    reference: "R2D1 소스 저장소",
+    official: "Quarkus 공식 확장 개발 안내"
+  },
+  zh: {
+    status: "包含于 R2D1 1.8.0",
+    intro: "可选 R2D1 扩展将相同的集合 API 与 Quarkus CDI 配置连接。已验证的基线为 Quarkus 3.39.5 和 Java 21+；托管 JDBC 虚拟线程需要 Java 25+。",
+    dependencies: "依赖项的适用范围",
+    dependencyText: `所有 Quarkus 集成都必须依赖：dev.nexcraft:r2d1-quarkus:${release.latestStableVersion}。它会传递引入 core dev.nexcraft:r2d1，因此无需单独声明 core。Quarkus 会根据扩展 descriptor 自动解析 r2d1-quarkus-deployment。`,
+    platformDependency: "Quarkus 应用使用 Quarkus platform/BOM 对齐框架版本。如果 Gradle plugin 或应用已导入 platform，请勿重复添加 BOM。",
+    runtime: "后端选择：基础 R2 + D1 组合使用 r2d1 中包含的 adapter。只有选择 filesystem 或 JDBC 后端时，才需要相应 adapter。",
+    backendDependenciesTitle: "Filesystem + JDBC + H2 可选依赖",
+    backendDependencies: "仅以下 filesystem + JDBC + H2 配置需要：两个 R2D1 adapter artifact、H2 JDBC driver，以及 Quarkus 管理 datasource 所需的 Agroal。其他数据库或应用自有 datasource 应使用对应的 driver/连接池。Quarkus 扩展版本由 Quarkus platform 管理。",
+    activation: "启用与配置",
+    codec: "集成默认禁用。应用必须提供 CDI DocumentCodec，没有默认 JSON codec。通过构造器注入 R2D1 并使用通用集合 API。以下示例还需要应用拥有的 documents Executor 和选定的 Quarkus datasource。",
+    resources: "应用 Bean 与资源所有权",
+    ownership: "应用的 facade、factory 和存储 Bean 可以替代默认 producer。自定义 IndexStore 需要对应的 CollectionInitializer。通过精确 CDI 名称或 Quarkus datasource 名称选择资源。应用提供的 client、executor 和 datasource 仅被借用；扩展创建的资源在关闭或启动失败时清理。",
+    execution: "JDBC 默认使用有界平台线程执行。Java 25+ 可显式设置 quarkus.r2d1.jdbc.execution-mode=virtual-thread。命名 executor 不能与显式执行模式同时配置。集合 schema 延迟初始化。",
+    native: "Native image 验证",
+    nativeText: "Filesystem/H2 CRUD 和索引查询已通过 JVM、打包 JVM 以及 GraalVM CE 25.0.2 / macOS arm64 native process 测试。文档类型需要显式注册 reflection。Smoke 应用包含 AWS CRT 0.48.4，用于解析 native checksum 类型。Linux CI、实际 Cloudflare 调用、R2/D1 native transport 和本地 adapter 源码 hot reload 尚未验证。",
+    reference: "R2D1 源码仓库",
+    official: "Quarkus 官方扩展指南"
+  },
+  ja: {
+    status: "R2D1 1.8.0 に含まれます",
+    intro: "オプションの R2D1 拡張は同じコレクション API を Quarkus CDI 設定に接続します。検証基準は Quarkus 3.39.5 と Java 21+。管理された JDBC 仮想スレッドには Java 25+ が必要です。",
+    dependencies: "依存関係の必要範囲",
+    dependencyText: `Quarkus 統合に必須: dev.nexcraft:r2d1-quarkus:${release.latestStableVersion}。core の dev.nexcraft:r2d1 を推移的に含むため、core を別途宣言する必要はありません。Quarkus は拡張 descriptor から r2d1-quarkus-deployment を自動解決します。`,
+    platformDependency: "Quarkus アプリケーションでは framework のバージョンを揃えるため Quarkus platform/BOM を使います。Gradle plugin またはアプリケーションで既に読み込んでいる場合、BOM を重複追加しないでください。",
+    runtime: "バックエンド選択: 基本の R2 + D1 組み合わせは r2d1 に含まれる adapter を使います。Filesystem または JDBC adapter は該当 backend を選んだ場合だけ必要です。",
+    backendDependenciesTitle: "Filesystem + JDBC + H2 の選択依存関係",
+    backendDependencies: "以下の filesystem + JDBC + H2 構成に限り必須: 2つの R2D1 adapter artifact、H2 JDBC driver、Quarkus 管理 datasource 用 Agroal。別の DB やアプリケーション所有 datasource では対応する driver/pool を使用します。Quarkus extension のバージョンは Quarkus platform が管理します。",
+    activation: "有効化と設定",
+    codec: "統合はデフォルトで無効です。アプリケーションの CDI DocumentCodec を提供してください。デフォルト JSON codec はありません。コンストラクターで R2D1 を注入し、共通コレクション API を使います。以下の例にはアプリケーション所有の documents Executor と選択した Quarkus datasource も必要です。",
+    resources: "アプリケーション Bean とリソース所有権",
+    ownership: "アプリケーションの facade、factory、ストア Bean はデフォルト producer を置き換えられます。カスタム IndexStore には対応する CollectionInitializer が必要です。正確な CDI 名または Quarkus datasource 名で選択します。提供された client、executor、datasource は借用され、拡張が作成したリソースは終了時や起動失敗時に閉じられます。",
+    execution: "JDBC はデフォルトで制限付きプラットフォームスレッド実行を使います。Java 25+ では quarkus.r2d1.jdbc.execution-mode=virtual-thread を明示できます。名前付き executor と明示的な実行モードは同時に設定できません。コレクション schema は遅延初期化されます。",
+    native: "ネイティブイメージ検証",
+    nativeText: "Filesystem/H2 CRUD とインデックスクエリは JVM、パッケージ JVM、GraalVM CE 25.0.2 / macOS arm64 のネイティブプロセスで成功しました。文書型の reflection を明示的に登録してください。Smoke アプリには native checksum 型のため AWS CRT 0.48.4 が含まれます。Linux CI、実際の Cloudflare 呼び出し、R2/D1 native transport、ローカル adapter ソース hot reload は未検証です。",
+    reference: "R2D1 ソースリポジトリ",
+    official: "Quarkus 公式拡張ガイド"
+  }
+} satisfies Record<Locale, Record<string, string>>;
+const c = copy[locale];
+const dependencies = `implementation("dev.nexcraft:r2d1-quarkus:${release.latestStableVersion}")`;
+const optionalBackendDependencies = `implementation("dev.nexcraft:r2d1-filesystem:${release.latestStableVersion}")
+implementation("dev.nexcraft:r2d1-jdbc:${release.latestStableVersion}")
+implementation("io.quarkus:quarkus-jdbc-h2")
+implementation("io.quarkus:quarkus-agroal")`;
+const configuration = `quarkus.r2d1.enabled=true
+quarkus.r2d1.document.type=filesystem
+quarkus.r2d1.index.type=jdbc
+quarkus.r2d1.filesystem.root-directory=./documents
+quarkus.r2d1.filesystem.executor=documents
+quarkus.r2d1.jdbc.datasource=selected
+quarkus.datasource.selected.db-kind=h2
+quarkus.datasource.selected.jdbc.url=jdbc:h2:mem:documents;DB_CLOSE_DELAY=-1
+quarkus.datasource.selected.devservices.enabled=false
+quarkus.r2d1.jdbc.max-concurrency=4
+quarkus.r2d1.jdbc.max-pending=64`;
+---
+
+<p><strong>{c.status}</strong></p>
+<p>{c.intro}</p>
+<h2>{c.dependencies}</h2>
+<p>{c.dependencyText}</p>
+<pre class="code-block"><code class="language-kotlin">{dependencies}</code></pre>
+<p>{c.platformDependency}</p>
+<p>{c.runtime}</p>
+<h3>{c.backendDependenciesTitle}</h3>
+<p>{c.backendDependencies}</p>
+<pre class="code-block"><code class="language-kotlin">{optionalBackendDependencies}</code></pre>
+<h2>{c.activation}</h2>
+<p>{c.codec}</p>
+<pre class="code-block"><code class="language-properties">{configuration}</code></pre>
+<h2>{c.resources}</h2>
+<p>{c.ownership}</p>
+<p>{c.execution}</p>
+<h2>{c.native}</h2>
+<p>{c.nativeText}</p>
+<ul>
+  <li><a href="https://github.com/nexcraft-dev/r2d1">{c.reference}</a></li>
+  <li><a href="https://quarkus.io/guides/writing-extensions">{c.official}</a></li>
+</ul>

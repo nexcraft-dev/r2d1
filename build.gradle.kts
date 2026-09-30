@@ -18,6 +18,8 @@ plugins {
     base
     id("com.diffplug.spotless") version "8.10.2" apply false
     id("io.micronaut.library") version "5.0.2" apply false
+    id("io.quarkus.extension") version "3.39.5" apply false
+    id("io.quarkus") version "3.39.5" apply false
     id("com.vanniktech.maven.publish") version "0.37.0" apply false
 }
 
@@ -45,6 +47,8 @@ val publicPublicationProjects =
         ":r2d1-filesystem" to "r2d1-filesystem",
         ":r2d1-jdbc" to "r2d1-jdbc",
         ":r2d1-micronaut" to "r2d1-micronaut",
+        ":r2d1-quarkus" to "r2d1-quarkus",
+        ":r2d1-quarkus-deployment" to "r2d1-quarkus-deployment",
         ":r2d1-spring-boot-autoconfigure" to "r2d1-spring-boot-autoconfigure",
         ":r2d1-spring-boot-starter" to "r2d1-spring-boot-starter",
     )
@@ -55,6 +59,8 @@ val publicationNames =
         "r2d1-filesystem" to "R2D1 Filesystem DocumentStore",
         "r2d1-jdbc" to "R2D1 JDBC IndexStore",
         "r2d1-micronaut" to "R2D1 Micronaut 5 Integration",
+        "r2d1-quarkus" to "R2D1 Quarkus Runtime",
+        "r2d1-quarkus-deployment" to "R2D1 Quarkus Deployment",
         "r2d1-spring-boot-autoconfigure" to "R2D1 Spring Boot Autoconfigure",
         "r2d1-spring-boot-starter" to "R2D1 Spring Boot Starter",
     )
@@ -375,6 +381,8 @@ val verifyPublishedConsumer =
                             "META-INF/spring-configuration-metadata.json",
                         ),
                     "r2d1-spring-boot-starter" to emptyList(),
+                    "r2d1-quarkus" to listOf("META-INF/quarkus-extension.properties"),
+                    "r2d1-quarkus-deployment" to listOf("META-INF/quarkus-build-steps.list"),
                 )
             val classOwners = mutableMapOf<String, String>()
 
@@ -410,6 +418,13 @@ val verifyPublishedConsumer =
                 }
                 check(oldCoordinates.none { coordinate -> module.contains(coordinate) }) {
                     "$artifactId Gradle Module Metadata contains a removed internal coordinate"
+                }
+                if (artifactId == "r2d1-quarkus") {
+                    listOf("r2d1-jdbc", "r2d1-filesystem", "r2d1-quarkus-deployment").forEach { excluded ->
+                        check(!pom.contains("<artifactId>$excluded</artifactId>") && !module.contains("\"module\": \"$excluded\"")) {
+                            "Quarkus runtime publication leaks optional or deployment dependency $excluded"
+                        }
+                    }
                 }
                 if (artifactId == "r2d1-jdbc") {
                     check(pom.contains("<artifactId>r2d1</artifactId>")) {
@@ -488,6 +503,13 @@ val verifyPublishedConsumer =
                     requiredEntries.getValue(artifactId).forEach { entry ->
                         check(entry in entries) {
                             "$artifactId is missing required class entry $entry"
+                        }
+                    }
+                    if (artifactId == "r2d1-quarkus") {
+                        val descriptor = java.util.Properties()
+                        jar.getInputStream(jar.getJarEntry("META-INF/quarkus-extension.properties")).use { descriptor.load(it) }
+                        check(descriptor.getProperty("deployment-artifact") == "dev.nexcraft:r2d1-quarkus-deployment:$version") {
+                            "Quarkus descriptor does not reference matching deployment coordinate"
                         }
                     }
                     entries.filter { it.endsWith(".class") }.forEach { entry ->
@@ -769,6 +791,54 @@ val verifyPublishedConsumer =
                         .start()
                 check(process.waitFor() == 0) {
                     "Published consumer verification failed for ${root.name}"
+                }
+                val quarkusRoot = root.resolve("quarkus")
+                quarkusRoot.mkdirs()
+                val metadata = if (useGradleMetadata) "" else "metadataSources { mavenPom(); artifact() }"
+                quarkusRoot.resolve("settings.gradle.kts").writeText(
+                    """
+                    pluginManagement { repositories { gradlePluginPortal(); mavenCentral() } }
+                    dependencyResolutionManagement {
+                        repositories {
+                            maven { url = uri("$repositoryUri"); $metadata }
+                            mavenCentral()
+                        }
+                    }
+                    rootProject.name = "r2d1-published-quarkus-consumer"
+                    """.trimIndent()
+                )
+                quarkusRoot.resolve("build.gradle.kts").writeText(
+                    """
+                    plugins { java; id("io.quarkus") version "3.39.5" }
+                    java { toolchain { languageVersion.set(JavaLanguageVersion.of(21)) } }
+                    dependencies {
+                        implementation(platform("io.quarkus:quarkus-bom:3.39.5"))
+                        implementation("dev.nexcraft:r2d1-quarkus:$version")
+                        implementation("dev.nexcraft:r2d1-filesystem:$version")
+                        implementation("dev.nexcraft:r2d1-jdbc:$version")
+                        implementation("io.quarkus:quarkus-rest")
+                        implementation("io.quarkus:quarkus-jdbc-h2")
+                        implementation("io.quarkus:quarkus-agroal")
+                        testImplementation("io.quarkus:quarkus-junit")
+                        testImplementation("io.rest-assured:rest-assured")
+                    }
+                    tasks.withType<Test>().configureEach {
+                        useJUnitPlatform()
+                        systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
+                    }
+                    """.trimIndent()
+                )
+                file("r2d1-quarkus-integration-tests/src").copyRecursively(quarkusRoot.resolve("src"), overwrite = true)
+                val quarkusProcess = ProcessBuilder(
+                    verificationGradleWrapper.absolutePath, "--no-daemon", "--console=plain", "test", "quarkusBuild"
+                ).directory(quarkusRoot).inheritIO().start()
+                check(quarkusProcess.waitFor() == 0) { "Published Quarkus consumer failed for ${root.name}" }
+                quarkusRoot.resolve("build/quarkus-app/lib").walkTopDown().filter { it.extension == "jar" }.forEach { runtimeJar ->
+                    JarFile(runtimeJar).use { jar ->
+                        check(jar.entries().asSequence().none { it.name.startsWith("dev/nexcraft/r2d1/quarkus/deployment/") || it.name == "io/quarkus/deployment/annotations/BuildStep.class" }) {
+                            "Build-only classes leaked into Quarkus runtime: $runtimeJar"
+                        }
+                    }
                 }
             }
         }
