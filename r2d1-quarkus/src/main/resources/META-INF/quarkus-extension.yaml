@@ -1,0 +1,11 @@
+name: "R2D1"
+description: "R2D1 document store integration with Quarkus CDI"
+metadata:
+  keywords:
+    - "r2d1"
+    - "document-store"
+    - "cloudflare"
+  guide: "https://github.com/nexcraft-dev/r2d1/blob/main/r2d1-quarkus/README.md"
+  categories:
+    - "data"
+  status: "preview"

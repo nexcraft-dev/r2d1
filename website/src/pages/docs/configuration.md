@@ -6,8 +6,8 @@ description: Public artifacts, storage combinations, resource ownership, and run
 
 ## Public modules
 
-The latest stable release exposes six artifacts, including the Spring Boot integration pair published
-in `1.7.0`:
+The latest stable release exposes seven application-facing artifacts, including the Quarkus extension
+and Spring Boot integrations:
 
 | Module | Coordinate | Provides |
 | --- | --- | --- |
@@ -15,6 +15,7 @@ in `1.7.0`:
 | `R2D1-FILESYSTEM` | `dev.nexcraft:r2d1-filesystem` | Filesystem `DocumentStore` |
 | `R2D1-JDBC` | `dev.nexcraft:r2d1-jdbc` | H2, HSQLDB, and SQLite `IndexStore` support |
 | `R2D1-MICRONAUT` | `dev.nexcraft:r2d1-micronaut` | Micronaut 5 configuration and bean integration |
+| `R2D1-QUARKUS` | `dev.nexcraft:r2d1-quarkus` | Quarkus extension; Quarkus resolves its deployment companion automatically |
 | `R2D1-SPRING-BOOT-AUTOCONFIGURE` | `dev.nexcraft:r2d1-spring-boot-autoconfigure` | Spring Boot 4 auto-configuration |
 | `R2D1-SPRING-BOOT-STARTER` | `dev.nexcraft:r2d1-spring-boot-starter` | Spring Boot 4 convenience starter |
 
@@ -32,6 +33,10 @@ dependencies {
 
 The base artifact is transitive from the filesystem, JDBC, and Micronaut integrations where the
 repository declares that relationship. Do not add every integration by default.
+
+## Quarkus extension in 1.8.0
+
+The [Quarkus extension](/docs/quarkus/) ships with R2D1 1.8.0 as `dev.nexcraft:r2d1-quarkus` and its build-time companion `dev.nexcraft:r2d1-quarkus-deployment`. The runtime artifact includes the core `dev.nexcraft:r2d1` transitively. Applications add the runtime artifact; Quarkus resolves the deployment artifact during augmentation.
 
 ## Document store backends
 

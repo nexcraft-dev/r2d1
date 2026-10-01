@@ -660,7 +660,8 @@ main {
 .module-card-jdbc { background: var(--steel); }
 .module-card-filesystem { background: var(--sage); }
 .module-card-micronaut { background: var(--salmon); }
-.module-card-spring { background: var(--yellow-sticker); }
+.module-card-spring-boot-starter { background: var(--yellow-sticker); }
+.module-card-quarkus { background: var(--peach); }
 
 .module-card h3 {
   margin: 0;

@@ -86,7 +86,8 @@ export const ui = {
           label: "INTEGRATIONS",
           links: [
             { label: "Micronaut", href: "/docs/micronaut/" },
-            { label: "Spring Boot", href: "/docs/spring/" }
+            { label: "Spring Boot", href: "/docs/spring/" },
+            { label: "Quarkus", href: "/docs/quarkus/" }
           ]
         }
       ]
@@ -150,7 +151,8 @@ export const ui = {
           label: "통합",
           links: [
             { label: "Micronaut", href: "/docs/micronaut/" },
-            { label: "Spring Boot", href: "/docs/spring/" }
+            { label: "Spring Boot", href: "/docs/spring/" },
+            { label: "Quarkus", href: "/docs/quarkus/" }
           ]
         }
       ]
@@ -214,7 +216,8 @@ export const ui = {
           label: "集成",
           links: [
             { label: "Micronaut", href: "/docs/micronaut/" },
-            { label: "Spring Boot", href: "/docs/spring/" }
+            { label: "Spring Boot", href: "/docs/spring/" },
+            { label: "Quarkus", href: "/docs/quarkus/" }
           ]
         }
       ]
@@ -278,7 +281,8 @@ export const ui = {
           label: "統合",
           links: [
             { label: "Micronaut", href: "/docs/micronaut/" },
-            { label: "Spring Boot", href: "/docs/spring/" }
+            { label: "Spring Boot", href: "/docs/spring/" },
+            { label: "Quarkus", href: "/docs/quarkus/" }
           ]
         }
       ]

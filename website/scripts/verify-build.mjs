@@ -21,6 +21,7 @@ const requiredFiles = [
   "docs/consistency/index.html",
   "docs/micronaut/index.html",
   "docs/spring/index.html",
+  "docs/quarkus/index.html",
   "404.html",
   "robots.txt"
 ];
@@ -37,7 +38,8 @@ const localizedSlugs = [
   "querying",
   "consistency",
   "micronaut",
-  "spring"
+  "spring",
+  "quarkus"
 ];
 
 for (const locale of localizedLocales) {
@@ -97,6 +99,47 @@ for (const [locale, htmlLang] of [["ko", "ko"], ["zh", "zh-CN"], ["ja", "ja"]]) 
 
   if (!localizedSpring.includes(`<h2>${localizedSpringHeading}</h2>`)) {
     throw new Error(`Localized Spring documentation is missing translated content: ${locale}`);
+  }
+}
+
+for (const locale of ["en", ...localizedLocales]) {
+  const prefix = locale === "en" ? "" : `${locale}/`;
+  const quarkus = readFileSync(join(rootPath, prefix, "docs/quarkus/index.html"), "utf8");
+  const localeHome = readFileSync(join(rootPath, prefix, "index.html"), "utf8");
+  const localeOverview = readFileSync(join(rootPath, prefix, "docs/index.html"), "utf8");
+  const heading = { en: "Enable and configure", ko: "활성화와 설정", zh: "启用与配置", ja: "有効化と設定" }[locale];
+  const status = { en: "Included in R2D1 1.8.0", ko: "R2D1 1.8.0에 포함", zh: "包含于 R2D1 1.8.0", ja: "R2D1 1.8.0 に含まれます" }[locale];
+  const dependencyHeading = { en: "Dependency requirements", ko: "의존성별 필요 여부", zh: "依赖项的适用范围", ja: "依存関係の必要範囲" }[locale];
+  const backendHeading = { en: "Filesystem + JDBC + H2 dependencies", ko: "Filesystem + JDBC + H2 선택 의존성", zh: "Filesystem + JDBC + H2 可选依赖", ja: "Filesystem + JDBC + H2 の選択依存関係" }[locale];
+  const href = `/${prefix}docs/quarkus/`;
+  for (const html of [localeHome, localeOverview]) {
+    if (!html.includes("R2D1-QUARKUS") || !html.includes(`href="${href}"`)) {
+      throw new Error(`Missing Quarkus card or locale-specific navigation: ${locale}`);
+    }
+  }
+  if (!quarkus.includes(`<h2>${heading}</h2>`) || !quarkus.includes(status)) {
+    throw new Error(`Missing localized Quarkus content or 1.8.0 release inclusion: ${locale}`);
+  }
+  if (!quarkus.includes(`<h2>${dependencyHeading}</h2>`) || !quarkus.includes(`<h3>${backendHeading}</h3>`)) {
+    throw new Error(`Missing required/optional dependency labels: ${locale}`);
+  }
+  if (quarkus.includes("Preview") || quarkus.includes("PREVIEW") || quarkus.includes("not yet published")) {
+    throw new Error(`Quarkus is incorrectly labeled as a preview: ${locale}`);
+  }
+  for (const value of [
+    `dev.nexcraft:r2d1-quarkus:${release.latestStableVersion}`,
+    "r2d1-quarkus-deployment", "quarkus.r2d1.enabled=true",
+    "quarkus.r2d1.jdbc.datasource=selected", "DocumentCodec", "3.39.5",
+    `implementation(&quot;dev.nexcraft:r2d1-quarkus:${release.latestStableVersion}&quot;)`,
+    `implementation(&quot;dev.nexcraft:r2d1-filesystem:${release.latestStableVersion}&quot;)`,
+    "quarkus-jdbc-h2", "quarkus-agroal", "core", "r2d1-quarkus-deployment"
+  ]) {
+    if (!quarkus.includes(value)) throw new Error(`Missing Quarkus contract ${value}: ${locale}`);
+  }
+  const extensionDependency = quarkus.indexOf(`dev.nexcraft:r2d1-quarkus:${release.latestStableVersion}`);
+  const optionalFilesystem = quarkus.indexOf(`dev.nexcraft:r2d1-filesystem:${release.latestStableVersion}`);
+  if (extensionDependency === -1 || optionalFilesystem < extensionDependency) {
+    throw new Error(`Quarkus extension dependency is not presented as the base dependency: ${locale}`);
   }
 }
 
