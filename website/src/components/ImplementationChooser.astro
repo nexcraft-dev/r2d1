@@ -1,0 +1,95 @@
+---
+import { localePath, type Locale } from "../i18n/config";
+
+interface Copy {
+  eyebrow: string;
+  title: string;
+  intro: string;
+  javaLabel: string;
+  javaDescription: string;
+  javaLink: string;
+  typescriptLabel: string;
+  typescriptDescription: string;
+  typescriptLink: string;
+}
+
+interface Props {
+  locale: Locale;
+}
+
+const copy: Record<Locale, Copy> = {
+  en: {
+    eyebrow: "IMPLEMENTATIONS",
+    title: "Choose your implementation.",
+    intro: "Use the Java library from Maven Central or the TypeScript package with Node.js and Cloudflare Workers.",
+    javaLabel: "JAVA / MAVEN CENTRAL",
+    javaDescription: "Java modules for Cloudflare R2 and D1, local storage, JDBC, and framework integrations.",
+    javaLink: "Java documentation →",
+    typescriptLabel: "TYPESCRIPT / NPM",
+    typescriptDescription: "A TypeScript package for Node.js and Cloudflare Workers with Java-compatible storage contracts.",
+    typescriptLink: "TypeScript overview →"
+  },
+  ko: {
+    eyebrow: "구현 버전",
+    title: "사용할 구현 버전을 선택하세요.",
+    intro: "Maven Central의 Java 라이브러리 또는 Node.js와 Cloudflare Workers용 TypeScript 패키지를 사용할 수 있습니다.",
+    javaLabel: "JAVA / MAVEN CENTRAL",
+    javaDescription: "Cloudflare R2와 D1, 로컬 저장소, JDBC, 프레임워크 통합을 위한 Java 모듈입니다.",
+    javaLink: "Java 문서 →",
+    typescriptLabel: "TYPESCRIPT / NPM",
+    typescriptDescription: "Node.js와 Cloudflare Workers를 지원하며 Java와 호환되는 저장소 규약을 사용하는 TypeScript 패키지입니다.",
+    typescriptLink: "TypeScript 개요 →"
+  },
+  zh: {
+    eyebrow: "实现版本",
+    title: "选择实现版本。",
+    intro: "可以使用 Maven Central 上的 Java 库，也可以使用面向 Node.js 和 Cloudflare Workers 的 TypeScript 包。",
+    javaLabel: "JAVA / MAVEN CENTRAL",
+    javaDescription: "提供 Cloudflare R2 与 D1、本地存储、JDBC 和框架集成的 Java 模块。",
+    javaLink: "Java 文档 →",
+    typescriptLabel: "TYPESCRIPT / NPM",
+    typescriptDescription: "面向 Node.js 和 Cloudflare Workers 的 TypeScript 包，使用与 Java 兼容的存储契约。",
+    typescriptLink: "TypeScript 概览 →"
+  },
+  ja: {
+    eyebrow: "実装",
+    title: "実装を選びます。",
+    intro: "Maven Central の Java ライブラリ、または Node.js と Cloudflare Workers 向けの TypeScript パッケージを使えます。",
+    javaLabel: "JAVA / MAVEN CENTRAL",
+    javaDescription: "Cloudflare R2 と D1、ローカルストレージ、JDBC、フレームワーク統合向けの Java モジュールです。",
+    javaLink: "Java ドキュメント →",
+    typescriptLabel: "TYPESCRIPT / NPM",
+    typescriptDescription: "Node.js と Cloudflare Workers 向けで、Java と互換性のあるストレージ契約を使う TypeScript パッケージです。",
+    typescriptLink: "TypeScript の概要 →"
+  }
+};
+
+const { locale } = Astro.props;
+const c = copy[locale];
+---
+
+<section class="section" aria-labelledby="implementation-title">
+  <div class="section-eyebrow section-eyebrow-salmon">
+    <span>{c.eyebrow}</span>
+    <h2 id="implementation-title">{c.title}</h2>
+  </div>
+  <p class="section-intro">{c.intro}</p>
+  <div class="backend-grid">
+    <article class="backend-panel backend-document">
+      <div class="backend-panel-heading">
+        <span>{c.javaLabel}</span>
+        <h3>Java</h3>
+      </div>
+      <p>{c.javaDescription}</p>
+      <a class="edition-card-link" href={localePath("/docs/getting-started/", locale)}>{c.javaLink}</a>
+    </article>
+    <article class="backend-panel backend-index">
+      <div class="backend-panel-heading">
+        <span>{c.typescriptLabel}</span>
+        <h3>TypeScript</h3>
+      </div>
+      <p>{c.typescriptDescription}</p>
+      <a class="edition-card-link" href={localePath("/typescript/", locale)}>{c.typescriptLink}</a>
+    </article>
+  </div>
+</section>

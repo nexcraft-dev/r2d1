@@ -4,23 +4,41 @@ import { ui } from "../i18n/ui";
 
 interface Props {
   locale?: Locale;
+  edition?: "java" | "typescript";
 }
 
-const { locale = "en" } = Astro.props;
+const { locale = "en", edition = "java" } = Astro.props;
 const texts = ui[locale];
 const basePath = stripLocale(Astro.url.pathname);
-const isActive = (href: string) =>
-  href === "/" ? basePath === href : basePath.startsWith(href);
+const homePath = edition === "typescript" ? "/typescript/" : "/";
+const docsPath = edition === "typescript" ? "/docs/typescript/" : "/docs/";
+const docsPrefix = edition === "typescript" ? "/docs/typescript" : "/docs";
+const startPath = edition === "typescript" ? "/docs/typescript/" : "/docs/getting-started/";
+const githubUrl = edition === "typescript"
+  ? "https://github.com/nexcraft-dev/r2d1-ts"
+  : "https://github.com/nexcraft-dev/r2d1";
 ---
 
 <a class="skip-link" href="#main-content">{texts.skip}</a>
 <header class="site-header">
   <div class="top-banner">
     <div>
-      <strong>{texts.bannerTitle}</strong>
-      <span>{texts.bannerSubtitle}</span>
+      <strong>{edition === "typescript" ? texts.typescriptBannerTitle : texts.bannerTitle}</strong>
+      <span>{edition === "typescript" ? texts.typescriptBannerSubtitle : texts.bannerSubtitle}</span>
     </div>
     <div class="top-banner-actions">
+      <nav class="implementation-switcher" aria-label={texts.implementationLabel}>
+        <a
+          class:list={{ "implementation-link": true, "is-active": edition === "java" }}
+          href={localePath("/", locale)}
+          aria-current={edition === "java" ? "true" : undefined}
+        >Java</a>
+        <a
+          class:list={{ "implementation-link": true, "is-active": edition === "typescript" }}
+          href={localePath("/typescript/", locale)}
+          aria-current={edition === "typescript" ? "true" : undefined}
+        >TypeScript</a>
+      </nav>
       <nav class="language-switcher" aria-label={texts.languageLabel}>
         {locales.map((availableLocale) => (
           <a
@@ -37,27 +55,27 @@ const isActive = (href: string) =>
   </div>
 
   <div class="site-nav-wrap">
-    <a class="brand" href={localePath("/", locale)} aria-label={`${texts.home} R2D1`}>
+    <a class="brand" href={localePath(homePath, locale)} aria-label={`${texts.home} R2D1`}>
       <img class="brand-mark" src="/r2d1-logo.png" alt="" width="52" height="52" />
       <span>R2D1</span>
     </a>
     <nav class="site-nav" aria-label={texts.docs}>
       <a
-        class:list={{ "nav-link": true, "is-active": isActive("/") }}
-        href={localePath("/", locale)}
-        aria-current={isActive("/") ? "page" : undefined}
+        class:list={{ "nav-link": true, "is-active": basePath === homePath }}
+        href={localePath(homePath, locale)}
+        aria-current={basePath === homePath ? "page" : undefined}
       >
         {texts.home}
       </a>
       <a
-        class:list={{ "nav-link": true, "is-active": isActive("/docs") }}
-        href={localePath("/docs/", locale)}
-        aria-current={isActive("/docs") ? "page" : undefined}
+        class:list={{ "nav-link": true, "is-active": basePath.startsWith(docsPrefix) }}
+        href={localePath(docsPath, locale)}
+        aria-current={basePath.startsWith(docsPrefix) ? "page" : undefined}
       >
         {texts.docs}
       </a>
-      <a class="nav-link" href="https://github.com/nexcraft-dev/r2d1" rel="noreferrer">{texts.github}</a>
+      <a class="nav-link" href={githubUrl} rel="noreferrer">{texts.github}</a>
     </nav>
-    <a class="sticker sticker-start" href={localePath("/docs/getting-started/", locale)}>{texts.getStarted}</a>
+    <a class="sticker sticker-start" href={localePath(startPath, locale)}>{texts.getStarted}</a>
   </div>
 </header>

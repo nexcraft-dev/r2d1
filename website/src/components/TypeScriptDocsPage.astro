@@ -1,0 +1,153 @@
+---
+import DocsLayout from "../layouts/DocsLayout.astro";
+import type { Locale } from "../i18n/config";
+
+interface Copy {
+  title: string;
+  description: string;
+  intro: string;
+  installTitle: string;
+  installDescription: string;
+  nodeTitle: string;
+  nodeDescription: string;
+  workersTitle: string;
+  workersDescription: string;
+  compatibilityTitle: string;
+  compatibilityDescription: string;
+  examplesTitle: string;
+  examplesDescription: string;
+  nodeExampleLink: string;
+  workersExampleLink: string;
+}
+
+const copy: Record<Locale, Copy> = {
+  en: {
+    title: "TypeScript",
+    description: "Install R2D1 for TypeScript, choose Node.js or Cloudflare Workers, and keep document formats compatible with your application.",
+    intro: "The TypeScript package provides one collection API over R2 document storage and D1 indexes. Choose the adapter for your runtime, then provide a schema and document codec.",
+    installTitle: "Install",
+    installDescription: "The package requires Node.js 22 or later for the Node.js adapters. Cloudflare Workers use the Workers subpath.",
+    nodeTitle: "Node.js",
+    nodeDescription: "Use the Node.js adapters for R2 and D1. The code below assumes you have configured r2Config, d1Config, schema, and codec.",
+    workersTitle: "Cloudflare Workers",
+    workersDescription: "Bind an R2 bucket as DOCUMENTS and a D1 database as INDEXES, then pass those bindings to the Workers adapters.",
+    compatibilityTitle: "Java data compatibility",
+    compatibilityDescription: "R2 keys, D1 tables, indexes, and cursor format follow the Java contracts. The document byte format belongs to your application: Java defines no default format. Use a TypeScript codec that writes and reads the same bytes. The jsonCodec helper is optional and does not support bigint. TypeScript long fields use bigint.",
+    examplesTitle: "Complete examples",
+    examplesDescription: "The repository includes complete Node.js, Workers, and shared codec examples.",
+    nodeExampleLink: "Node.js example →",
+    workersExampleLink: "Workers example →"
+  },
+  ko: {
+    title: "TypeScript",
+    description: "TypeScript용 R2D1을 설치하고 Node.js 또는 Cloudflare Workers를 선택한 뒤 애플리케이션의 문서 형식과 호환되게 설정하세요.",
+    intro: "TypeScript 패키지는 R2 문서 저장소와 D1 인덱스를 하나의 컬렉션 API로 연결합니다. 런타임에 맞는 어댑터를 선택하고 schema와 document codec을 전달하세요.",
+    installTitle: "설치",
+    installDescription: "Node.js 어댑터에는 Node.js 22 이상이 필요합니다. Cloudflare Workers는 Workers 하위 경로를 사용합니다.",
+    nodeTitle: "Node.js",
+    nodeDescription: "R2와 D1용 Node.js 어댑터를 사용하세요. 아래 예제에서 r2Config, d1Config, schema, codec은 미리 설정되어 있습니다.",
+    workersTitle: "Cloudflare Workers",
+    workersDescription: "R2 버킷을 DOCUMENTS로, D1 데이터베이스를 INDEXES로 바인딩한 다음 Workers 어댑터에 전달하세요.",
+    compatibilityTitle: "Java 데이터 호환성",
+    compatibilityDescription: "R2 키, D1 테이블과 인덱스, cursor 형식은 Java 규약과 호환됩니다. 문서 바이트 형식은 애플리케이션이 정합니다. Java에는 기본 형식이 없습니다. 같은 바이트를 쓰고 읽도록 TypeScript codec을 설정하세요. jsonCodec은 선택 기능이며 bigint를 지원하지 않습니다. TypeScript의 long 필드에는 bigint를 사용합니다.",
+    examplesTitle: "전체 예제",
+    examplesDescription: "저장소에는 Node.js, Workers, 공통 codec 전체 예제가 있습니다.",
+    nodeExampleLink: "Node.js 예제 →",
+    workersExampleLink: "Workers 예제 →"
+  },
+  zh: {
+    title: "TypeScript",
+    description: "安装 TypeScript 版 R2D1，选择 Node.js 或 Cloudflare Workers，并确保文档格式与应用兼容。",
+    intro: "TypeScript 包通过一个集合 API 连接 R2 文档存储和 D1 索引。选择运行时适配器，并提供 schema 与 document codec。",
+    installTitle: "安装",
+    installDescription: "Node.js 适配器需要 Node.js 22 或更高版本。Cloudflare Workers 使用 Workers 子路径。",
+    nodeTitle: "Node.js",
+    nodeDescription: "使用 Node.js 的 R2 和 D1 适配器。以下代码假定 r2Config、d1Config、schema 和 codec 已配置。",
+    workersTitle: "Cloudflare Workers",
+    workersDescription: "将 R2 bucket 绑定为 DOCUMENTS，将 D1 database 绑定为 INDEXES，然后传给 Workers 适配器。",
+    compatibilityTitle: "Java 数据兼容性",
+    compatibilityDescription: "R2 key、D1 table、index 和 cursor 格式遵循 Java 契约。文档字节格式由应用决定：Java 没有默认格式。请使用能读写相同字节的 TypeScript codec。jsonCodec 是可选项，且不支持 bigint。TypeScript 的 long 字段使用 bigint。",
+    examplesTitle: "完整示例",
+    examplesDescription: "仓库提供完整的 Node.js、Workers 和共享 codec 示例。",
+    nodeExampleLink: "Node.js 示例 →",
+    workersExampleLink: "Workers 示例 →"
+  },
+  ja: {
+    title: "TypeScript",
+    description: "TypeScript 版 R2D1 をインストールし、Node.js または Cloudflare Workers を選び、アプリケーションのドキュメント形式に合わせます。",
+    intro: "TypeScript パッケージは R2 のドキュメントストアと D1 のインデックスを1つのコレクション API で接続します。ランタイム用 adapter を選び、schema と document codec を渡します。",
+    installTitle: "インストール",
+    installDescription: "Node.js adapter には Node.js 22 以降が必要です。Cloudflare Workers では Workers の subpath を使います。",
+    nodeTitle: "Node.js",
+    nodeDescription: "R2 と D1 用の Node.js adapter を使います。下のコードでは r2Config、d1Config、schema、codec を設定済みとします。",
+    workersTitle: "Cloudflare Workers",
+    workersDescription: "R2 bucket を DOCUMENTS、D1 database を INDEXES として binding し、Workers adapter に渡します。",
+    compatibilityTitle: "Java データとの互換性",
+    compatibilityDescription: "R2 key、D1 table、index、cursor 形式は Java の契約に従います。ドキュメント bytes の形式はアプリケーションが決めます。Java に既定の形式はありません。同じ bytes を読み書きする TypeScript codec を使います。jsonCodec は任意機能で bigint に対応しません。TypeScript の long フィールドには bigint を使います。",
+    examplesTitle: "完全な例",
+    examplesDescription: "リポジトリには Node.js、Workers、共通 codec の完全な例があります。",
+    nodeExampleLink: "Node.js の例 →",
+    workersExampleLink: "Workers の例 →"
+  }
+};
+
+const { locale } = Astro.props as { locale: Locale };
+const c = copy[locale];
+const nodeExample = [
+  'import { R2D1 } from "@nexcraft-dev/r2d1";',
+  'import { NodeR2DocumentStore, NodeD1IndexStore } from "@nexcraft-dev/r2d1/node";',
+  "",
+  "const users = await new R2D1(",
+  "  new NodeR2DocumentStore(r2Config),",
+  "  new NodeD1IndexStore(d1Config),",
+  ").collection(schema, codec);",
+  "",
+  'await users.put({ id: "user-1", country: "NZ", score: 4.5 });',
+  "const page = await users",
+  '  .query().where("country").eq("NZ")',
+  '  .sortBy("score", "DESC").limit(20).fetch();'
+].join("\n");
+const workersExample = [
+  'import { R2D1 } from "@nexcraft-dev/r2d1";',
+  "import {",
+  "  WorkersR2DocumentStore,",
+  "  WorkersD1IndexStore,",
+  '} from "@nexcraft-dev/r2d1/workers";',
+  "",
+  "const users = await new R2D1(",
+  "  new WorkersR2DocumentStore(env.DOCUMENTS),",
+  "  new WorkersD1IndexStore(env.INDEXES),",
+  ").collection(schema, codec);"
+].join("\n");
+---
+
+<DocsLayout
+  title={c.title}
+  description={c.description}
+  locale={locale}
+  edition="typescript"
+>
+  <p>{c.intro}</p>
+
+  <h2>{c.installTitle}</h2>
+  <p>{c.installDescription}</p>
+  <pre class="code-block"><code class="language-bash">npm install @nexcraft-dev/r2d1</code></pre>
+
+  <h2>{c.nodeTitle}</h2>
+  <p>{c.nodeDescription}</p>
+  <pre class="code-block"><code class="language-typescript">{nodeExample}</code></pre>
+
+  <h2>{c.workersTitle}</h2>
+  <p>{c.workersDescription}</p>
+  <pre class="code-block"><code class="language-typescript">{workersExample}</code></pre>
+
+  <h2>{c.compatibilityTitle}</h2>
+  <p>{c.compatibilityDescription}</p>
+
+  <h2>{c.examplesTitle}</h2>
+  <p>{c.examplesDescription}</p>
+  <ul>
+    <li><a href="https://github.com/nexcraft-dev/r2d1-ts/blob/main/examples/node.ts" rel="noreferrer">{c.nodeExampleLink}</a></li>
+    <li><a href="https://github.com/nexcraft-dev/r2d1-ts/blob/main/examples/workers.ts" rel="noreferrer">{c.workersExampleLink}</a></li>
+  </ul>
+</DocsLayout>
