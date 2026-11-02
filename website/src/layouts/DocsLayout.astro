@@ -10,8 +10,10 @@ interface Props {
   frontmatter?: {
     title?: string;
     description?: string;
+    edition?: "java" | "typescript";
   };
   locale?: Locale;
+  edition?: "java" | "typescript";
 }
 
 const title = Astro.props.title ?? Astro.props.frontmatter?.title ?? "Documentation";
@@ -20,11 +22,12 @@ const description =
   Astro.props.frontmatter?.description ??
   "R2D1 documentation for document stores, index stores, querying, and consistency.";
 const locale = Astro.props.locale ?? "en";
+const edition = Astro.props.edition ?? Astro.props.frontmatter?.edition ?? "java";
 const texts = ui[locale];
 const currentPath = Astro.url.pathname;
 ---
 
-<SiteLayout title={`R2D1 ${texts.docsTitle} | ${title}`} description={description} locale={locale}>
+<SiteLayout title={`R2D1 ${texts.docsTitle} | ${title}`} description={description} locale={locale} edition={edition}>
   <div class="docs-mobile-nav">
     <details>
       <summary>{texts.docsMobileOpen}</summary>

@@ -1,5 +1,6 @@
 ---
 import SiteLayout from "../layouts/SiteLayout.astro";
+import ImplementationChooser from "./ImplementationChooser.astro";
 import { localePath, type Locale } from "../i18n/config";
 import release from "../data/release.json";
 
@@ -304,6 +305,8 @@ const latestStableVersion = release.latestStableVersion;
       <span>{c.heroMarkSub}</span>
     </div>
   </section>
+
+  <ImplementationChooser locale={locale} />
 
   <section class="section" aria-labelledby="backends-title">
     <div class="section-eyebrow section-eyebrow-olive">

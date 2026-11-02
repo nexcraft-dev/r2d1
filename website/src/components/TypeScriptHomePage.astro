@@ -1,0 +1,189 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import { localePath, type Locale } from "../i18n/config";
+
+interface Copy {
+  title: string;
+  description: string;
+  kicker: string;
+  start: string;
+  repository: string;
+  runtimesEyebrow: string;
+  runtimesTitle: string;
+  runtimesIntro: string;
+  nodeTitle: string;
+  nodeDescription: string;
+  nodeLink: string;
+  workersTitle: string;
+  workersDescription: string;
+  workersLink: string;
+  installEyebrow: string;
+  installTitle: string;
+  installDescription: string;
+  compatibilityTitle: string;
+  compatibilityDescription: string;
+  docsLink: string;
+}
+
+const copy: Record<Locale, Copy> = {
+  en: {
+    title: "Document storage and indexed queries for TypeScript.",
+    description: "Use one R2D1 collection API on Node.js or Cloudflare Workers. R2 stores complete documents; D1 stores a rebuildable index.",
+    kicker: "R2D1 / TYPESCRIPT",
+    start: "READ THE TYPESCRIPT GUIDE",
+    repository: "VIEW THE NPM PACKAGE",
+    runtimesEyebrow: "RUNTIME SUPPORT",
+    runtimesTitle: "Choose your runtime.",
+    runtimesIntro: "The package provides separate adapters for Node.js and Cloudflare Workers.",
+    nodeTitle: "Node.js 22+",
+    nodeDescription: "Use the Node.js R2 and D1 adapters. The R2 adapter uses the AWS S3 SDK.",
+    nodeLink: "Node.js setup →",
+    workersTitle: "Cloudflare Workers",
+    workersDescription: "Use Workers R2 and D1 bindings. Core and Workers adapters do not import Node.js modules.",
+    workersLink: "Workers setup →",
+    installEyebrow: "INSTALL",
+    installTitle: "Add the package.",
+    installDescription: "Install R2D1 from npm, then choose the adapter for your runtime.",
+    compatibilityTitle: "Compatible storage contracts.",
+    compatibilityDescription: "R2 keys, D1 schema, and cursors follow the Java contracts. Document bytes use your codec. JSON is an explicit option, not a default format.",
+    docsLink: "Read the TypeScript guide →"
+  },
+  ko: {
+    title: "TypeScript를 위한 문서 저장과 인덱스 쿼리.",
+    description: "Node.js 또는 Cloudflare Workers에서 하나의 R2D1 컬렉션 API를 사용하세요. R2는 전체 문서를 저장하고 D1은 재구축할 수 있는 인덱스를 저장합니다.",
+    kicker: "R2D1 / TYPESCRIPT",
+    start: "TYPESCRIPT 가이드 읽기",
+    repository: "NPM 패키지 보기",
+    runtimesEyebrow: "런타임 지원",
+    runtimesTitle: "런타임을 선택하세요.",
+    runtimesIntro: "패키지는 Node.js와 Cloudflare Workers용 어댑터를 제공합니다.",
+    nodeTitle: "Node.js 22 이상",
+    nodeDescription: "Node.js용 R2 및 D1 어댑터를 사용합니다. R2 어댑터는 AWS S3 SDK를 사용합니다.",
+    nodeLink: "Node.js 설정 →",
+    workersTitle: "Cloudflare Workers",
+    workersDescription: "Workers R2 및 D1 바인딩을 사용합니다. Core와 Workers 어댑터는 Node.js 모듈을 가져오지 않습니다.",
+    workersLink: "Workers 설정 →",
+    installEyebrow: "설치",
+    installTitle: "패키지를 추가하세요.",
+    installDescription: "npm에서 R2D1을 설치한 다음 런타임에 맞는 어댑터를 선택하세요.",
+    compatibilityTitle: "호환되는 저장소 규약.",
+    compatibilityDescription: "R2 키, D1 스키마, cursor는 Java 규약과 호환됩니다. 문서 바이트 형식은 codec이 정합니다. JSON은 선택 사항이며 기본 형식이 아닙니다.",
+    docsLink: "TypeScript 가이드 읽기 →"
+  },
+  zh: {
+    title: "面向 TypeScript 的文档存储与索引查询。",
+    description: "在 Node.js 或 Cloudflare Workers 上使用同一个 R2D1 集合 API。R2 保存完整文档；D1 保存可重建的索引。",
+    kicker: "R2D1 / TYPESCRIPT",
+    start: "阅读 TypeScript 指南",
+    repository: "查看 npm 包",
+    runtimesEyebrow: "运行时支持",
+    runtimesTitle: "选择运行时。",
+    runtimesIntro: "该包为 Node.js 和 Cloudflare Workers 提供独立适配器。",
+    nodeTitle: "Node.js 22+",
+    nodeDescription: "使用 Node.js R2 和 D1 适配器。R2 适配器使用 AWS S3 SDK。",
+    nodeLink: "Node.js 设置 →",
+    workersTitle: "Cloudflare Workers",
+    workersDescription: "使用 Workers R2 和 D1 绑定。Core 与 Workers 适配器不会导入 Node.js 模块。",
+    workersLink: "Workers 设置 →",
+    installEyebrow: "安装",
+    installTitle: "添加 npm 包。",
+    installDescription: "从 npm 安装 R2D1，然后选择适合运行时的适配器。",
+    compatibilityTitle: "兼容的存储契约。",
+    compatibilityDescription: "R2 键、D1 schema 和 cursor 遵循 Java 契约。文档字节格式由 codec 决定。JSON 是显式选项，不是默认格式。",
+    docsLink: "阅读 TypeScript 指南 →"
+  },
+  ja: {
+    title: "TypeScript 向けのドキュメント保存とインデックス検索。",
+    description: "Node.js または Cloudflare Workers で同じ R2D1 コレクション API を使います。R2 は完全なドキュメントを保存し、D1 は再構築できるインデックスを保存します。",
+    kicker: "R2D1 / TYPESCRIPT",
+    start: "TypeScript ガイドを読む",
+    repository: "npm パッケージを見る",
+    runtimesEyebrow: "ランタイム対応",
+    runtimesTitle: "ランタイムを選びます。",
+    runtimesIntro: "パッケージは Node.js と Cloudflare Workers 用の別々の adapter を提供します。",
+    nodeTitle: "Node.js 22 以降",
+    nodeDescription: "Node.js 用 R2 と D1 adapter を使います。R2 adapter は AWS S3 SDK を使います。",
+    nodeLink: "Node.js の設定 →",
+    workersTitle: "Cloudflare Workers",
+    workersDescription: "Workers の R2 と D1 binding を使います。Core と Workers adapter は Node.js module を import しません。",
+    workersLink: "Workers の設定 →",
+    installEyebrow: "インストール",
+    installTitle: "パッケージを追加します。",
+    installDescription: "npm から R2D1 をインストールし、ランタイムに合う adapter を選びます。",
+    compatibilityTitle: "互換性のあるストレージ契約。",
+    compatibilityDescription: "R2 key、D1 schema、cursor は Java の契約に従います。ドキュメント bytes の形式は codec が決めます。JSON は明示的な選択肢であり、既定の形式ではありません。",
+    docsLink: "TypeScript ガイドを読む →"
+  }
+};
+
+const { locale } = Astro.props as { locale: Locale };
+const c = copy[locale];
+const installCommand = "npm install @nexcraft-dev/r2d1";
+---
+
+<SiteLayout
+  title={`R2D1 TypeScript | ${c.title}`}
+  description={c.description}
+  locale={locale}
+  edition="typescript"
+>
+  <section class="hero" aria-labelledby="typescript-title">
+    <div class="hero-copy">
+      <p class="hero-kicker">{c.kicker}</p>
+      <h1 id="typescript-title">{c.title}</h1>
+      <p>{c.description}</p>
+      <div class="hero-actions">
+        <a class="button-primary" href={localePath("/docs/typescript/", locale)}>{c.start}</a>
+        <a class="button-secondary" href="https://www.npmjs.com/package/@nexcraft-dev/r2d1" rel="noreferrer">{c.repository}</a>
+      </div>
+    </div>
+    <div class="hero-mark" aria-label="TypeScript">
+      <strong>TS</strong>
+      <span>NODE.JS + WORKERS</span>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="runtimes-title">
+    <div class="section-eyebrow section-eyebrow-olive">
+      <span>{c.runtimesEyebrow}</span>
+      <h2 id="runtimes-title">{c.runtimesTitle}</h2>
+    </div>
+    <p class="section-intro">{c.runtimesIntro}</p>
+    <div class="backend-grid">
+      <article class="backend-panel backend-document">
+        <div class="backend-panel-heading">
+          <span>NODE.JS</span>
+          <h3>{c.nodeTitle}</h3>
+        </div>
+        <p>{c.nodeDescription}</p>
+        <a class="edition-card-link" href={localePath("/docs/typescript/", locale)}>{c.nodeLink}</a>
+      </article>
+      <article class="backend-panel backend-index">
+        <div class="backend-panel-heading">
+          <span>CLOUDFLARE</span>
+          <h3>{c.workersTitle}</h3>
+        </div>
+        <p>{c.workersDescription}</p>
+        <a class="edition-card-link" href={localePath("/docs/typescript/", locale)}>{c.workersLink}</a>
+      </article>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="install-title">
+    <div class="section-eyebrow section-eyebrow-sky">
+      <span>{c.installEyebrow}</span>
+      <h2 id="install-title">{c.installTitle}</h2>
+    </div>
+    <p class="section-intro">{c.installDescription}</p>
+    <pre class="code-block"><code>{installCommand}</code></pre>
+  </section>
+
+  <section class="section" aria-labelledby="compatibility-title">
+    <div class="section-eyebrow section-eyebrow-salmon">
+      <span>R2D1</span>
+      <h2 id="compatibility-title">{c.compatibilityTitle}</h2>
+    </div>
+    <p class="section-intro">{c.compatibilityDescription}</p>
+    <a href={localePath("/docs/typescript/", locale)}>{c.docsLink}</a>
+  </section>
+</SiteLayout>

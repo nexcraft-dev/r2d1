@@ -9,9 +9,10 @@ interface Props {
   description: string;
   noindex?: boolean;
   locale?: Locale;
+  edition?: "java" | "typescript";
 }
 
-const { title, description, noindex = false, locale = "en" } = Astro.props;
+const { title, description, noindex = false, locale = "en", edition = "java" } = Astro.props;
 const basePath = stripLocale(Astro.url.pathname);
 const canonical = new URL(
   localePath(basePath, locale),
@@ -52,11 +53,11 @@ const canonical = new URL(
   <body>
     <div class="site-frame">
       <div class="site-page">
-        <SiteHeader locale={locale} />
+        <SiteHeader locale={locale} edition={edition} />
         <main id="main-content">
           <slot />
         </main>
-        <SiteFooter locale={locale} />
+        <SiteFooter locale={locale} edition={edition} />
       </div>
     </div>
   </body>

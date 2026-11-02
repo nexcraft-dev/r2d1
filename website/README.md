@@ -36,6 +36,10 @@ Chinese), and `/ja/` (Japanese). The header language switcher keeps the current 
 translation exists. Each generated page includes a locale-specific canonical URL and `hreflang`
 alternates.
 
+The site covers both R2D1 implementations. Java remains at the root and under `/docs/`. The
+TypeScript landing page is at `/typescript/`, with its guide under `/docs/typescript/`. These
+routes are also generated for Korean, Simplified Chinese, and Japanese.
+
 ## Cloudflare Pages deployment
 
 The GitHub Actions workflow deploys the generated `dist/` directory to Cloudflare Pages only after

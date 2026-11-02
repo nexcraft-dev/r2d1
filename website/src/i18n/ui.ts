@@ -5,12 +5,15 @@ interface UiCopy {
   skip: string;
   bannerTitle: string;
   bannerSubtitle: string;
+  typescriptBannerTitle: string;
+  typescriptBannerSubtitle: string;
   home: string;
   docs: string;
   docsTitle: string;
   github: string;
   getStarted: string;
   languageLabel: string;
+  implementationLabel: string;
   docsMobileOpen: string;
   docsMobileClose: string;
   docsEyebrow: string;
@@ -33,12 +36,15 @@ export const ui = {
     skip: "Skip to content",
     bannerTitle: "R2D1 / JAVA MODULES",
     bannerSubtitle: "One collection API across document and index backends.",
+    typescriptBannerTitle: "R2D1 / TYPESCRIPT",
+    typescriptBannerSubtitle: "Document storage and indexed queries for Node.js and Cloudflare Workers.",
     home: "HOME",
     docs: "DOCS",
     docsTitle: "Docs",
     github: "GITHUB",
     getStarted: "GET STARTED",
     languageLabel: "Language",
+    implementationLabel: "Implementation",
     docsMobileOpen: "OPEN DOCUMENTATION NAVIGATION",
     docsMobileClose: "CLOSE DOCUMENTATION NAVIGATION",
     docsEyebrow: "R2D1 / DOCS",
@@ -53,7 +59,8 @@ export const ui = {
           label: "START HERE",
           links: [
             { label: "Overview", href: "/docs/" },
-            { label: "Getting Started", href: "/docs/getting-started/" }
+            { label: "Getting Started", href: "/docs/getting-started/" },
+            { label: "TypeScript", href: "/docs/typescript/" }
           ]
         },
         {
@@ -98,12 +105,15 @@ export const ui = {
     skip: "본문으로 건너뛰기",
     bannerTitle: "R2D1 / 자바 모듈",
     bannerSubtitle: "하나의 컬렉션 API로 문서 및 인덱스 백엔드를 연결합니다.",
+    typescriptBannerTitle: "R2D1 / TYPESCRIPT",
+    typescriptBannerSubtitle: "Node.js와 Cloudflare Workers를 위한 문서 저장 및 인덱스 쿼리입니다.",
     home: "홈",
     docs: "문서",
     docsTitle: "문서",
     github: "깃허브",
     getStarted: "시작하기",
     languageLabel: "언어",
+    implementationLabel: "구현 방식",
     docsMobileOpen: "문서 탐색 열기",
     docsMobileClose: "문서 탐색 닫기",
     docsEyebrow: "R2D1 / 문서",
@@ -118,7 +128,8 @@ export const ui = {
           label: "처음 시작",
           links: [
             { label: "개요", href: "/docs/" },
-            { label: "시작하기", href: "/docs/getting-started/" }
+            { label: "시작하기", href: "/docs/getting-started/" },
+            { label: "TypeScript", href: "/docs/typescript/" }
           ]
         },
         {
@@ -163,12 +174,15 @@ export const ui = {
     skip: "跳转到正文",
     bannerTitle: "R2D1 / Java 模块",
     bannerSubtitle: "用一个集合 API 连接文档与索引后端。",
+    typescriptBannerTitle: "R2D1 / TypeScript",
+    typescriptBannerSubtitle: "面向 Node.js 和 Cloudflare Workers 的文档存储与索引查询。",
     home: "首页",
     docs: "文档",
     docsTitle: "文档",
     github: "GitHub",
     getStarted: "开始使用",
     languageLabel: "语言",
+    implementationLabel: "实现版本",
     docsMobileOpen: "打开文档导航",
     docsMobileClose: "关闭文档导航",
     docsEyebrow: "R2D1 / 文档",
@@ -183,7 +197,8 @@ export const ui = {
           label: "从这里开始",
           links: [
             { label: "概览", href: "/docs/" },
-            { label: "开始使用", href: "/docs/getting-started/" }
+            { label: "开始使用", href: "/docs/getting-started/" },
+            { label: "TypeScript", href: "/docs/typescript/" }
           ]
         },
         {
@@ -228,12 +243,15 @@ export const ui = {
     skip: "本文へ移動",
     bannerTitle: "R2D1 / Java モジュール",
     bannerSubtitle: "1つのコレクション API でドキュメントとインデックスのバックエンドを接続します。",
+    typescriptBannerTitle: "R2D1 / TypeScript",
+    typescriptBannerSubtitle: "Node.js と Cloudflare Workers 向けのドキュメント保存とインデックス検索。",
     home: "ホーム",
     docs: "ドキュメント",
     docsTitle: "ドキュメント",
     github: "GitHub",
     getStarted: "はじめる",
     languageLabel: "言語",
+    implementationLabel: "実装",
     docsMobileOpen: "ドキュメントナビゲーションを開く",
     docsMobileClose: "ドキュメントナビゲーションを閉じる",
     docsEyebrow: "R2D1 / ドキュメント",
@@ -248,7 +266,8 @@ export const ui = {
           label: "まずはここから",
           links: [
             { label: "概要", href: "/docs/" },
-            { label: "はじめに", href: "/docs/getting-started/" }
+            { label: "はじめに", href: "/docs/getting-started/" },
+            { label: "TypeScript", href: "/docs/typescript/" }
           ]
         },
         {

@@ -177,6 +177,28 @@ img {
   justify-content: flex-end;
 }
 
+.implementation-switcher {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--ui);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.implementation-link {
+  padding: 3px 6px;
+  color: var(--canvas);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.implementation-link:hover,
+.implementation-link.is-active {
+  background: var(--yellow-sticker);
+  color: var(--ink);
+}
+
 .language-switcher {
   display: flex;
   gap: 2px;
@@ -455,6 +477,12 @@ main {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   margin-top: 24px;
+}
+
+.edition-card-link {
+  display: inline-block;
+  margin: 14px 16px 16px;
+  font-weight: 700;
 }
 
 .backend-panel {
