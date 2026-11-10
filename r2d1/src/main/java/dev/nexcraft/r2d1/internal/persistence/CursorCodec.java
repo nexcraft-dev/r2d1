@@ -10,6 +10,7 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
@@ -58,7 +59,7 @@ final class CursorCodec {
         }
         return new IndexCursor(key, sortValue);
       }
-    } catch (IllegalArgumentException | IOException failure) {
+    } catch (IllegalArgumentException | IOException | DateTimeException failure) {
       throw new IllegalArgumentException("invalid cursor", failure);
     }
   }
@@ -99,7 +100,7 @@ final class CursorCodec {
       case NONE -> Optional.empty();
       case STRING -> Optional.of(new IndexValue.StringValue(readString(input)));
       case LONG -> Optional.of(new IndexValue.LongValue(input.readLong()));
-      case DOUBLE -> Optional.of(new IndexValue.DoubleValue(input.readDouble()));
+      case DOUBLE -> Optional.of(new IndexValue.DoubleValue(readFiniteDouble(input)));
       case BOOLEAN -> Optional.of(new IndexValue.BooleanValue(readBoolean(input)));
       case TIMESTAMP ->
           Optional.of(
@@ -107,6 +108,14 @@ final class CursorCodec {
                   Instant.ofEpochSecond(input.readLong(), input.readInt())));
       default -> throw new IOException("cursor contains an unknown value type");
     };
+  }
+
+  private static double readFiniteDouble(DataInputStream input) throws IOException {
+    double value = input.readDouble();
+    if (!Double.isFinite(value)) {
+      throw new IOException("cursor contains a non-finite number");
+    }
+    return value;
   }
 
   private static boolean readBoolean(DataInputStream input) throws IOException {
